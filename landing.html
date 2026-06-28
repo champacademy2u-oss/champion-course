@@ -579,6 +579,30 @@
       submitBtn.classList.add('loading');
       submitBtn.querySelector('.btn-text').textContent = '提交中...';
 
+      // ── GitHub Pages / no backend: skip API, show success directly ──
+      if (isGitHubOrLocalFile && !apiBase) {
+        // Save lead to localStorage as a fallback record
+        try {
+          const leads = JSON.parse(localStorage.getItem('landing_leads_static') || '[]');
+          leads.unshift({ name, phone: fullPhone, industry, challenge, createdAt: new Date().toISOString() });
+          localStorage.setItem('landing_leads_static', JSON.stringify(leads));
+        } catch (_) {}
+
+        document.getElementById('formMain').classList.add('hide');
+        document.getElementById('successOverlay').classList.add('show');
+
+        setTimeout(() => {
+          const link = document.createElement('a');
+          link.href = './世界级营销100招( 流量密码2.0） .pdf';
+          link.download = '';
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+        }, 800);
+        return;
+      }
+
+      // ── Backend server mode: submit to API ──
       try {
         const res = await fetch(`${apiBase}/api/landing-leads`, {
           method: 'POST',
@@ -588,14 +612,12 @@
 
         if (!res.ok) throw new Error('Server error');
 
-        // Show success
         document.getElementById('formMain').classList.add('hide');
         document.getElementById('successOverlay').classList.add('show');
 
-        // Auto-trigger download after short delay
         setTimeout(() => {
           const link = document.createElement('a');
-          link.href = isGitHubOrLocalFile ? './世界级营销100招( 流量密码2.0） .pdf' : `${apiBase}/download-ebook`;
+          link.href = `${apiBase}/download-ebook`;
           link.download = '';
           document.body.appendChild(link);
           link.click();
