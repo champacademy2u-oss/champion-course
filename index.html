@@ -1,0 +1,709 @@
+<!doctype html>
+<html lang="zh-Hans">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Champ Academy</title>
+    <link rel="stylesheet" href="./styles.css" />
+    <link rel="manifest" href="./manifest.json" />
+  </head>
+  <body>
+    <aside class="sidebar">
+      <div class="brand">
+        <img src="logo.png" alt="Champ Academy Logo" style="width: 40px; height: 40px; object-fit: contain; border-radius: 8px;" onerror="this.style.display='none'; document.getElementById('brand-fallback').style.display='flex';">
+        <div id="brand-fallback" class="brand-mark" style="display: none;">CA</div>
+        <div>
+          <h1>Champ Academy</h1>
+          <p>Sales Follow-up System</p>
+        </div>
+      </div>
+
+      <nav class="nav">
+        <button class="nav-item active" data-view="dashboard" title="Dashboard">
+          <span>▦</span> Dashboard
+        </button>
+        <button class="nav-item" data-view="leads" title="Leads">
+          <span>☰</span> Leads
+        </button>
+        <button class="nav-item" data-view="followup" title="Follow Up">
+          <span>🎯</span> Follow Up
+        </button>
+        <button class="nav-item" data-view="courses" title="Preview Courses">
+          <span>❒</span> Preview Courses
+        </button>
+        <button class="nav-item" data-view="templates" title="Templates">
+          <span>✉</span> Templates
+        </button>
+        <a href="https://mail.google.com/mail/u/0/#inbox" target="_blank" class="nav-item" title="Open Gmail" style="text-decoration: none;">
+          <span>📧</span> Mailbox
+        </a>
+        <button class="nav-item" data-view="videos" title="Video Library">
+          <span>🎬</span> Videos
+        </button>
+        <button class="nav-item" data-view="landingLeads" title="Landing Page Leads" style="border-top: 1px solid rgba(255,255,255,0.08); margin-top: 8px; padding-top: 8px;">
+          <span>📋</span> Landing Leads
+        </button>
+      </nav>
+
+      <nav class="nav">
+        <div class="nav-folder" id="courseFolder">
+          <button class="nav-item folder-toggle" id="toggleCourseFolder" onclick="document.getElementById('courseFolder').classList.toggle('active')">
+            <span>📂</span> <strong>Course</strong>
+            <span class="arrow" style="margin-left: auto; font-size: 10px; transition: transform 0.2s;">▼</span>
+          </button>
+          <div class="folder-content">
+            <button class="nav-item sub-item" data-view="enrollments" data-course="all" title="Combined Course Report">
+              <span>📊</span> <strong>Combined Courses</strong>
+            </button>
+            <button class="nav-item sub-item" data-view="enrollments" data-course="All in 1 (无限杠杠+孙子兵法+无限引流+收网系统)" title="All in 1">
+              <span>★</span> All in 1
+            </button>
+            <button class="nav-item sub-item" data-view="enrollments" data-course="企业无限杠杠" title="企业无限杠杠">
+              <span>⚙</span> 企业无限杠杠
+            </button>
+            <button class="nav-item sub-item" data-view="enrollments" data-course="企业孙子兵法" title="企业孙子兵法">
+              <span>⚔</span> 企业孙子兵法
+            </button>
+            <button class="nav-item sub-item" data-view="enrollments" data-course="无限引流+收网系统" title="无限引流+收网系统">
+              <span>🔗</span> 无限引流+收网系统
+            </button>
+          </div>
+        </div>
+      </nav>
+
+      <div class="sidebar-note">
+        <strong>Follow-up schedule</strong>
+        <span>Day 1 · Day 3 · Day 7</span>
+      </div>
+    </aside>
+
+    <!-- Persistent data file banner -->
+    <div id="dataFileBanner" style="display:none; background: linear-gradient(90deg, #7c3aed, #4f46e5); color: #fff; padding: 10px 20px; font-size: 13px; display: flex; align-items: center; justify-content: space-between; gap: 12px;">
+      <div style="display:flex; align-items:center; gap: 10px;">
+        <span style="font-size:18px;">💾</span>
+        <div>
+          <strong id="dataFileBannerTitle">数据文件未连接</strong>
+          <span id="dataFileBannerSub" style="opacity:0.8; margin-left: 8px;">请选择或创建数据文件，保证资料永久保存</span>
+        </div>
+      </div>
+      <div style="display:flex; gap:8px;">
+        <button id="connectFileBtn" onclick="connectOrCreateDataFile()" style="background:#fff; color:#4f46e5; border:none; padding: 6px 14px; border-radius: 6px; font-weight: 700; font-size: 12px; cursor: pointer;">📂 连接数据文件</button>
+        <button onclick="document.getElementById('dataFileBanner').style.display='none'" style="background: rgba(255,255,255,0.2); color:#fff; border:none; padding: 6px 10px; border-radius: 6px; cursor: pointer; font-size: 12px;">✕ 暂时忽略</button>
+      </div>
+    </div>
+
+    <main class="app-shell">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">Sales Operations</p>
+          <h2 id="viewTitle">Dashboard</h2>
+        </div>
+        <div class="top-actions">
+          <button id="fileStorageBtn" title="数据文件状态" onclick="connectOrCreateDataFile()" style="padding: 6px 12px; font-size: 12px; font-weight: 700; border: 1px solid #cbd5e0; border-radius: 8px; background: #f8fafc; cursor:pointer; display:flex; align-items:center; gap:6px;">
+            <span id="fileStorageIcon">💾</span>
+            <span id="fileStorageLabel">连接文件</span>
+          </button>
+          <label class="text-button primary" title="Import CSV" style="padding: 8px 16px; font-size: 13px; font-weight: 700;">
+            <span>⬆</span> Import
+            <input id="csvInput" type="file" accept=".csv,.tsv,text/csv,text/tab-separated-values" style="display:none" />
+          </label>
+          <button class="text-button" id="exportBtn" title="Export Leads" style="padding: 8px 16px; font-size: 13px; font-weight: 700;">
+            <span>⬇</span> Export
+          </button>
+          <button class="text-button" id="backupBtn" title="Backup/Restore Data" style="padding: 8px 16px; font-size: 13px; font-weight: 700;">
+            <span>☁</span> Backup
+          </button>
+          <button class="text-button" id="globalPdfBtn" title="Export Total Enrollment PDF Report" onclick="generateEnrollmentPDF('all')" style="padding: 8px 16px; font-size: 13px; font-weight: 700;">
+            <span>📄</span> Report
+          </button>
+        </div>
+      </header>
+
+      <section class="view active" id="dashboardView">
+        <!-- New Performance Metrics Section -->
+        <div class="panel wide" style="margin-bottom: 25px; background: linear-gradient(135deg, #1A202C 0%, #2D3748 100%); color: white; border: none;">
+          <div class="panel-heading" style="border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 15px; flex-wrap: wrap; gap: 15px;">
+            <div style="display: flex; align-items: center; gap: 10px;">
+              <span style="font-size: 20px;">📊</span>
+              <h3 style="color: white; margin: 0;">Performance Report</h3>
+            </div>
+            <div style="display: flex; align-items: center; gap: 10px; background: rgba(255,255,255,0.1); padding: 5px 12px; border-radius: 8px;">
+              <span style="font-size: 12px; font-weight: 700; color: #a0aec0;">FILTER BY DATE</span>
+              <input type="date" id="perfStart" style="background: transparent; border: none; color: white; font-size: 13px; outline: none;">
+              <span style="color: #4a5568;">to</span>
+              <input type="date" id="perfEnd" style="background: transparent; border: none; color: white; font-size: 13px; outline: none;">
+            </div>
+          </div>
+          <div class="metrics-grid" style="grid-template-columns: repeat(3, 1fr); padding: 20px 0;">
+            <div class="metric" style="background: transparent; border-right: 1px solid rgba(255,255,255,0.1); border-radius: 0;">
+              <span style="color: #a0aec0;">Total Sales (Revenue)</span>
+              <strong id="perfRevenue" style="color: #48bb78;">RM 0.00</strong>
+            </div>
+            <div class="metric" style="background: transparent; border-right: 1px solid rgba(255,255,255,0.1); border-radius: 0;">
+              <span style="color: #a0aec0;">Total Profit</span>
+              <strong id="perfProfit" style="color: #38b2ac;">RM 0.00</strong>
+            </div>
+            <div class="metric" style="background: transparent;">
+              <span style="color: #a0aec0;">Total Closings</span>
+              <strong id="perfClosing" style="color: #6366f1;">0</strong>
+            </div>
+          </div>
+        </div>
+
+        <div class="metrics-grid">
+          <div class="metric">
+            <span>Total Leads</span>
+            <strong id="totalLeads">0</strong>
+          </div>
+          <div class="metric">
+            <span>Need Follow-up</span>
+            <strong id="dueLeads">0</strong>
+          </div>
+          <div class="metric">
+            <span>Contacted</span>
+            <strong id="contactedLeads">0</strong>
+          </div>
+          <div class="metric">
+            <span>Converted</span>
+            <strong id="convertedLeads">0</strong>
+          </div>
+        </div>
+
+        <div class="dashboard-layout">
+          <div class="panel chart-panel">
+            <div class="panel-heading">
+              <h3>7-Day Intake Trend</h3>
+            </div>
+            <div id="intakeChart" class="chart-container"></div>
+          </div>
+          <div class="panel funnel-panel">
+            <div class="panel-heading">
+              <h3>Sales Funnel</h3>
+            </div>
+            <div id="funnelChart" class="funnel-container">
+              <!-- Funnel Stages will be injected here -->
+            </div>
+          </div>
+        </div>
+
+        <div class="workspace">
+          <section class="panel wide">
+            <div class="panel-heading">
+              <h3>Today Follow-up</h3>
+              <select id="dueFilter">
+                <option value="all">All due leads</option>
+                <option value="1">Day 1</option>
+                <option value="3">Day 3</option>
+                <option value="7">Day 7</option>
+              </select>
+            </div>
+            <div id="dueList" class="lead-list empty-state"></div>
+          </section>
+
+          <section class="panel">
+            <div class="panel-heading">
+              <h3>Import Guide</h3>
+            </div>
+            <ol class="guide">
+              <li>Facebook Ads Manager export Lead Form CSV.</li>
+              <li>Click upload button and select CSV.</li>
+              <li>System only imports full_name, phone_number, email and job_title.</li>
+              <li>Use WhatsApp or Email buttons to send follow-up.</li>
+            </ol>
+          </section>
+        </div>
+      </section>
+
+      <section class="view" id="leadsView">
+        <div class="toolbar">
+          <div class="search-wrap">
+            <span>⌕</span>
+            <input id="searchInput" type="search" placeholder="Search name, phone, email, job..." />
+          </div>
+          <select id="statusFilter">
+            <option value="all">All status</option>
+            <option value="new">New</option>
+            <option value="contacted">Contacted</option>
+            <option value="interested">Interested</option>
+            <option value="converted">Converted</option>
+            <option value="not_interested">Not interested</option>
+          </select>
+          <select id="courseFilter">
+            <option value="all">All Preview Courses</option>
+          </select>
+          <button class="text-button primary" id="bulkWhatsappBtn">Bulk WhatsApp</button>
+          <button class="text-button" id="bulkEmailBtn">Bulk Email</button>
+          <div class="view-toggle">
+            <button class="active" id="tableViewBtn">Table</button>
+            <button id="kanbanViewBtn">Kanban</button>
+          </div>
+          <button class="text-button success" onclick="openNotes(null)" style="font-weight:700;">+ Add New Lead</button>
+        </div>
+
+        <div id="bulkToolbar" class="bulk-toolbar">
+          <span id="bulkCount">0 selected</span>
+          <select id="bulkStatus">
+            <option value="">Update status...</option>
+            <option value="new">New</option>
+            <option value="contacted">Contacted</option>
+            <option value="interested">Interested</option>
+            <option value="converted">Converted</option>
+            <option value="not_interested">Not interested</option>
+          </select>
+          <button class="mini-button danger" id="bulkDeleteBtn">Delete Selection</button>
+        </div>
+
+        <div class="table-wrap" id="leadTableView">
+          <table>
+            <thead>
+              <tr>
+                <th style="width: 40px"><input type="checkbox" id="selectAll"></th>
+                <th>Name</th>
+                <th>Phone</th>
+                <th>Preview Course</th>
+                <th>Email</th>
+                <th>Job</th>
+                <th>Import Date</th>
+                <th>Status</th>
+                <th>Next</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="leadTable"></tbody>
+          </table>
+        </div>
+
+        <div class="view" id="leadKanbanView">
+          <div class="kanban-board">
+            <div class="kanban-column" data-status="new">
+              <h3>New <span class="count">0</span></h3>
+              <div class="kanban-cards"></div>
+            </div>
+            <div class="kanban-column" data-status="contacted">
+              <h3>Contacted <span class="count">0</span></h3>
+              <div class="kanban-cards"></div>
+            </div>
+            <div class="kanban-column" data-status="interested">
+              <h3>Interested <span class="count">0</span></h3>
+              <div class="kanban-cards"></div>
+            </div>
+            <div class="kanban-column" data-status="converted">
+              <h3>Converted <span class="count">0</span></h3>
+              <div class="kanban-cards"></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="view" id="coursesView">
+        <div class="panel wide" style="margin-bottom: 30px;">
+          <div class="panel-heading">
+            <h3>📊 Preview Performance Log</h3>
+            <button class="text-button success" onclick="openPreviewModal()">+ Add Preview Session</button>
+          </div>
+          <div id="previewSessionList" class="preview-session-grid">
+            <!-- Preview cards populated by JS -->
+          </div>
+        </div>
+
+        <div class="panel wide">
+          <div class="panel-heading">
+            <h3>📁 Automatic Course Groups</h3>
+            <button class="text-button danger" onclick="clearAllPreviewCourses()" style="font-weight: 700;">Delete All Preview Data</button>
+          </div>
+          <div id="courseList" class="course-grid"></div>
+        </div>
+      </section>
+
+      <section class="view" id="enrollmentsView">
+        <div class="panel wide">
+          <div class="panel-heading">
+            <div>
+              <h3 id="enrollmentViewTitle">Course Enrollments</h3>
+              <div id="enrollmentStats" class="muted" style="font-size: 13px; font-weight: 600;"></div>
+            </div>
+            <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+              <div id="enrollBulkBar" style="display:none; align-items:center; gap:8px; background:var(--warn); border:1px solid #fcd34d; border-radius:8px; padding:6px 12px;">
+                <span id="enrollSelectedCount" style="font-size:13px; font-weight:700; color:var(--accent);">0 selected</span>
+                <button class="text-button danger" onclick="deleteSelectedEnrollments()" style="font-weight:700; min-height:32px; font-size:13px;">Delete Selected</button>
+                <button class="text-button" onclick="clearEnrollSelection()" style="min-height:32px; font-size:13px;">Cancel</button>
+              </div>
+              <label class="text-button" style="cursor:pointer; display:flex; align-items:center; gap:6px; font-weight:700; min-height:36px;" title="Import enrollment CSV">
+                ⬆ Import
+                <input type="file" id="enrollImportInput" accept=".csv" style="display:none" />
+              </label>
+              <button class="text-button" id="enrollExportBtn" style="font-weight:700;" title="Export enrollment CSV">⬇ Export</button>
+              <button class="text-button" id="enrollPdfBtn" style="font-weight:700; background:var(--brand); border-color:var(--brand); color:#fff;" title="Generate PDF report" onclick="generateEnrollmentPDF(state.enrollmentFilter)">📄 PDF</button>
+              <button class="text-button primary" onclick="openNotes(null)" style="font-weight: 700;">+ Add Entry</button>
+              <button class="text-button danger" id="clearCourseBtn" onclick="clearCurrentCourse()" style="font-weight: 700; display: none;">Delete All</button>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th style="width:40px"><input type="checkbox" id="enrollSelectAll" onclick="toggleSelectAllEnrollments(this)"></th>
+                  <th>Name</th>
+                  <th>Phone</th>
+                  <th>Course</th>
+                  <th>Amount (RM)</th>
+                  <th>Profit (RM)</th>
+                  <th>Payment Method</th>
+                  <th>Enrollment Date</th>
+                  <th style="width: 80px">Action</th>
+                </tr>
+              </thead>
+              <tbody id="enrollmentTable"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <section class="view" id="videosView">
+        <div class="panel wide">
+          <div class="panel-heading">
+            <div>
+              <h3>Video Library</h3>
+              <p class="muted">Add training videos, tutorials, or screen recordings.</p>
+            </div>
+            <div style="display: flex; gap: 10px;">
+              <button class="text-button" onclick="document.querySelector('#videoFileInput').click()">📂 Import Video File</button>
+              <button class="text-button primary" onclick="showAddVideoPrompt()">🔗 Add Link</button>
+              <input type="file" id="videoFileInput" accept="video/*" style="display:none" onchange="importVideoFile(event)">
+            </div>
+          </div>
+          <div id="videoGrid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 20px; padding: 20px;">
+            <!-- Videos will be injected here -->
+          </div>
+        </div>
+      </section>
+
+      <section class="view" id="templatesView">
+        <div class="template-grid">
+          <label class="template-field">
+            <span>Template 1 (Intro)</span>
+            <textarea id="waTemplate1"></textarea>
+          </label>
+          <label class="template-field">
+            <span>Template 2 (Follow-up)</span>
+            <textarea id="waTemplate2"></textarea>
+          </label>
+          <label class="template-field">
+            <span>Template 3 (Special Offer)</span>
+            <textarea id="waTemplate3"></textarea>
+          </label>
+          <label class="template-field">
+            <span>Template 4 (Checking in)</span>
+            <textarea id="waTemplate4"></textarea>
+          </label>
+          <label class="template-field">
+            <span>Template 5 (Success Story)</span>
+            <textarea id="waTemplate5"></textarea>
+          </label>
+          <label class="template-field">
+            <span>Template 6 (Call Invitation)</span>
+            <textarea id="waTemplate6"></textarea>
+          </label>
+          <label class="template-field">
+            <span>Template 7 (Extra Details)</span>
+            <textarea id="waTemplate7"></textarea>
+          </label>
+          <label class="template-field">
+            <span>Template 8 (Group Invite)</span>
+            <textarea id="waTemplate8"></textarea>
+          </label>
+          <label class="template-field">
+            <span>Template 9 (Early Bird)</span>
+            <textarea id="waTemplate9"></textarea>
+          </label>
+          <label class="template-field">
+            <span>Template 10 (Welcome)</span>
+            <textarea id="waTemplate10"></textarea>
+          </label>
+          <label class="template-field full">
+            <span>Bulk WhatsApp Message</span>
+            <textarea id="bulkWhatsapp"></textarea>
+          </label>
+          <label class="template-field">
+            <span>Email Subject</span>
+            <input id="emailSubject" type="text" />
+          </label>
+          <label class="template-field full">
+            <span>Email Body</span>
+            <textarea id="emailBody"></textarea>
+          </label>
+        </div>
+        <button class="text-button primary" id="saveTemplatesBtn">Save Templates</button>
+      </section>
+
+      <section id="followupView" class="view">
+        <div class="card">
+          <div class="card-header" style="display:flex; justify-content:space-between; align-items:center;">
+            <div>
+              <h3>🎯 Quality Follow-up Pipeline</h3>
+              <p class="muted">Leads identified as high-priority or in active negotiation.</p>
+            </div>
+            <button class="text-button" style="background:#e8590c; border-color:#e8590c; color:#fff; font-weight:700;" onclick="openNotes(null)">+ Add Hot Lead</button>
+          </div>
+          <div id="followupList" class="followup-grid">
+            <!-- Follow-up cards populated by JS -->
+          </div>
+        </div>
+      </section>
+
+      <!-- ── LANDING LEADS ADMIN VIEW ── -->
+      <section class="view" id="landingLeadsView">
+        <div class="panel wide">
+          <div class="panel-heading">
+            <div>
+              <h3>📋 Landing Page Leads</h3>
+              <p class="muted" style="font-size:13px; margin-top:4px;">电子书领取名单 — 客户填写后自动记录</p>
+            </div>
+            <div style="display:flex; gap:10px; align-items:center;">
+              <button class="text-button" id="refreshLandingLeadsBtn" onclick="loadLandingLeads()" style="font-weight:700;">🔄 刷新</button>
+              <button class="text-button" id="exportLandingLeadsBtn" onclick="exportLandingLeadsCSV()" style="font-weight:700;">⬇ Export CSV</button>
+              <a href="http://localhost:4175/landing" target="_blank" class="text-button primary" style="text-decoration:none; font-weight:700; display:inline-flex; align-items:center; gap:6px;">🔗 打开Landing Page</a>
+            </div>
+          </div>
+
+          <!-- Stats bar -->
+          <div id="landingLeadsStats" style="display:flex; gap:20px; padding: 16px 0; border-bottom: 1px solid var(--line); margin-bottom: 16px; flex-wrap:wrap;"></div>
+
+          <!-- Table -->
+          <div class="table-wrap">
+            <table id="landingLeadsTable">
+              <thead>
+                <tr>
+                  <th style="width:40px">#</th>
+                  <th>姓名</th>
+                  <th>电话</th>
+                  <th>工作领域</th>
+                  <th>面对的挑战</th>
+                  <th>提交时间</th>
+                  <th style="width:100px">操作</th>
+                </tr>
+              </thead>
+              <tbody id="landingLeadsBody">
+                <tr><td colspan="7" style="text-align:center; color:var(--muted); padding:40px;">正在加载...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+    </main>
+
+    <div id="notesModal" class="modal-overlay">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3 id="modalName">Lead Notes</h3>
+          <button class="icon-button" id="closeModal">✕</button>
+        </div>
+        <div class="modal-body">
+          <div id="newLeadFields" style="display: none; margin-bottom: 20px; border-bottom: 1px solid var(--line); padding-bottom: 10px;">
+             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px;">
+                <label class="template-field">
+                  <span>Name</span>
+                  <input type="text" id="nameInput" placeholder="Lead Name" />
+                </label>
+                <label class="template-field">
+                  <span>Phone Number</span>
+                  <input type="text" id="phoneInput" placeholder="601..." />
+                </label>
+             </div>
+          </div>
+          <div class="enrollment-section" style="background: var(--soft); padding: 12px; border-radius: 8px; margin-bottom: 16px;">
+            <label class="template-field" style="margin-bottom: 12px;">
+              <span style="font-weight: 700; font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--brand);">Enrollment Details</span>
+            </label>
+            <label class="template-field" style="margin-bottom: 12px;">
+              <span>Enrolled Preview Course</span>
+              <select id="courseInput">
+                <option value="">None / Other</option>
+                <option value="All in 1 (无限杠杠+孙子兵法+无限引流+收网系统)">All in 1 (无限杠杠+孙子兵法+无限引流+收网系统)</option>
+                <option value="企业无限杠杠">企业无限杠杠</option>
+                <option value="企业孙子兵法">企业孙子兵法</option>
+                <option value="无限引流+收网系统">无限引流+收网系统</option>
+              </select>
+            </label>
+            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin-bottom: 12px;">
+              <label class="template-field">
+                <span>Amount (RM)</span>
+                <input type="number" id="amountInput" placeholder="0.00" />
+              </label>
+              <label class="template-field">
+                <span>Profit (RM)</span>
+                <input type="number" id="profitInput" placeholder="0.00" />
+              </label>
+              <label class="template-field">
+                <span>Payment Method</span>
+                <select id="paymentMethodInput">
+                  <option value="">Select method...</option>
+                  <option value="Online Transfer">Online Transfer</option>
+                  <option value="Credit card">Credit card</option>
+                  <option value="IPP分期">IPP分期</option>
+                  <option value="E-wallet">E-wallet</option>
+                  <option value="BNPL">BNPL</option>
+                </select>
+              </label>
+            </div>
+            <label class="template-field">
+              <span>Enrollment Date</span>
+              <input type="date" id="enrollmentDateInput" />
+            </label>
+          </div>
+
+          <!-- FOLLOW UP STRATEGY -->
+          <div class="followup-section" style="background: #fff8f1; padding: 12px; border-radius: 8px; border: 1px solid #ffe8cc; margin-bottom: 16px;">
+            <label class="template-field" style="margin-bottom: 8px;">
+              <span style="font-weight: 700; font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: #e8590c;">Follow-up Priority & Action</span>
+            </label>
+            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px;">
+              <label class="template-field">
+                <span>Quality / Stage</span>
+                <select id="followupStage">
+                  <option value="">-- No Specific Stage --</option>
+                  <option value="high">🔥 Hot Lead (High Quality)</option>
+                  <option value="trial">🧪 Requesting Trial</option>
+                  <option value="proposal">📄 Reviewing Proposal</option>
+                  <option value="negotiation">🤝 Price Negotiation</option>
+                  <option value="closing">✍️ Closing Stage</option>
+                </select>
+              </label>
+              <label class="template-field">
+                <span>Member Level</span>
+                <select id="memberLevel">
+                  <option value="">-- No Level --</option>
+                  <option value="brown">🟫 Brown</option>
+                  <option value="silver1">🥈 Silver Level 1</option>
+                  <option value="silver2">🔘 Silver Level 2</option>
+                  <option value="gold1">🥇 Gold Level 1</option>
+                  <option value="gold2">👑 Gold Level 2</option>
+                  <option value="vip">💎 VIP</option>
+                </select>
+              </label>
+              <label class="template-field">
+                <span>Next Action Plan</span>
+                <input type="text" id="followupAction" placeholder="e.g. Call back on Friday" />
+              </label>
+            </div>
+          </div>
+          <div class="quick-replies" style="margin-bottom: 12px; display: flex; gap: 8px; align-items: center;">
+            <span class="muted" style="font-size: 12px; font-weight: 700;">QUICK WA:</span>
+            <button class="mini-button" onclick="triggerWhatsapp(state.editingLeadId, 1)">1</button>
+            <button class="mini-button" onclick="triggerWhatsapp(state.editingLeadId, 2)">2</button>
+            <button class="mini-button" onclick="triggerWhatsapp(state.editingLeadId, 3)">3</button>
+            <button class="mini-button" onclick="triggerWhatsapp(state.editingLeadId, 4)">4</button>
+            <button class="mini-button" onclick="triggerWhatsapp(state.editingLeadId, 5)">5</button>
+            <button class="mini-button" onclick="triggerWhatsapp(state.editingLeadId, 6)">6</button>
+            <button class="mini-button" onclick="triggerWhatsapp(state.editingLeadId, 7)">7</button>
+            <button class="mini-button" onclick="triggerWhatsapp(state.editingLeadId, 8)">8</button>
+            <button class="mini-button" onclick="triggerWhatsapp(state.editingLeadId, 9)">9</button>
+            <button class="mini-button" onclick="triggerWhatsapp(state.editingLeadId, 10)">10</button>
+          </div>
+          <textarea id="noteInput" placeholder="Add a note or update interaction history..." style="width:100%; min-height: 120px;"></textarea>
+          <div id="leadTimeline" class="timeline"></div>
+        </div>
+        <div class="modal-footer">
+          <button class="text-button" id="cancelNote">Cancel</button>
+          <button class="text-button primary" id="saveNote">Save Note</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="backupModal" class="modal-overlay">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3>Cloud Backup & Restore</h3>
+          <button class="icon-button" id="closeBackup">✕</button>
+        </div>
+        <div class="modal-body">
+          <p class="muted">Download all leads, templates, and notes as a JSON file or restore from a previous backup.</p>
+          <div style="display: flex; flex-direction: column; gap: 12px; margin-top: 20px;">
+            <button class="text-button primary" id="downloadBackupBtn">Download Full JSON Backup</button>
+            <label class="text-button" style="display: flex; align-items: center; justify-content: center; cursor: pointer; border: 1px solid #cbd5e0;">
+              Restore from JSON File
+              <input type="file" id="restoreInput" accept=".json" style="display:none">
+            </label>
+            <hr style="margin: 10px 0; border: none; border-top: 1px solid #e2e8f0;" />
+            <button class="text-button" id="restoreLastDeletedBtn" style="color: #c53030; border-color: #feb2b2;">Restore Last Deleted Leads</button>
+            <button class="text-button" id="deepScanBtn" style="color: #6366f1; border-color: #c7d2fe;">Deep Scan (Aggressive Recovery)</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="previewModal" class="modal-overlay">
+      <div class="modal-content" style="max-width: 600px;">
+        <div class="modal-header">
+          <h3 id="previewModalTitle">Add Preview Performance Log</h3>
+          <button class="icon-button" onclick="closePreviewModal()">✕</button>
+        </div>
+        <div class="modal-body">
+          <div id="previewForm">
+            <input type="hidden" id="previewEditId" />
+            <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 12px; margin-bottom: 20px;">
+              <label class="template-field">
+                <span>Preview Session Name</span>
+                <input type="text" id="prevTitle" placeholder="e.g. Marketing Preview Jan 20" />
+              </label>
+              <label class="template-field">
+                <span>Event Date</span>
+                <input type="date" id="prevDate" />
+              </label>
+            </div>
+            
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 20px;">
+              <label class="template-field">
+                <span>Ad Spend (RM)</span>
+                <input type="number" id="prevAdSpend" placeholder="0.00" step="0.01" />
+              </label>
+              <label class="template-field">
+                <span>Total Leads</span>
+                <input type="number" id="prevLeads" placeholder="0" />
+              </label>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 20px;">
+              <label class="template-field">
+                <span>Joined WA Group</span>
+                <input type="number" id="prevWa" placeholder="0" />
+              </label>
+              <label class="template-field">
+                <span>Entered Zoom</span>
+                <input type="number" id="prevZoom" placeholder="0" />
+              </label>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 2fr; gap: 12px; margin-bottom: 20px;">
+              <label class="template-field">
+                <span>Sales (Conversions)</span>
+                <input type="number" id="prevConver" placeholder="0" />
+              </label>
+              <label class="template-field">
+                <span>Product / Course Name</span>
+                <input type="text" id="prevProduct" placeholder="e.g. Masterclass Silver" />
+              </label>
+            </div>
+            
+            <label class="template-field" style="margin-bottom: 20px;">
+              <span>Total Revenue (RM)</span>
+              <input type="number" id="prevRevenue" placeholder="0.00" step="0.01" />
+            </label>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="text-button" onclick="closePreviewModal()">Cancel</button>
+          <button class="text-button primary" onclick="savePreviewSession()">Save Performance Log</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="toast" class="toast"></div>
+    <script src="./jspdf.umd.min.js"></script>
+    <script src="./jspdf.plugin.autotable.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <script src="./app.js"></script>
+  </body>
+</html>

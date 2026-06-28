@@ -1,0 +1,17 @@
+{
+  "name": "Lead Center CRM",
+  "short_name": "LeadCenter",
+  "description": "Professional Facebook Lead follow-up system",
+  "start_url": "index.html",
+  "display": "standalone",
+  "background_color": "#f4f6f8",
+  "theme_color": "#0f766e",
+  "icons": [
+    {
+      "src": "https://cdn-icons-png.flaticon.com/512/2983/2983067.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

@@ -1,0 +1,5 @@
+created_time,full_name,phone_number,email,job_title,campaign_name
+2026-06-04 10:15:00,Ali Tan,+60123456789,ali@example.com,Business Owner,June Campaign
+2026-06-04 11:30:00,Ali Tan,,ali.backup@example.com,,Duplicate Test
+2026-06-02 15:40:00,Mei Wong,+60198765432,mei@example.com,Teacher,June Campaign
+2026-05-29 09:20:00,Raj Kumar,+60111111111,raj@example.com,Sales Manager,Retargeting

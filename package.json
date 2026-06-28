@@ -1,0 +1,18 @@
+{
+  "name": "champion-course-lead-center",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js",
+    "check:config": "node scripts/check-config.js",
+    "meta:subscribe-pages": "node scripts/subscribe-pages.js",
+    "test": "node --test"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.7",
+    "googleapis": "^144.0.0"
+  },
+  "devDependencies": {}
+}
