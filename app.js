@@ -2581,93 +2581,69 @@ if (elements.deepScanBtn) {
 
 // Auto-load backup from server if localStorage is empty or version param ?v=X is present
 async function autoLoadBackupFromServer() {
-  const urlParams = new URLSearchParams(window.location.search);
-  const version = urlParams.get('v');
-  const localLeadsCount = state.leads.length;
+  const BACKUP_URL = './lead-center-full-backup-2026-06-28.json';
+  const BACKUP_VER_KEY = 'lead_center_backup_last_loaded';
   
-  const lastImportedVerKey = "lead_center_last_imported_version";
-  const lastImportedVer = localStorage.getItem(lastImportedVerKey);
-  
-  const shouldLoad = !localLeadsCount || (version && version !== lastImportedVer);
-  if (!shouldLoad) return;
-  
+  // Track which backup file we last loaded so we don't reload on every page view.
+  // Change the value below when you upload a newer backup file.
+  const BACKUP_ID = '2026-06-28';
+  const alreadyLoaded = localStorage.getItem(BACKUP_VER_KEY);
+  if (alreadyLoaded === BACKUP_ID) return; // already loaded this exact backup
+
   try {
-    const backupUrl = './lead-center-full-backup-2026-06-28.json';
-    const response = await fetch(backupUrl);
+    const response = await fetch(BACKUP_URL);
     if (!response.ok) {
-      console.warn("Server backup file not found:", backupUrl);
+      console.warn('[Backup] File not found:', BACKUP_URL);
       return;
     }
     const data = await response.json();
-    if (data && typeof data === 'object') {
-      let importedCount = 0;
-      if (Array.isArray(data.leads) && data.leads.length > 0) {
-        const incomingLeads = data.leads.map(sanitizeLead);
-        state.leads = mergeDuplicateLeads([...state.leads, ...incomingLeads]);
-        saveJson(storageKeys.leads, state.leads);
-        importedCount = incomingLeads.length;
-      }
-      if (data.templates) {
-        state.templates = { ...state.templates, ...data.templates };
-        saveJson(storageKeys.templates, state.templates);
-      }
-      if (Array.isArray(data.previews)) {
-        state.previews = data.previews;
-        saveJson(storageKeys.previews, state.previews);
-      }
-      if (Array.isArray(data.videos)) {
-        state.videos = data.videos;
-        saveJson(storageKeys.videos, state.videos);
-      }
-      if (Array.isArray(data.customGroups)) {
-        localStorage.setItem("lead_center_custom_groups", JSON.stringify(data.customGroups));
-      }
-      if (Array.isArray(data.courseOrder)) {
-        localStorage.setItem("lead_center_course_order", JSON.stringify(data.courseOrder));
-      }
-      
-      // Update last imported version
-      if (version) {
-        localStorage.setItem(lastImportedVerKey, version);
-      }
-      
-      // Hide banner if leads loaded
-      const banner = document.getElementById("dataFileBanner");
-      if (banner && state.leads.length > 0) {
-        banner.style.display = "none";
-      }
-      
-      fillForms();
-      render();
-      toast(`✅ 成功自动载入云端备份，恢复了 ${importedCount} 条客户记录`);
+    if (!data || typeof data !== 'object') return;
+
+    let importedCount = 0;
+    if (Array.isArray(data.leads) && data.leads.length > 0) {
+      // Merge incoming with any existing local leads, deduplicating by id
+      const incomingLeads = data.leads.map(sanitizeLead);
+      state.leads = mergeDuplicateLeads([...incomingLeads, ...state.leads]);
+      saveJson(storageKeys.leads, state.leads);
+      importedCount = data.leads.length;
+    }
+    if (data.templates) {
+      state.templates = { ...state.templates, ...data.templates };
+      saveJson(storageKeys.templates, state.templates);
+    }
+    if (Array.isArray(data.previews) && data.previews.length > 0) {
+      state.previews = data.previews;
+      saveJson(storageKeys.previews, state.previews);
+    }
+    if (Array.isArray(data.videos) && data.videos.length > 0) {
+      state.videos = data.videos;
+      saveJson(storageKeys.videos, state.videos);
+    }
+    if (Array.isArray(data.customGroups)) {
+      localStorage.setItem('lead_center_custom_groups', JSON.stringify(data.customGroups));
+    }
+    if (Array.isArray(data.courseOrder)) {
+      localStorage.setItem('lead_center_course_order', JSON.stringify(data.courseOrder));
+    }
+
+    // Mark this backup version as loaded so it won't reload on next visit
+    localStorage.setItem(BACKUP_VER_KEY, BACKUP_ID);
+
+    fillForms();
+    render();
+    if (importedCount > 0) {
+      toast(`✅ 数据已就绪，共 ${importedCount} 条客户记录`);
     }
   } catch (err) {
-    console.error("Auto load backup error:", err);
+    console.error('[Backup] Load error:', err);
   }
 }
 
 initPerformanceFilters();
 fillForms();
 render();
-autoLoadBackupFromServer(); // Load from cloud storage backup if local storage is empty
+autoLoadBackupFromServer();
 
-// Show file storage banner on startup
-(function showStartupBanner() {
-  const banner = document.getElementById("dataFileBanner");
-  const hasLocalData = state.leads.length > 0;
-  if (!banner) return;
-
-  if (!hasLocalData) {
-    banner.style.display = "flex";
-    const title = document.getElementById("dataFileBannerTitle");
-    const sub = document.getElementById("dataFileBannerSub");
-    if (title) title.textContent = "⚠️ 未找到客户资料";
-    if (sub) sub.textContent = "您之前保存过数据文件吗？点击「连接数据文件」来恢复您的客户资料。";
-  } else {
-    banner.style.display = "none";
-  }
-  updateFileStorageBtnUI(false, null);
-})();
 
 // ──────────────────────────────────────────────────────
 // Landing Page Leads Admin Functions
