@@ -61,6 +61,17 @@ const server = http.createServer(async (req, res) => {
     const url = new URL(req.url, `http://${req.headers.host}`);
     const pathname = url.pathname;
 
+    // ── CORS preflight ──
+    if (req.method === "OPTIONS") {
+      res.writeHead(204, {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+        "Access-Control-Allow-Headers": "Content-Type",
+        "Access-Control-Max-Age": "86400",
+      });
+      return res.end();
+    }
+
     // ── Health check ──
     if (req.method === "GET" && pathname === "/health") {
       return sendJson(res, 200, { ok: true });
@@ -438,6 +449,11 @@ function serveFile(res, filePath, contentType) {
 }
 
 function sendJson(res, status, body) {
-  res.writeHead(status, { "Content-Type": "application/json" });
+  res.writeHead(status, { 
+    "Content-Type": "application/json",
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type"
+  });
   res.end(JSON.stringify(body));
 }

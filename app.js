@@ -1183,7 +1183,14 @@ function renderEnrollments() {
       return `
       <tr class="${state.enrollSelectedIds.has(l.id) ? 'selected-row' : ''}">
         <td><input type="checkbox" class="enroll-cb" data-id="${l.id}" ${checked} onchange="toggleEnrollSelect(this)"></td>
-        <td><strong>${escapeHtml(l.name)}</strong></td>
+        <td>
+          <strong>${escapeHtml(l.name)}</strong>
+          <div class="mobile-subtitle" style="display:none; font-size:11px; color:#718096; margin-top:4px; line-height:1.4;">
+            <div>📚 ${escapeHtml(l.course)}</div>
+            <div>💰 Profit: ${l.profit ? `RM ${parseFloat(l.profit).toFixed(2)}` : "-"} (${escapeHtml(l.paymentMethod || "Other")})</div>
+            <div class="muted">${l.enrollmentDate ? formatDate(l.enrollmentDate) : "-"}</div>
+          </div>
+        </td>
         <td><span class="muted">${escapeHtml(l.phone || "-")}</span></td>
         <td><span class="badge" style="background:var(--soft); font-size:11px">${escapeHtml(l.course)}</span></td>
         <td style="font-family: monospace; font-weight: 700;">${l.amountPaid ? `RM ${parseFloat(l.amountPaid).toFixed(2)}` : "-"}</td>
@@ -1413,6 +1420,11 @@ function renderLeadTable() {
             <td>
               <strong>${highlight(lead.name)}</strong>
               ${lead.memberLevel ? `<span class="badge level-${lead.memberLevel}" style="margin-left: 5px;">${lead.memberLevel.toUpperCase()}</span>` : ""}
+              <div class="mobile-subtitle" style="display:none; font-size:11px; color:#718096; margin-top:4px; line-height:1.4;">
+                <div>📚 ${escapeHtml(lead.course || "General Preview")}</div>
+                ${lead.job ? `<div>💼 ${escapeHtml(lead.job)}</div>` : ''}
+                ${step ? `<div>🎯 Next: Day ${step}</div>` : ''}
+              </div>
             </td>
             <td>${highlight(lead.phone || "-")}</td>
             <td><span class="badge" style="background:var(--soft); font-size:10px">${escapeHtml(lead.course || "General Preview")}</span></td>
@@ -2567,9 +2579,77 @@ if (elements.deepScanBtn) {
   elements.deepScanBtn.addEventListener("click", deepScanRecovery);
 }
 
+// Auto-load backup from server if localStorage is empty or version param ?v=X is present
+async function autoLoadBackupFromServer() {
+  const urlParams = new URLSearchParams(window.location.search);
+  const version = urlParams.get('v');
+  const localLeadsCount = state.leads.length;
+  
+  const lastImportedVerKey = "lead_center_last_imported_version";
+  const lastImportedVer = localStorage.getItem(lastImportedVerKey);
+  
+  const shouldLoad = !localLeadsCount || (version && version !== lastImportedVer);
+  if (!shouldLoad) return;
+  
+  try {
+    const backupUrl = './lead-center-full-backup-2026-06-28.json';
+    const response = await fetch(backupUrl);
+    if (!response.ok) {
+      console.warn("Server backup file not found:", backupUrl);
+      return;
+    }
+    const data = await response.json();
+    if (data && typeof data === 'object') {
+      let importedCount = 0;
+      if (Array.isArray(data.leads) && data.leads.length > 0) {
+        const incomingLeads = data.leads.map(sanitizeLead);
+        state.leads = mergeDuplicateLeads([...state.leads, ...incomingLeads]);
+        saveJson(storageKeys.leads, state.leads);
+        importedCount = incomingLeads.length;
+      }
+      if (data.templates) {
+        state.templates = { ...state.templates, ...data.templates };
+        saveJson(storageKeys.templates, state.templates);
+      }
+      if (Array.isArray(data.previews)) {
+        state.previews = data.previews;
+        saveJson(storageKeys.previews, state.previews);
+      }
+      if (Array.isArray(data.videos)) {
+        state.videos = data.videos;
+        saveJson(storageKeys.videos, state.videos);
+      }
+      if (Array.isArray(data.customGroups)) {
+        localStorage.setItem("lead_center_custom_groups", JSON.stringify(data.customGroups));
+      }
+      if (Array.isArray(data.courseOrder)) {
+        localStorage.setItem("lead_center_course_order", JSON.stringify(data.courseOrder));
+      }
+      
+      // Update last imported version
+      if (version) {
+        localStorage.setItem(lastImportedVerKey, version);
+      }
+      
+      // Hide banner if leads loaded
+      const banner = document.getElementById("dataFileBanner");
+      if (banner && state.leads.length > 0) {
+        banner.style.display = "none";
+      }
+      
+      fillForms();
+      render();
+      toast(`✅ 成功自动载入云端备份，恢复了 ${importedCount} 条客户记录`);
+    }
+  } catch (err) {
+    console.error("Auto load backup error:", err);
+  }
+}
+
 initPerformanceFilters();
 fillForms();
 render();
+autoLoadBackupFromServer(); // Load from cloud storage backup if local storage is empty
 
 // Show file storage banner on startup
 (function showStartupBanner() {
@@ -2598,8 +2678,11 @@ window.loadLandingLeads = async function() {
   const statsBar = document.getElementById('landingLeadsStats');
   if (!tbody) return;
 
+  const apiBase = (window.CONFIG && window.CONFIG.API_BASE_URL) || '';
+  const isLocalStorageOrDevMode = window.location.protocol === 'file:' && !apiBase;
+
   // ── Detect file:// mode ──
-  if (window.location.protocol === 'file:') {
+  if (isLocalStorageOrDevMode) {
     if (statsBar) statsBar.innerHTML = '';
     tbody.innerHTML = `
       <tr><td colspan="7" style="padding:0;">
@@ -2608,23 +2691,15 @@ window.loadLandingLeads = async function() {
           <h3 style="font-size:18px; font-weight:800; margin-bottom:10px;">请通过服务器访问</h3>
           <p style="color:var(--muted); font-size:14px; line-height:1.7; margin-bottom:20px;">
             你目前是用 <code style="background:rgba(255,255,255,0.08);padding:2px 8px;border-radius:5px;">file://</code> 方式直接打开文件。<br/>
-            Landing Leads 功能需要通过服务器才能使用。
+            Landing Leads 功能需要通过服务器或配置远程 API URL 才能使用。
           </p>
           <div style="display:flex; flex-direction:column; gap:10px; align-items:center;">
             <div style="background:rgba(0,0,0,0.3); border:1px solid rgba(255,255,255,0.1); border-radius:10px; padding:12px 24px; font-family:monospace; font-size:15px; letter-spacing:0.03em;">
-              <span style="color:#a0aec0;">步骤1：</span> 开启终端，运行 <strong style="color:#F5A623;">npm start</strong>
+              <span style="color:#a0aec0;">选项A：</span> 开启终端，运行 <strong style="color:#F5A623;">npm start</strong> 并访问录入管理
             </div>
             <div style="background:rgba(0,0,0,0.3); border:1px solid rgba(255,255,255,0.1); border-radius:10px; padding:12px 24px; font-family:monospace; font-size:15px; letter-spacing:0.03em;">
-              <span style="color:#a0aec0;">步骤2：</span> 用浏览器打开 <a href="http://localhost:4175" target="_blank" style="color:#7C3AED; font-weight:700;">http://localhost:4175</a>
+              <span style="color:#a0aec0;">选项B：</span> 在 <strong style="color:#7C3AED;">config.js</strong> 中设置其托管服务的 API_BASE_URL
             </div>
-          </div>
-          <div style="margin-top:20px; display:flex; gap:12px; justify-content:center; flex-wrap:wrap;">
-            <a href="http://localhost:4175" target="_blank" style="background:linear-gradient(135deg,#7C3AED,#A855F7); color:#fff; border:none; padding:12px 28px; border-radius:10px; font-weight:700; font-size:14px; text-decoration:none; cursor:pointer;">
-              🚀 打开管理系统（服务器版）
-            </a>
-            <a href="http://localhost:4175/landing" target="_blank" style="background:linear-gradient(135deg,#F5A623,#FF8C42); color:#000; border:none; padding:12px 28px; border-radius:10px; font-weight:700; font-size:14px; text-decoration:none; cursor:pointer;">
-              🎯 打开 Landing Page
-            </a>
           </div>
         </div>
       </td></tr>`;
@@ -2634,7 +2709,7 @@ window.loadLandingLeads = async function() {
   tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:40px;color:var(--muted)">⏳ 加载中...</td></tr>`;
 
   try {
-    const res = await fetch('/api/landing-leads');
+    const res = await fetch(`${apiBase}/api/landing-leads`);
     if (!res.ok) throw new Error('Cannot reach server');
     const { leads, total } = await res.json();
 
@@ -2692,18 +2767,20 @@ window.loadLandingLeads = async function() {
       `;
     }).join('');
   } catch (err) {
-    tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:40px;color:#ef4444;">⚠️ 无法连接服务器<br/><small>请确保服务器正在运行（npm start）</small></td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:40px;color:#ef4444;">⚠️ 无法连接服务器<br/><small>请确保服务器正在运行且可以连接</small></td></tr>`;
     if (statsBar) statsBar.innerHTML = '';
   }
 };
 
 window.exportLandingLeadsCSV = async function() {
-  if (window.location.protocol === 'file:') {
-    alert('请通过 http://localhost:4175 访问管理系统，再使用导出功能。');
+  const apiBase = (window.CONFIG && window.CONFIG.API_BASE_URL) || '';
+  const isLocalStorageOrDevMode = window.location.protocol === 'file:' && !apiBase;
+  if (isLocalStorageOrDevMode) {
+    alert('请通过管理系统（服务器版）访问，或在 config.js 指定 API_BASE_URL 再使用导出功能。');
     return;
   }
   try {
-    const res = await fetch('/api/landing-leads');
+    const res = await fetch(`${apiBase}/api/landing-leads`);
     if (!res.ok) throw new Error('Server error');
     const { leads } = await res.json();
     if (!leads.length) { toast('暂时没有数据可以导出'); return; }

@@ -854,13 +854,59 @@ tr:last-child td {
   }
 }
 
+@media (max-width: 768px) {
+  .mobile-subtitle {
+    display: block !important;
+  }
+
+  /* Leads Table hides: Course (4), Email (5), Job (6), Import Date (7), Next (9) */
+  #leadTableView table th:nth-child(4), #leadTableView table td:nth-child(4),
+  #leadTableView table th:nth-child(5), #leadTableView table td:nth-child(5),
+  #leadTableView table th:nth-child(6), #leadTableView table td:nth-child(6),
+  #leadTableView table th:nth-child(7), #leadTableView table td:nth-child(7),
+  #leadTableView table th:nth-child(9), #leadTableView table td:nth-child(9) {
+    display: none !important;
+  }
+
+  /* Enrollment Table hides: Course (4), Profit (6), Payment Method (7), Date (8) */
+  #enrollmentsView table th:nth-child(4), #enrollmentsView table td:nth-child(4),
+  #enrollmentsView table th:nth-child(6), #enrollmentsView table td:nth-child(6),
+  #enrollmentsView table th:nth-child(7), #enrollmentsView table td:nth-child(7),
+  #enrollmentsView table th:nth-child(8), #enrollmentsView table td:nth-child(8) {
+    display: none !important;
+  }
+}
+
 @media (max-width: 640px) {
   .topbar,
-  .toolbar,
   .lead-card {
     align-items: stretch;
     flex-direction: column;
     grid-template-columns: 1fr;
+  }
+
+  .toolbar {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr !important;
+    gap: 8px !important;
+  }
+
+  .toolbar .search-wrap {
+    grid-column: 1 / -1 !important;
+  }
+
+  .toolbar select,
+  .toolbar button,
+  .toolbar .view-toggle {
+    margin: 0 !important;
+    width: 100% !important;
+    min-height: 40px !important;
+    height: 40px !important;
+    box-sizing: border-box !important;
+  }
+
+  .toolbar button.success {
+    grid-column: 1 / -1 !important;
   }
 
   .metrics-grid {
@@ -872,8 +918,22 @@ tr:last-child td {
   }
 
   .quick-actions {
-  justify-content: flex-start;
+    justify-content: flex-start;
+  }
 }
+
+@media (max-width: 500px) {
+  .modal-content {
+    margin: 12px;
+    padding: 16px;
+    max-height: 95vh;
+    overflow-y: auto;
+  }
+
+  .modal-body div[style*="grid-template-columns"] {
+    grid-template-columns: 1fr !important;
+    gap: 8px !important;
+  }
 }
 
 /* Modal Styles */

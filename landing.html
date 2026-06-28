@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>免费领取 | 世界级营销100招（流量密码2.0）</title>
   <meta name="description" content="免费下载《世界级营销100招·流量密码2.0》电子书，掌握最实用的营销策略，让你的生意流量倍增！" />
+  <script src="./config.js"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;700;900&family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
@@ -312,6 +313,15 @@
       .form-card { max-width: 100%; }
     }
 
+    @media (max-width: 600px) {
+      .book-wrap {
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+        gap: 16px;
+      }
+    }
+
     /* ── PARTICLES ── */
     .particles {
       position: fixed; inset: 0; z-index: 0; pointer-events: none; overflow: hidden;
@@ -492,7 +502,7 @@
           <div class="success-icon">🎉</div>
           <h2>恭喜！资料提交成功</h2>
           <p>感谢您的填写！<br />您的电子书已准备好，请点击下方按钮立即下载。</p>
-          <a href="/download-ebook" class="download-btn" download>
+          <a href="/download-ebook" id="downloadLink" class="download-btn" download>
             📥 立即下载电子书
           </a>
           <p class="auto-note">如下载未自动开始，请点击上方按钮</p>
@@ -534,6 +544,20 @@
     const submitBtn = document.getElementById('submitBtn');
     const errorMsg = document.getElementById('errorMsg');
 
+    // Configure URLs dynamically based on deployment environment
+    const apiBase = (window.CONFIG && window.CONFIG.API_BASE_URL) || '';
+    const isGitHubOrLocalFile = window.location.hostname.includes('github.io') || window.location.protocol === 'file:';
+    
+    // Set landing success download link
+    const dLink = document.getElementById('downloadLink');
+    if (dLink) {
+      if (isGitHubOrLocalFile) {
+        dLink.href = './世界级营销100招( 流量密码2.0） .pdf';
+      } else {
+        dLink.href = `${apiBase}/download-ebook`;
+      }
+    }
+
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
       errorMsg.classList.remove('show');
@@ -556,7 +580,7 @@
       submitBtn.querySelector('.btn-text').textContent = '提交中...';
 
       try {
-        const res = await fetch('/api/landing-leads', {
+        const res = await fetch(`${apiBase}/api/landing-leads`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ name, phone: fullPhone, industry, challenge })
@@ -571,7 +595,7 @@
         // Auto-trigger download after short delay
         setTimeout(() => {
           const link = document.createElement('a');
-          link.href = '/download-ebook';
+          link.href = isGitHubOrLocalFile ? './世界级营销100招( 流量密码2.0） .pdf' : `${apiBase}/download-ebook`;
           link.download = '';
           document.body.appendChild(link);
           link.click();
