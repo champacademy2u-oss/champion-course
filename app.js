@@ -1634,6 +1634,10 @@ function handleBackup() {
   const data = {
     leads: state.leads,
     templates: state.templates,
+    previews: state.previews || [],
+    videos: state.videos || [],
+    customGroups: JSON.parse(localStorage.getItem('lead_center_custom_groups') || 'null'),
+    courseOrder: JSON.parse(localStorage.getItem('lead_center_course_order') || 'null'),
     exportDate: new Date().toISOString()
   };
   const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
