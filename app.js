@@ -2581,12 +2581,12 @@ if (elements.deepScanBtn) {
 
 // Auto-load backup from server if localStorage is empty or version param ?v=X is present
 async function autoLoadBackupFromServer() {
-  const BACKUP_URL = './lead-center-full-backup-2026-06-28.json';
+  const BACKUP_URL = './lead-center-full-backup-2026-07-04.json';
   const BACKUP_VER_KEY = 'lead_center_backup_last_loaded';
   
   // Track which backup file we last loaded so we don't reload on every page view.
   // Change the value below when you upload a newer backup file.
-  const BACKUP_ID = '2026-06-28';
+  const BACKUP_ID = '2026-07-04';
   const alreadyLoaded = localStorage.getItem(BACKUP_VER_KEY);
   if (alreadyLoaded === BACKUP_ID) return; // already loaded this exact backup
 
