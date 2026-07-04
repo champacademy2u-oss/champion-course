@@ -2655,39 +2655,26 @@ window.loadLandingLeads = async function() {
   if (!tbody) return;
 
   const apiBase = (window.CONFIG && window.CONFIG.API_BASE_URL) || '';
-  const isLocalStorageOrDevMode = window.location.protocol === 'file:' && !apiBase;
-
-  // ── Detect file:// mode ──
-  if (isLocalStorageOrDevMode) {
-    if (statsBar) statsBar.innerHTML = '';
-    tbody.innerHTML = `
-      <tr><td colspan="7" style="padding:0;">
-        <div style="margin:20px 0; background:linear-gradient(135deg,rgba(124,58,237,0.08),rgba(245,166,35,0.05)); border:1px solid rgba(124,58,237,0.25); border-radius:14px; padding:32px; text-align:center;">
-          <div style="font-size:40px; margin-bottom:16px;">🖥️</div>
-          <h3 style="font-size:18px; font-weight:800; margin-bottom:10px;">请通过服务器访问</h3>
-          <p style="color:var(--muted); font-size:14px; line-height:1.7; margin-bottom:20px;">
-            你目前是用 <code style="background:rgba(255,255,255,0.08);padding:2px 8px;border-radius:5px;">file://</code> 方式直接打开文件。<br/>
-            Landing Leads 功能需要通过服务器或配置远程 API URL 才能使用。
-          </p>
-          <div style="display:flex; flex-direction:column; gap:10px; align-items:center;">
-            <div style="background:rgba(0,0,0,0.3); border:1px solid rgba(255,255,255,0.1); border-radius:10px; padding:12px 24px; font-family:monospace; font-size:15px; letter-spacing:0.03em;">
-              <span style="color:#a0aec0;">选项A：</span> 开启终端，运行 <strong style="color:#F5A623;">npm start</strong> 并访问录入管理
-            </div>
-            <div style="background:rgba(0,0,0,0.3); border:1px solid rgba(255,255,255,0.1); border-radius:10px; padding:12px 24px; font-family:monospace; font-size:15px; letter-spacing:0.03em;">
-              <span style="color:#a0aec0;">选项B：</span> 在 <strong style="color:#7C3AED;">config.js</strong> 中设置其托管服务的 API_BASE_URL
-            </div>
-          </div>
-        </div>
-      </td></tr>`;
-    return;
-  }
+  const isFallbackMode = !apiBase && (window.location.protocol === 'file:' || window.location.hostname.includes('github.io'));
 
   tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:40px;color:var(--muted)">⏳ 加载中...</td></tr>`;
 
   try {
-    const res = await fetch(`${apiBase}/api/landing-leads`);
-    if (!res.ok) throw new Error('Cannot reach server');
-    const { leads, total } = await res.json();
+    let leads = [];
+    let total = 0;
+    
+    if (isFallbackMode) {
+      // Offline fallback: load from browser's local storage (only leads submitted on this exact machine)
+      leads = JSON.parse(localStorage.getItem('landing_leads_static') || '[]');
+      total = leads.length;
+    } else {
+      // Online mode: fetch from backend API
+      const res = await fetch(`${apiBase}/api/landing-leads`);
+      if (!res.ok) throw new Error('Cannot reach server');
+      const data = await res.json();
+      leads = data.leads || [];
+      total = data.total || 0;
+    }
 
     // Stats bar
     if (statsBar) {
@@ -2702,7 +2689,21 @@ window.loadLandingLeads = async function() {
       leads.forEach(l => { industries[l.industry] = (industries[l.industry] || 0) + 1; });
       const topIndustry = Object.entries(industries).sort((a,b)=>b[1]-a[1])[0];
 
+      let warningMsg = '';
+      if (isFallbackMode) {
+        warningMsg = `
+          <div style="background:rgba(239,68,68,0.1); border:1px solid rgba(239,68,68,0.2); border-radius:10px; padding:12px 20px; width: 100%;">
+            <strong style="color:#EF4444; font-size:14px;">⚠️ 离线模式 (Offline Mode)</strong><br/>
+            <span style="font-size:13px; color:var(--text-muted);">
+              目前系统运行在静态页面上（无后端）。这里显示的资料仅为您在<strong>当前电脑/浏览器</strong>自行填写的测试数据。<br/>
+              如果需要接收真实客户的资料，请开启本地 <strong>start.bat</strong> 服务器或在 <strong>config.js</strong> 中配置线上后端 API。
+            </span>
+          </div>
+        `;
+      }
+
       statsBar.innerHTML = `
+        ${warningMsg}
         <div style="background:rgba(124,58,237,0.1);border:1px solid rgba(124,58,237,0.2);border-radius:10px;padding:12px 20px;display:flex;flex-direction:column;gap:2px;">
           <span style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.06em;">总下载人数</span>
           <strong style="font-size:22px;color:#7C3AED;">${total}</strong>
