@@ -27,7 +27,7 @@ function saveLandingLead(lead) {
 
 const config = {
   port: Number(process.env.PORT || 4175),
-  host: process.env.HOST || "127.0.0.1",
+  host: process.env.HOST || "0.0.0.0",
   graphVersion: process.env.META_GRAPH_VERSION || "v21.0",
   verifyToken: process.env.META_VERIFY_TOKEN || "",
   appSecret: process.env.META_APP_SECRET || "",
