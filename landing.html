@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>免费领取 | 世界级营销100招（流量密码2.0）</title>
   <meta name="description" content="免费下载《世界级营销100招·流量密码2.0》电子书，掌握最实用的营销策略，让你的生意流量倍增！" />
-  <script src="./config.js"></script>
+  <!-- config.js loaded later with Firebase SDK -->
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;700;900&family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
@@ -520,9 +520,13 @@
     let _db = null;
     try {
       if (window.FIREBASE_CONFIG) {
-        const fbApp = firebase.initializeApp(window.FIREBASE_CONFIG);
+        // Reuse existing app if already initialized (prevent 'duplicate app' error)
+        const fbApp = firebase.apps.length
+          ? firebase.app()
+          : firebase.initializeApp(window.FIREBASE_CONFIG);
         _db = firebase.firestore(fbApp);
         _db.enablePersistence().catch(() => {});
+        console.log('[Landing] Firebase connected.');
       }
     } catch (e) {
       console.warn('[Landing] Firebase init failed:', e);
