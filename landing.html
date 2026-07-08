@@ -511,7 +511,23 @@
     </div>
   </div>
 
+  <!-- Firebase SDK -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+  <script src="./config.js"></script>
   <script>
+    // ── Init Firebase ──
+    let _db = null;
+    try {
+      if (window.FIREBASE_CONFIG) {
+        const fbApp = firebase.initializeApp(window.FIREBASE_CONFIG);
+        _db = firebase.firestore(fbApp);
+        _db.enablePersistence().catch(() => {});
+      }
+    } catch (e) {
+      console.warn('[Landing] Firebase init failed:', e);
+    }
+
     // ── Particles ──
     const container = document.getElementById('particles');
     for (let i = 0; i < 18; i++) {
@@ -533,30 +549,23 @@
       const el = document.getElementById('dlCount');
       const base = 1247;
       const rand = Math.floor(Math.random() * 50);
-      let target = base + rand;
-      el.textContent = target.toLocaleString();
+      el.textContent = (base + rand).toLocaleString();
     }
     animateCounter();
     setInterval(animateCounter, 30000);
+
+    // ── Set download link ──
+    const dLink = document.getElementById('downloadLink');
+    if (dLink) {
+      dLink.href = './世界级营销100招( 流量密码2.0） .pdf';
+      dLink.removeAttribute('download');
+      dLink.target = '_blank';
+    }
 
     // ── Form Submit ──
     const form = document.getElementById('leadForm');
     const submitBtn = document.getElementById('submitBtn');
     const errorMsg = document.getElementById('errorMsg');
-
-    // Configure URLs dynamically based on deployment environment
-    const apiBase = (window.CONFIG && window.CONFIG.API_BASE_URL) || '';
-    const isGitHubOrLocalFile = window.location.hostname.includes('github.io') || window.location.protocol === 'file:';
-    
-    // Set landing success download link
-    const dLink = document.getElementById('downloadLink');
-    if (dLink) {
-      if (isGitHubOrLocalFile) {
-        dLink.href = './世界级营销100招( 流量密码2.0） .pdf';
-      } else {
-        dLink.href = `${apiBase}/download-ebook`;
-      }
-    }
 
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
@@ -575,61 +584,51 @@
       }
 
       const fullPhone = prefix + phone.replace(/^0/, '');
+      const leadData = {
+        id: crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36),
+        name,
+        phone: fullPhone,
+        industry,
+        challenge,
+        createdAt: new Date().toISOString()
+      };
 
       submitBtn.classList.add('loading');
       submitBtn.querySelector('.btn-text').textContent = '提交中...';
 
-      // ── GitHub Pages / no backend: skip API, show success directly ──
-      if (isGitHubOrLocalFile && !apiBase) {
-        // Save lead to localStorage as a fallback record
+      // ── Save to Firebase Firestore (primary) ──
+      let saved = false;
+      if (_db) {
+        try {
+          await _db.collection('landing_leads').doc(leadData.id).set(leadData);
+          saved = true;
+          console.log('[Landing] Lead saved to Firebase.');
+        } catch (err) {
+          console.warn('[Landing] Firebase save failed, falling back to localStorage:', err);
+        }
+      }
+
+      // ── Fallback: save to localStorage if Firebase unavailable ──
+      if (!saved) {
         try {
           const leads = JSON.parse(localStorage.getItem('landing_leads_static') || '[]');
-          leads.unshift({ name, phone: fullPhone, industry, challenge, createdAt: new Date().toISOString() });
+          leads.unshift(leadData);
           localStorage.setItem('landing_leads_static', JSON.stringify(leads));
         } catch (_) {}
-
-        document.getElementById('formMain').classList.add('hide');
-        document.getElementById('successOverlay').classList.add('show');
-
-        setTimeout(() => {
-          const link = document.createElement('a');
-          link.href = './世界级营销100招( 流量密码2.0） .pdf';
-          link.download = '';
-          document.body.appendChild(link);
-          link.click();
-          document.body.removeChild(link);
-        }, 800);
-        return;
       }
 
-      // ── Backend server mode: submit to API ──
-      try {
-        const res = await fetch(`${apiBase}/api/landing-leads`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name, phone: fullPhone, industry, challenge })
-        });
+      // ── Show success + trigger download ──
+      document.getElementById('formMain').classList.add('hide');
+      document.getElementById('successOverlay').classList.add('show');
 
-        if (!res.ok) throw new Error('Server error');
-
-        document.getElementById('formMain').classList.add('hide');
-        document.getElementById('successOverlay').classList.add('show');
-
-        setTimeout(() => {
-          const link = document.createElement('a');
-          link.href = `${apiBase}/download-ebook`;
-          link.download = '';
-          document.body.appendChild(link);
-          link.click();
-          document.body.removeChild(link);
-        }, 800);
-
-      } catch (err) {
-        errorMsg.textContent = '提交失败，请检查网络连接后再试。';
-        errorMsg.classList.add('show');
-        submitBtn.classList.remove('loading');
-        submitBtn.querySelector('.btn-text').textContent = '🎁 立即免费领取电子书';
-      }
+      setTimeout(() => {
+        const link = document.createElement('a');
+        link.href = './世界级营销100招( 流量密码2.0） .pdf';
+        link.target = '_blank';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      }, 800);
     });
   </script>
 </body>
