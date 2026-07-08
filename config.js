@@ -1,6 +1,15 @@
 // Configuration for Champion Course Lead Center
 window.CONFIG = {
-  // When hosting backend server publicly, specify the URL here (e.g., "https://your-backend.onrender.com").
-  // Leave empty ("") to automatically fall back to local server mode (current host).
+  // Original backend for backwards compatibility during migration
   API_BASE_URL: "https://champion-course.onrender.com",
+};
+
+window.FIREBASE_CONFIG = {
+  apiKey: "AIzaSyCJ_pqxqo4bCmSPQ0COG1ZkWw64ukX0SoM",
+  authDomain: "champion-course.firebaseapp.com",
+  projectId: "champion-course",
+  storageBucket: "champion-course.firebasestorage.app",
+  messagingSenderId: "337920852937",
+  appId: "1:337920852937:web:fab67a792d3b15c574de18",
+  measurementId: "G-3RZV6TX39W"
 };

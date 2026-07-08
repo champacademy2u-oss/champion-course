@@ -59,9 +59,92 @@ const defaultTemplates = {
 };
 
 // ──────────────────────────────────────────
-// Persistent File Storage System
-// Data is saved to a real .json file on disk,
-// surviving browser clears and path changes.
+// Firebase Firestore Cloud Storage
+// All data is synced to Google Firebase cloud.
+// ──────────────────────────────────────────
+let _db = null;
+try {
+  if (window.FIREBASE_CONFIG) {
+    const fbApp = firebase.initializeApp(window.FIREBASE_CONFIG);
+    _db = firebase.firestore(fbApp);
+    _db.enablePersistence().catch((err) => {
+      console.warn('[Firebase] Offline persistence enable failed:', err.code);
+    });
+    console.log('[Firebase] Firestore connected with persistence.');
+  }
+} catch (e) {
+  console.warn('[Firebase] Failed to init:', e);
+}
+
+async function fbSaveLead(lead) {
+  if (!_db || !lead?.id) return;
+  try { await _db.collection('leads').doc(lead.id).set(lead); } catch(e) { console.warn('fbSaveLead error:', e); }
+}
+async function fbDeleteLead(id) {
+  if (!_db) return;
+  try { await _db.collection('leads').doc(id).delete(); } catch(e) { console.warn('fbDeleteLead error:', e); }
+}
+async function fbSaveLeadsBatch(leads) {
+  if (!_db) return;
+  const CHUNK_SIZE = 400;
+  for (let i = 0; i < leads.length; i += CHUNK_SIZE) {
+    const chunk = leads.slice(i, i + CHUNK_SIZE);
+    const batch = _db.batch();
+    chunk.forEach(lead => {
+      if (lead.id) {
+        batch.set(_db.collection('leads').doc(lead.id), lead);
+      }
+    });
+    try {
+      await batch.commit();
+    } catch (e) {
+      console.warn('fbSaveLeadsBatch chunk error:', e);
+    }
+  }
+}
+async function fbDeleteLeadsBatch(ids) {
+  if (!_db) return;
+  const CHUNK_SIZE = 400;
+  for (let i = 0; i < ids.length; i += CHUNK_SIZE) {
+    const chunk = ids.slice(i, i + CHUNK_SIZE);
+    const batch = _db.batch();
+    chunk.forEach(id => {
+      batch.delete(_db.collection('leads').doc(id));
+    });
+    try {
+      await batch.commit();
+    } catch (e) {
+      console.warn('fbDeleteLeadsBatch chunk error:', e);
+    }
+  }
+}
+async function fbSaveCollection(collectionName, items) {
+  if (!_db) return;
+  const CHUNK_SIZE = 400;
+  for (let i = 0; i < items.length; i += CHUNK_SIZE) {
+    const chunk = items.slice(i, i + CHUNK_SIZE);
+    const batch = _db.batch();
+    chunk.forEach(item => { if (item.id) batch.set(_db.collection(collectionName).doc(item.id), item); });
+    try { await batch.commit(); } catch(e) { console.warn('fbSaveCollection error:', e); }
+  }
+}
+async function fbSaveConfig(docId, data) {
+  if (!_db) return;
+  try { await _db.collection('config').doc(docId).set(data); } catch(e) { console.warn('fbSaveConfig error:', e); }
+}
+async function fbSaveLayout() {
+  if (!_db) return;
+  const customGroups = loadJson("lead_center_custom_groups", []);
+  const courseOrder = loadJson("lead_center_course_order", []);
+  try {
+    await _db.collection('config').doc('layout').set({ customGroups, courseOrder });
+  } catch (e) {
+    console.warn('fbSaveLayout error:', e);
+  }
+}
+
+// ──────────────────────────────────────────
+// Legacy Local File Storage (kept for offline fallback)
 // ──────────────────────────────────────────
 let _dataFileHandle = null;
 
@@ -314,6 +397,25 @@ function saveJson(key, value) {
   localStorage.setItem(key, JSON.stringify(value));
   // Also persist to the connected local file
   if (_dataFileHandle) saveToFile();
+  // Also sync to Firebase if connected
+  if (_db) {
+    if (key === storageKeys.leads) {
+      // Leads are individually synced via saveLead/removeLead — skip batch here
+    } else if (key === storageKeys.previews) {
+      fbSaveCollection('previews', value).catch(()=>{});
+    } else if (key === storageKeys.videos) {
+      fbSaveCollection('videos', value).catch(()=>{});
+    } else if (key === storageKeys.templates) {
+      fbSaveConfig('templates', value).catch(()=>{});
+    }
+  }
+}
+
+// Smart lead save — writes individual lead doc to Firebase
+function saveLead(lead) {
+  const arr = state.leads;
+  saveJson(storageKeys.leads, arr);
+  fbSaveLead(lead).catch(()=>{});
 }
 
 function sanitizeLead(lead) {
@@ -516,6 +618,8 @@ function importRows(rows, targetCourse = null) {
   });
 
   saveJson(storageKeys.leads, state.leads);
+  // Sync all current leads to Firebase (covers both new additions and merged updates)
+  fbSaveLeadsBatch(state.leads).catch(()=>{});
   return { added, merged };
 }
 
@@ -665,6 +769,7 @@ function markStepDone(id, step) {
   lead.lastContactedAt = new Date().toISOString();
   if (lead.status === "new") lead.status = "contacted";
   saveJson(storageKeys.leads, state.leads);
+  fbSaveLead(lead).catch(()=>{});
   render();
 }
 
@@ -679,12 +784,15 @@ function updateStatus(id, status) {
   }
   
   saveJson(storageKeys.leads, state.leads);
+  fbSaveLead(lead).catch(()=>{});
   render();
 }
 
 function removeLead(id) {
+  const toDelete = state.leads.find(l => l.id === id);
   state.leads = state.leads.filter((lead) => lead.id !== id);
   saveJson(storageKeys.leads, state.leads);
+  if (toDelete) fbDeleteLead(id).catch(()=>{});
   render();
   toast("Lead removed.");
 }
@@ -840,7 +948,12 @@ function renderCourseView() {
   currentNames.forEach(name => {
     if (!courseOrder.includes(name)) courseOrder.push(name);
   });
-  localStorage.setItem("lead_center_course_order", JSON.stringify(courseOrder));
+  const oldOrderStr = localStorage.getItem("lead_center_course_order");
+  const newOrderStr = JSON.stringify(courseOrder);
+  if (oldOrderStr !== newOrderStr) {
+    localStorage.setItem("lead_center_course_order", newOrderStr);
+    fbSaveLayout();
+  }
 
   const toolbarHtml = `
     <div style="margin-bottom: 25px; display: flex; justify-content: space-between; align-items: center; background: #fff; padding: 15px 20px; border-radius: 12px; border: 1px solid #e2e8f0; box-shadow: 0 4px 6px rgba(0,0,0,0.02);">
@@ -934,6 +1047,7 @@ window.handleCourseDrop = function(e, targetCourse) {
     order.splice(fromIdx, 1);
     order.splice(toIdx, 0, draggedCourse);
     localStorage.setItem("lead_center_course_order", JSON.stringify(order));
+    fbSaveLayout();
     render();
     toast("Order updated!");
   }
@@ -947,6 +1061,7 @@ window.createManualCourseGroup = function() {
   if (!customGroups.includes(name.trim())) {
     customGroups.push(name.trim());
     localStorage.setItem("lead_center_custom_groups", JSON.stringify(customGroups));
+    fbSaveLayout();
     render();
     toast(`Created new group: ${name.trim()}`);
   } else {
@@ -958,13 +1073,18 @@ window.deleteEntireGroup = function(courseName) {
   if (!confirm(`CAUTION: This will delete the group "${courseName}" AND all leads inside it. Proceed?`)) return;
   
   // Remove leads
+  const toDelete = state.leads.filter(l => (l.course || "No Preview Course Assigned") === courseName);
   state.leads = state.leads.filter(l => (l.course || "No Preview Course Assigned") !== courseName);
   saveJson(storageKeys.leads, state.leads);
+  if (toDelete.length > 0) {
+    fbDeleteLeadsBatch(toDelete.map(l => l.id)).catch(()=>{});
+  }
   
   // Remove from custom groups if present
   const customGroups = loadJson("lead_center_custom_groups", []);
   const updatedCustom = customGroups.filter(n => n !== courseName);
   localStorage.setItem("lead_center_custom_groups", JSON.stringify(updatedCustom));
+  fbSaveLayout();
   
   render();
   toast(`Deleted group: ${courseName}`);
@@ -974,14 +1094,38 @@ window.renameCourseGroup = function(oldName) {
   const newName = prompt(`Rename group "${oldName}" to:`, oldName);
   if (!newName || !newName.trim() || newName === oldName) return;
   
+  const updatedLeads = [];
   state.leads = state.leads.map(l => {
     if ((l.course || "No Preview Course Assigned") === oldName) {
-      return { ...l, course: newName.trim() };
+      const updated = { ...l, course: newName.trim() };
+      updatedLeads.push(updated);
+      return updated;
     }
     return l;
   });
   
   saveJson(storageKeys.leads, state.leads);
+  if (updatedLeads.length > 0) {
+    fbSaveLeadsBatch(updatedLeads).catch(()=>{});
+  }
+  
+  // Also rename the group in customGroups if it's there
+  const customGroups = loadJson("lead_center_custom_groups", []);
+  const idx = customGroups.indexOf(oldName);
+  if (idx > -1) {
+    customGroups[idx] = newName.trim();
+    localStorage.setItem("lead_center_custom_groups", JSON.stringify(customGroups));
+  }
+  
+  // Rename in courseOrder
+  let order = loadJson("lead_center_course_order", []);
+  const oIdx = order.indexOf(oldName);
+  if (oIdx > -1) {
+    order[oIdx] = newName.trim();
+    localStorage.setItem("lead_center_course_order", JSON.stringify(order));
+  }
+  fbSaveLayout();
+  
   render();
   toast(`Renamed Group to "${newName}"`);
 };
@@ -1270,9 +1414,11 @@ function deleteSelectedEnrollments() {
   const count = state.enrollSelectedIds.size;
   if (!count) return;
   if (confirm(`Delete ${count} selected lead(s)?`)) {
+    const deletedIds = [...state.enrollSelectedIds];
     state.leads = state.leads.filter(l => !state.enrollSelectedIds.has(l.id));
     state.enrollSelectedIds.clear();
     saveJson(storageKeys.leads, state.leads);
+    fbDeleteLeadsBatch(deletedIds).catch(()=>{});
     toast(`${count} lead(s) deleted.`);
     render();
   }
@@ -1283,8 +1429,12 @@ function clearCurrentCourse() {
   if (targetCourse === "all") return;
   
   if (confirm(`Are you sure you want to delete ALL ${state.leads.filter(l => l.course === targetCourse).length} leads in "${targetCourse}"? This cannot be undone.`)) {
+    const toDelete = state.leads.filter(l => l.course === targetCourse);
     state.leads = state.leads.filter(l => l.course !== targetCourse);
     saveJson(storageKeys.leads, state.leads);
+    if (toDelete.length > 0) {
+      fbDeleteLeadsBatch(toDelete.map(l => l.id)).catch(()=>{});
+    }
     toast(`Cleared ${targetCourse}.`);
     render();
   }
@@ -1532,6 +1682,7 @@ function addHistory(id, type, text) {
   if (!lead) return;
   lead.history.push({ type, text, date: new Date().toISOString() });
   saveJson(storageKeys.leads, state.leads);
+  fbSaveLead(lead).catch(()=>{});
 }
 
 function closeNotes() {
@@ -1566,6 +1717,7 @@ function saveNote() {
     if (noteText) addHistory(lead.id, "note", noteText);
     
     saveJson(storageKeys.leads, state.leads);
+    fbSaveLead(lead).catch(()=>{});
     toast("New registration added! ✓");
     render();
     closeNotes();
@@ -1587,6 +1739,7 @@ function saveNote() {
     lead.memberLevel = elements.memberLevel.value;
     lead.followupAction = elements.followupAction.value;
     saveJson(storageKeys.leads, state.leads);
+    fbSaveLead(lead).catch(()=>{});
     toast("Lead info updated. ✓");
     render();
   }
@@ -1660,6 +1813,13 @@ async function handleRestore(event) {
       state.templates = { ...defaultTemplates, ...(data.templates || {}) };
       saveJson(storageKeys.leads, state.leads);
       saveJson(storageKeys.templates, state.templates);
+      // Push to Firebase before reloading so the data is in the cloud
+      if (_db) {
+        toast('⏳ 正在上传数据到云端，请稍候...');
+        await fbSaveLeadsBatch(state.leads);
+        await fbSaveConfig('templates', state.templates);
+        if (data.previews) await fbSaveCollection('previews', data.previews);
+      }
       location.reload();
     }
   } catch (e) {
@@ -2223,9 +2383,11 @@ elements.selectAll.addEventListener("change", (e) => {
 
 elements.bulkDeleteBtn.addEventListener("click", () => {
   if (confirm(`Delete ${state.selectedIds.size} leads?`)) {
+    const deletedIds = [...state.selectedIds];
     state.leads = state.leads.filter(l => !state.selectedIds.has(l.id));
     state.selectedIds.clear();
     saveJson(storageKeys.leads, state.leads);
+    fbDeleteLeadsBatch(deletedIds).catch(()=>{});
     render();
     toast("Leads deleted.");
   }
@@ -2234,12 +2396,17 @@ elements.bulkDeleteBtn.addEventListener("click", () => {
 elements.bulkStatus.addEventListener("change", (e) => {
   const status = e.target.value;
   if (!status) return;
+  const modified = [];
   state.leads.forEach(l => {
-    if (state.selectedIds.has(l.id)) l.status = status;
+    if (state.selectedIds.has(l.id)) {
+      l.status = status;
+      modified.push(l);
+    }
   });
   state.selectedIds.clear();
   e.target.value = "";
   saveJson(storageKeys.leads, state.leads);
+  fbSaveLeadsBatch(modified).catch(()=>{});
   render();
   toast("Status updated.");
 });
@@ -2643,14 +2810,152 @@ async function autoLoadBackupFromServer() {
   }
 }
 
-initPerformanceFilters();
-fillForms();
-render();
-autoLoadBackupFromServer();
+// ─── Firebase startup: load all data from Firestore then render ───
+async function initFromFirebase() {
+  if (!_db) {
+    // No Firebase — fall back to localStorage + JSON backup
+    initPerformanceFilters();
+    fillForms();
+    render();
+    autoLoadBackupFromServer();
+    return;
+  }
+
+  try {
+    toast('⏳ 正在从云端加载数据...');
+
+    // Load leads
+    const leadsSnap = await _db.collection('leads').get();
+    if (!leadsSnap.empty) {
+      const fbLeads = leadsSnap.docs.map(d => d.data());
+      state.leads = mergeDuplicateLeads(fbLeads.map(sanitizeLead));
+      saveJson(storageKeys.leads, state.leads);
+    }
+
+    // Load previews
+    const previewsSnap = await _db.collection('previews').get();
+    if (!previewsSnap.empty) {
+      state.previews = previewsSnap.docs.map(d => d.data());
+      saveJson(storageKeys.previews, state.previews);
+    }
+
+    // Load videos
+    const videosSnap = await _db.collection('videos').get();
+    if (!videosSnap.empty) {
+      state.videos = videosSnap.docs.map(d => d.data());
+      saveJson(storageKeys.videos, state.videos);
+    }
+
+    // Load templates
+    const templatesDoc = await _db.collection('config').doc('templates').get();
+    if (templatesDoc.exists) {
+      state.templates = { ...defaultTemplates, ...templatesDoc.data() };
+      saveJson(storageKeys.templates, state.templates);
+    }
+
+    // Load layout config
+    const layoutDoc = await _db.collection('config').doc('layout').get();
+    if (layoutDoc.exists) {
+      const layout = layoutDoc.data();
+      if (layout.customGroups) localStorage.setItem('lead_center_custom_groups', JSON.stringify(layout.customGroups));
+      if (layout.courseOrder) localStorage.setItem('lead_center_course_order', JSON.stringify(layout.courseOrder));
+    }
+
+    initPerformanceFilters();
+    fillForms();
+    render();
+    toast(`✅ 云端数据加载完成，共 ${state.leads.length} 条记录`);
+    setupRealTimeSync(); // Start live listeners after first load
+  } catch (err) {
+    console.error('[Firebase] initFromFirebase error:', err);
+    // Fallback to localStorage
+    initPerformanceFilters();
+    fillForms();
+    render();
+    toast('⚠️ 云端加载失败，显示本地缓存数据');
+  }
+}
+
+// ─── Real-time sync: onSnapshot listeners so all devices update instantly ───
+let _unsubscribeLeads = null;
+let _unsubscribePreviews = null;
+let _unsubscribeVideos = null;
+let _unsubscribeTemplates = null;
+let _unsubscribeLayout = null;
+
+function setupRealTimeSync() {
+  if (!_db) return;
+
+  // Unsubscribe from any previous listeners (safety)
+  if (_unsubscribeLeads) _unsubscribeLeads();
+  if (_unsubscribePreviews) _unsubscribePreviews();
+  if (_unsubscribeVideos) _unsubscribeVideos();
+  if (_unsubscribeTemplates) _unsubscribeTemplates();
+  if (_unsubscribeLayout) _unsubscribeLayout();
+
+  // ── Leads ──
+  _unsubscribeLeads = _db.collection('leads').onSnapshot(snap => {
+    // Skip if all changes are from this device's own writes (hasPendingWrites)
+    const hasRemoteChange = snap.docChanges().some(c => !c.doc.metadata.hasPendingWrites);
+    if (!hasRemoteChange) return;
+
+    const fbLeads = snap.docs.map(d => d.data());
+    state.leads = mergeDuplicateLeads(fbLeads.map(sanitizeLead));
+    saveJson(storageKeys.leads, state.leads);
+    render();
+    console.log('[Sync] Leads updated from cloud.');
+  }, err => console.warn('[Sync] leads onSnapshot error:', err));
+
+  // ── Previews ──
+  _unsubscribePreviews = _db.collection('previews').onSnapshot(snap => {
+    if (snap.docChanges().every(c => c.doc.metadata.hasPendingWrites)) return;
+    state.previews = snap.docs.map(d => d.data());
+    saveJson(storageKeys.previews, state.previews);
+    render();
+    console.log('[Sync] Previews updated from cloud.');
+  }, err => console.warn('[Sync] previews onSnapshot error:', err));
+
+  // ── Videos ──
+  _unsubscribeVideos = _db.collection('videos').onSnapshot(snap => {
+    if (snap.docChanges().every(c => c.doc.metadata.hasPendingWrites)) return;
+    state.videos = snap.docs.map(d => d.data());
+    saveJson(storageKeys.videos, state.videos);
+    render();
+    console.log('[Sync] Videos updated from cloud.');
+  }, err => console.warn('[Sync] videos onSnapshot error:', err));
+
+  // ── Templates ──
+  _unsubscribeTemplates = _db.collection('config').doc('templates').onSnapshot(snap => {
+    if (!snap.exists || snap.metadata.hasPendingWrites) return;
+    state.templates = { ...defaultTemplates, ...snap.data() };
+    saveJson(storageKeys.templates, state.templates);
+    // Update form fields only if none are focused to avoid interrupting typing
+    if (!document.activeElement || document.activeElement.tagName !== 'TEXTAREA') {
+      fillForms();
+    }
+    console.log('[Sync] Templates updated from cloud.');
+  }, err => console.warn('[Sync] templates onSnapshot error:', err));
+
+  // ── Layout (custom groups + course order) ──
+  _unsubscribeLayout = _db.collection('config').doc('layout').onSnapshot(snap => {
+    if (!snap.exists || snap.metadata.hasPendingWrites) return;
+    const layout = snap.data();
+    if (layout.customGroups) localStorage.setItem('lead_center_custom_groups', JSON.stringify(layout.customGroups));
+    if (layout.courseOrder) localStorage.setItem('lead_center_course_order', JSON.stringify(layout.courseOrder));
+    render();
+    console.log('[Sync] Layout updated from cloud.');
+  }, err => console.warn('[Sync] layout onSnapshot error:', err));
+
+  console.log('[Firebase] Real-time sync listeners active.');
+}
+
+initFromFirebase();
+
+
 
 
 // ──────────────────────────────────────────────────────
-// Landing Page Leads Admin Functions
+// Landing Page Leads Admin — reads from Firebase Firestore
 // ──────────────────────────────────────────────────────
 
 window.loadLandingLeads = async function() {
@@ -2658,29 +2963,22 @@ window.loadLandingLeads = async function() {
   const statsBar = document.getElementById('landingLeadsStats');
   if (!tbody) return;
 
-  const apiBase = (window.CONFIG && window.CONFIG.API_BASE_URL) || '';
-  const isFallbackMode = !apiBase && (window.location.protocol === 'file:' || window.location.hostname.includes('github.io'));
-
   tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:40px;color:var(--muted)">⏳ 加载中...</td></tr>`;
 
   try {
     let leads = [];
-    let total = 0;
-    
-    if (isFallbackMode) {
-      // Offline fallback: load from browser's local storage (only leads submitted on this exact machine)
-      leads = JSON.parse(localStorage.getItem('landing_leads_static') || '[]');
-      total = leads.length;
+
+    if (_db) {
+      // Firebase mode: read from Firestore
+      const snap = await _db.collection('landing_leads').orderBy('createdAt', 'desc').get();
+      leads = snap.docs.map(doc => doc.data());
     } else {
-      // Online mode: fetch from backend API
-      const res = await fetch(`${apiBase}/api/landing-leads`);
-      if (!res.ok) throw new Error('Cannot reach server');
-      const data = await res.json();
-      leads = data.leads || [];
-      total = data.total || 0;
+      // Fallback: local storage
+      leads = JSON.parse(localStorage.getItem('landing_leads_static') || '[]');
     }
 
-    // Stats bar
+    const total = leads.length;
+
     if (statsBar) {
       const today = leads.filter(l => {
         const d = new Date(l.createdAt);
@@ -2688,26 +2986,11 @@ window.loadLandingLeads = async function() {
         return d.toDateString() === now.toDateString();
       }).length;
 
-      // Group by industry
       const industries = {};
       leads.forEach(l => { industries[l.industry] = (industries[l.industry] || 0) + 1; });
-      const topIndustry = Object.entries(industries).sort((a,b)=>b[1]-a[1])[0];
-
-      let warningMsg = '';
-      if (isFallbackMode) {
-        warningMsg = `
-          <div style="background:rgba(239,68,68,0.1); border:1px solid rgba(239,68,68,0.2); border-radius:10px; padding:12px 20px; width: 100%;">
-            <strong style="color:#EF4444; font-size:14px;">⚠️ 离线模式 (Offline Mode)</strong><br/>
-            <span style="font-size:13px; color:var(--text-muted);">
-              目前系统运行在静态页面上（无后端）。这里显示的资料仅为您在<strong>当前电脑/浏览器</strong>自行填写的测试数据。<br/>
-              如果需要接收真实客户的资料，请开启本地 <strong>start.bat</strong> 服务器或在 <strong>config.js</strong> 中配置线上后端 API。
-            </span>
-          </div>
-        `;
-      }
+      const topIndustry = Object.entries(industries).sort((a,b) => b[1]-a[1])[0];
 
       statsBar.innerHTML = `
-        ${warningMsg}
         <div style="background:rgba(124,58,237,0.1);border:1px solid rgba(124,58,237,0.2);border-radius:10px;padding:12px 20px;display:flex;flex-direction:column;gap:2px;">
           <span style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.06em;">总下载人数</span>
           <strong style="font-size:22px;color:#7C3AED;">${total}</strong>
@@ -2740,30 +3023,30 @@ window.loadLandingLeads = async function() {
           <td style="color:var(--muted);font-size:13px;">${total - i}</td>
           <td><strong>${escapeHtml(l.name)}</strong></td>
           <td><span class="muted">${escapeHtml(l.phone || '-')}</span></td>
-          <td><span class="badge" style="background:rgba(124,58,237,0.1);color:#7C3AED;border:1px solid rgba(124,58,237,0.2);font-size:12px;">${escapeHtml(l.industry)}</span></td>
-          <td style="max-width:260px;font-size:13px;color:var(--muted);" title="${escapeHtml(l.challenge)}">${escapeHtml(l.challenge.length > 80 ? l.challenge.slice(0,80)+'...' : l.challenge)}</td>
+          <td><span class="badge" style="background:rgba(124,58,237,0.1);color:#7C3AED;border:1px solid rgba(124,58,237,0.2);font-size:12px;">${escapeHtml(l.industry || '')}</span></td>
+          <td style="max-width:260px;font-size:13px;color:var(--muted);" title="${escapeHtml(l.challenge || '')}">${escapeHtml((l.challenge || '').length > 80 ? l.challenge.slice(0,80)+'...' : (l.challenge || ''))}</td>
           <td style="font-size:12px;color:var(--muted);">${dateStr}</td>
           <td>${wa}</td>
         </tr>
       `;
     }).join('');
+
   } catch (err) {
-    tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:40px;color:#ef4444;">⚠️ 无法连接服务器<br/><small>请确保服务器正在运行且可以连接</small></td></tr>`;
+    console.error('loadLandingLeads error:', err);
+    tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:40px;color:#ef4444;">⚠️ 加载失败，请刷新重试</td></tr>`;
     if (statsBar) statsBar.innerHTML = '';
   }
 };
 
 window.exportLandingLeadsCSV = async function() {
-  const apiBase = (window.CONFIG && window.CONFIG.API_BASE_URL) || '';
-  const isLocalStorageOrDevMode = window.location.protocol === 'file:' && !apiBase;
-  if (isLocalStorageOrDevMode) {
-    alert('请通过管理系统（服务器版）访问，或在 config.js 指定 API_BASE_URL 再使用导出功能。');
-    return;
-  }
   try {
-    const res = await fetch(`${apiBase}/api/landing-leads`);
-    if (!res.ok) throw new Error('Server error');
-    const { leads } = await res.json();
+    let leads = [];
+    if (_db) {
+      const snap = await _db.collection('landing_leads').orderBy('createdAt', 'desc').get();
+      leads = snap.docs.map(doc => doc.data());
+    } else {
+      leads = JSON.parse(localStorage.getItem('landing_leads_static') || '[]');
+    }
     if (!leads.length) { toast('暂时没有数据可以导出'); return; }
 
     const headers = ['编号','姓名','电话','工作领域','面对的挑战','提交时间'];
@@ -2772,7 +3055,7 @@ window.exportLandingLeadsCSV = async function() {
       l.name,
       l.phone,
       l.industry,
-      l.challenge.replace(/\n/g, ' '),
+      (l.challenge || '').replace(/\n/g, ' '),
       new Date(l.createdAt).toLocaleString('zh-MY'),
     ]);
 
@@ -2789,7 +3072,7 @@ window.exportLandingLeadsCSV = async function() {
     URL.revokeObjectURL(url);
     toast(`✅ 成功导出 ${leads.length} 条记录`);
   } catch {
-    toast('❌ 导出失败，请检查服务器连接');
+    toast('❌ 导出失败，请重试');
   }
 };
 
