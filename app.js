@@ -63,6 +63,7 @@ const defaultTemplates = {
 // All data is synced to Google Firebase cloud.
 // ──────────────────────────────────────────
 let _db = null;
+let _storage = null;
 try {
   if (window.FIREBASE_CONFIG) {
     const fbApp = firebase.initializeApp(window.FIREBASE_CONFIG);
@@ -70,6 +71,12 @@ try {
     _db.enablePersistence().catch((err) => {
       console.warn('[Firebase] Offline persistence enable failed:', err.code);
     });
+    try {
+      _storage = firebase.storage(fbApp);
+      console.log('[Firebase] Cloud Storage initialized.');
+    } catch(storageErr) {
+      console.warn('[Firebase] Cloud Storage failed to init:', storageErr);
+    }
     console.log('[Firebase] Firestore connected with persistence.');
   }
 } catch (e) {
@@ -1871,7 +1878,12 @@ function renderVideos() {
   grid.innerHTML = state.videos.map(v => {
     let mediaHtml = "";
     if (v.type === "file") {
-      mediaHtml = `<video width="100%" height="100%" controls style="background: #000;"><source src="${v.blobUrl || '#'}" type="${v.mime || 'video/mp4'}"></video>`;
+      const srcUrl = v.url || v.blobUrl || "";
+      if (!srcUrl || srcUrl === "#") {
+        mediaHtml = `<div style="color:var(--muted); text-align:center; padding: 20px 10px; font-size:12px; line-height:1.5;">⚠️ 视频源在此设备不可用<br/><small style="opacity:0.7">只保存在旧版本的浏览器中。请删除该视频，并重新在此新版本中上传导入该视频，系统会自动上传至云端以同步到所有设备。</small></div>`;
+      } else {
+        mediaHtml = `<video width="100%" height="100%" controls style="background: #000;"><source src="${srcUrl}" type="${v.mime || 'video/mp4'}"></video>`;
+      }
     } else {
       mediaHtml = `<iframe width="100%" height="100%" src="${getEmbedUrl(v.url)}" title="Video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>`;
     }
@@ -1884,7 +1896,7 @@ function renderVideos() {
       <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 10px;">
         <div style="flex: 1;">
           <h4 style="margin: 0 0 4px 0; font-size: 14px; line-height: 1.4; cursor: pointer; word-break: break-word;" onclick="renameVideo('${v.id}')" title="Click to rename">${escapeHtml(v.title)}</h4>
-          <p class="muted" style="font-size: 11px; margin: 0;">${v.type === 'file' ? 'Local' : 'Link'} • ${formatDate(v.date)}</p>
+          <p class="muted" style="font-size: 11px; margin: 0;">${v.type === 'file' ? 'Cloud File' : 'Link'} • ${formatDate(v.date)}</p>
         </div>
         <div style="display: flex; gap: 5px; flex-shrink: 0;">
           <button class="mini-button danger" onclick="removeVideo('${v.id}')">Delete</button>
@@ -2009,25 +2021,82 @@ async function importVideoFile(event) {
     return;
   }
   
-  if (!db) {
-    toast("System is still initializing. Please wait a moment.");
+  if (!_storage) {
+    // If Firebase storage is not initialized, fallback to IndexedDB locally
+    console.warn("Firebase Storage is not initialized, falling back to IndexedDB local storage.");
+    if (!db) {
+      toast("System is initializing. Please try again in a moment.");
+      return;
+    }
+    try {
+      toast("Saving video to local browser database (other devices won't see this)...");
+      const id = crypto.randomUUID();
+      const tx = db.transaction(storeName, "readwrite");
+      const store = tx.objectStore(storeName);
+      const addRequest = store.add({ id, blob: file });
+      await new Promise((resolve, reject) => {
+        addRequest.onsuccess = resolve;
+        addRequest.onerror = () => reject(new Error("Local write failed."));
+      });
+      state.videos.unshift({
+        id,
+        type: "file",
+        title: file.name,
+        mime: file.type,
+        date: new Date().toISOString(),
+        blobUrl: URL.createObjectURL(file)
+      });
+      saveJson(storageKeys.videos, state.videos.map(({blobUrl, ...v}) => {
+        const {blobUrl: _, ...rest} = v;
+        return rest;
+      }));
+      renderVideos();
+      toast("Video imported locally! ✓");
+    } catch(err) {
+      toast("Error: " + err.message);
+    } finally {
+      if (event.target) event.target.value = "";
+    }
     return;
   }
 
   try {
-    toast("Saving video to local database...");
     const id = crypto.randomUUID();
+    const fileName = `${id}_${file.name}`;
     
-    const tx = db.transaction(storeName, "readwrite");
-    const store = tx.objectStore(storeName);
-    const addRequest = store.add({ id, blob: file });
+    toast("⏳ 正在准备上传视频至云存储 (等候上传)...");
+    
+    // Save to IndexedDB as local offline cache
+    if (db) {
+      try {
+        const tx = db.transaction(storeName, "readwrite");
+        tx.objectStore(storeName).add({ id, blob: file });
+      } catch (dbErr) {
+        console.warn("Failed to write offline copy to IndexedDB:", dbErr);
+      }
+    }
 
+    const storageRef = _storage.ref().child('videos/' + fileName);
+    const uploadTask = storageRef.put(file);
+
+    // Watch upload progress
     await new Promise((resolve, reject) => {
-      addRequest.onsuccess = resolve;
-      addRequest.onerror = () => reject(new Error("Failed to write to database."));
-      tx.oncomplete = resolve;
-      tx.onerror = () => reject(new Error("Transaction failed."));
+      uploadTask.on('state_changed', 
+        (snapshot) => {
+          const progress = Math.round((snapshot.bytesTransferred / snapshot.totalBytes) * 100);
+          toast(`⏳ 视频上传进度: ${progress}% ...`);
+        }, 
+        (error) => {
+          reject(error);
+        }, 
+        () => {
+          resolve();
+        }
+      );
     });
+
+    toast("✨ 正在生成云端链接...");
+    const downloadUrl = await storageRef.getDownloadURL();
 
     state.videos.unshift({
       id,
@@ -2035,19 +2104,20 @@ async function importVideoFile(event) {
       title: file.name,
       mime: file.type,
       date: new Date().toISOString(),
-      blobUrl: URL.createObjectURL(file)
+      url: downloadUrl,
+      fileName: fileName // store filename so we can delete it from Storage later
     });
     
     saveJson(storageKeys.videos, state.videos.map(({blobUrl, ...v}) => {
-      const {blobUrl: _, ...rest} = v; // Clean up just in case
+      const {blobUrl: _, ...rest} = v;
       return rest;
     }));
     
     renderVideos();
-    toast("Video file imported successfully! ✓");
+    toast("✅ 视频已上传成功，所有设备都可以同步观看了！");
   } catch (err) {
-    console.error("Video Import Error:", err);
-    toast("Error: " + err.message);
+    console.error("Video Cloud Upload Error:", err);
+    toast("❌ 上传失败: " + err.message);
   } finally {
     if (event.target) event.target.value = "";
   }
@@ -2067,18 +2137,34 @@ function handleVideoDrop(e) {
 function removeVideo(id) {
   if (confirm("Delete this video?")) {
     const video = state.videos.find(v => v.id === id);
-    if (video && video.blobUrl) URL.revokeObjectURL(video.blobUrl);
+    if (!video) return;
     
+    if (video.blobUrl) URL.revokeObjectURL(video.blobUrl);
+    
+    // If uploading via storage with fileName, attempt to delete from Cloud Storage
+    if (_storage && video.fileName) {
+      _storage.ref().child('videos/' + video.fileName).delete().catch(err => {
+        console.warn("Could not delete from Cloud Storage (might already be gone):", err);
+      });
+    }
+
     state.videos = state.videos.filter(v => v.id !== id);
     saveJson(storageKeys.videos, state.videos.map(({blobUrl, ...v}) => v));
     
-    const tx = db.transaction(storeName, "readwrite");
-    tx.objectStore(storeName).delete(id);
+    if (db) {
+      try {
+        const tx = db.transaction(storeName, "readwrite");
+        tx.objectStore(storeName).delete(id);
+      } catch (dbErr) {
+        console.warn("Could not delete from IndexedDB:", dbErr);
+      }
+    }
     
     renderVideos();
-    toast("Video removed.");
+    toast("Video deleted.");
   }
 }
+
 
 function renderPreviewSessionList() {
   const list = elements.previewSessionList || document.querySelector("#previewSessionList");
