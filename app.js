@@ -3011,6 +3011,11 @@ window.loadLandingLeads = async function() {
       return;
     }
 
+    // Reset select-all checkbox
+    const selAll = document.getElementById('landingSelectAll');
+    if (selAll) selAll.checked = false;
+    updateLandingBulkBar();
+
     tbody.innerHTML = leads.map((l, i) => {
       const date = new Date(l.createdAt);
       const dateStr = new Intl.DateTimeFormat('zh-MY', {
@@ -3019,14 +3024,18 @@ window.loadLandingLeads = async function() {
       }).format(date);
       const wa = l.phone ? `<a href="https://wa.me/${l.phone.replace(/[^\d]/g,'')}" target="_blank" class="mini-button" style="background:#25D366;color:#fff;border-color:#25D366;text-decoration:none;">WA</a>` : '-';
       return `
-        <tr>
+        <tr data-lead-id="${escapeHtml(l.id || '')}">
+          <td><input type="checkbox" class="landing-lead-select" data-id="${escapeHtml(l.id || '')}" onchange="updateLandingBulkBar()"></td>
           <td style="color:var(--muted);font-size:13px;">${total - i}</td>
           <td><strong>${escapeHtml(l.name)}</strong></td>
           <td><span class="muted">${escapeHtml(l.phone || '-')}</span></td>
           <td><span class="badge" style="background:rgba(124,58,237,0.1);color:#7C3AED;border:1px solid rgba(124,58,237,0.2);font-size:12px;">${escapeHtml(l.industry || '')}</span></td>
           <td style="max-width:260px;font-size:13px;color:var(--muted);" title="${escapeHtml(l.challenge || '')}">${escapeHtml((l.challenge || '').length > 80 ? l.challenge.slice(0,80)+'...' : (l.challenge || ''))}</td>
           <td style="font-size:12px;color:var(--muted);">${dateStr}</td>
-          <td>${wa}</td>
+          <td style="display:flex;gap:6px;align-items:center;">
+            ${wa}
+            <button class="mini-button" style="background:rgba(239,68,68,0.12);color:#ef4444;border-color:rgba(239,68,68,0.3);" onclick="deleteLandingLead('${escapeHtml(l.id || '')}', this)" title="删除这条记录">🗑</button>
+          </td>
         </tr>
       `;
     }).join('');
@@ -3076,3 +3085,85 @@ window.exportLandingLeadsCSV = async function() {
   }
 };
 
+// ── Landing Leads: update bulk action bar ──
+function updateLandingBulkBar() {
+  const checkboxes = document.querySelectorAll('.landing-lead-select');
+  const selected   = document.querySelectorAll('.landing-lead-select:checked');
+  const bar        = document.getElementById('landingBulkBar');
+  const countEl    = document.getElementById('landingSelectedCount');
+  const selAll     = document.getElementById('landingSelectAll');
+  if (!bar) return;
+  if (selected.length > 0) {
+    bar.style.display = 'flex';
+    countEl.textContent = `${selected.length} 选中`;
+  } else {
+    bar.style.display = 'none';
+  }
+  if (selAll) {
+    selAll.checked = checkboxes.length > 0 && selected.length === checkboxes.length;
+    selAll.indeterminate = selected.length > 0 && selected.length < checkboxes.length;
+  }
+}
+
+// ── Landing Leads: toggle select all ──
+window.toggleSelectAllLandingLeads = function(masterCb) {
+  document.querySelectorAll('.landing-lead-select').forEach(cb => { cb.checked = masterCb.checked; });
+  updateLandingBulkBar();
+};
+
+// ── Landing Leads: clear selection ──
+window.clearLandingSelection = function() {
+  document.querySelectorAll('.landing-lead-select').forEach(cb => { cb.checked = false; });
+  const selAll = document.getElementById('landingSelectAll');
+  if (selAll) { selAll.checked = false; selAll.indeterminate = false; }
+  updateLandingBulkBar();
+};
+
+// ── Landing Leads: delete single lead ──
+window.deleteLandingLead = async function(id, btn) {
+  if (!id) return;
+  if (!confirm('确定删除这条记录？')) return;
+  if (btn) { btn.disabled = true; btn.textContent = '...'; }
+  try {
+    if (_db) {
+      await _db.collection('landing_leads').doc(id).delete();
+    } else {
+      const leads = JSON.parse(localStorage.getItem('landing_leads_static') || '[]');
+      localStorage.setItem('landing_leads_static', JSON.stringify(leads.filter(l => l.id !== id)));
+    }
+    const row = document.querySelector(`tr[data-lead-id="${id}"]`);
+    if (row) row.remove();
+    updateLandingBulkBar();
+    loadLandingLeads();
+    toast('✅ 记录已删除');
+  } catch (err) {
+    console.error('deleteLandingLead error:', err);
+    toast('❌ 删除失败，请重试');
+    if (btn) { btn.disabled = false; btn.textContent = '🗑'; }
+  }
+};
+
+// ── Landing Leads: delete selected leads ──
+window.deleteSelectedLandingLeads = async function() {
+  const selected = [...document.querySelectorAll('.landing-lead-select:checked')];
+  if (!selected.length) return;
+  if (!confirm(`确定删除选中的 ${selected.length} 条记录？`)) return;
+
+  const ids = selected.map(cb => cb.dataset.id).filter(Boolean);
+  try {
+    if (_db) {
+      const batch = _db.batch();
+      ids.forEach(id => batch.delete(_db.collection('landing_leads').doc(id)));
+      await batch.commit();
+    } else {
+      const leads = JSON.parse(localStorage.getItem('landing_leads_static') || '[]');
+      const idSet = new Set(ids);
+      localStorage.setItem('landing_leads_static', JSON.stringify(leads.filter(l => !idSet.has(l.id))));
+    }
+    toast(`✅ 已删除 ${ids.length} 条记录`);
+    loadLandingLeads();
+  } catch (err) {
+    console.error('deleteSelectedLandingLeads error:', err);
+    toast('❌ 删除失败，请重试');
+  }
+};
