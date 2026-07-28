@@ -1843,6 +1843,8 @@ function switchView(view, targetCourse) {
 
   let title = view.charAt(0).toUpperCase() + view.slice(1);
   if (view === "courses") title = "Preview Courses";
+  if (view === "previewLeads") title = "Preview Leads";
+  if (view === "landingLeads") title = "Landing Page Leads";
   if (view === "enrollments") {
     title = state.enrollmentFilter === "all" ? "Combined Course Enrollments" : state.enrollmentFilter;
   }
@@ -3069,7 +3071,7 @@ window.loadLandingLeads = async function() {
     if (_db) {
       // Firebase mode: read from Firestore
       const snap = await _db.collection('landing_leads').orderBy('createdAt', 'desc').get();
-      leads = snap.docs.map(doc => doc.data());
+      leads = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
     } else {
       // Fallback: local storage
       leads = JSON.parse(localStorage.getItem('landing_leads_static') || '[]');
@@ -3150,7 +3152,7 @@ window.exportLandingLeadsCSV = async function() {
     let leads = [];
     if (_db) {
       const snap = await _db.collection('landing_leads').orderBy('createdAt', 'desc').get();
-      leads = snap.docs.map(doc => doc.data());
+      leads = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
     } else {
       leads = JSON.parse(localStorage.getItem('landing_leads_static') || '[]');
     }
@@ -3284,11 +3286,13 @@ window.loadPreviewLeads = async function() {
     if (_db) {
       // Firebase mode: read from Firestore
       const snap = await _db.collection('preview_leads').orderBy('createdAt', 'desc').get();
-      leads = snap.docs.map(doc => doc.data());
+      leads = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
     } else {
       // Fallback: local storage
       leads = JSON.parse(localStorage.getItem('preview_leads_static') || '[]');
     }
+
+    window._previewLeadsCache = leads;
 
     const total = leads.length;
 
@@ -3319,39 +3323,7 @@ window.loadPreviewLeads = async function() {
       `;
     }
 
-    if (!leads.length) {
-      tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:60px;color:var(--muted)">📋 暂时没有报名记录<br/><small style="opacity:0.6">当有用户通过 champ-preview 链接报名后，记录将自动同步到这里。</small></td></tr>`;
-      return;
-    }
-
-    // Reset select-all checkbox
-    const selAll = document.getElementById('previewSelectAll');
-    if (selAll) selAll.checked = false;
-    updatePreviewBulkBar();
-
-    tbody.innerHTML = leads.map((l, i) => {
-      const date = new Date(l.createdAt || l.date);
-      const dateStr = isNaN(date.getTime()) ? (l.date || '-') : new Intl.DateTimeFormat('zh-MY', {
-        year:'numeric',month:'short',day:'2-digit',
-        hour:'2-digit',minute:'2-digit'
-      }).format(date);
-      const wa = l.phone ? `<a href="https://wa.me/${l.phone.replace(/[^\d]/g,'')}" target="_blank" class="mini-button" style="background:#25D366;color:#fff;border-color:#25D366;text-decoration:none;">WA</a>` : '-';
-      return `
-        <tr data-lead-id="${escapeHtml(l.id || '')}">
-          <td><input type="checkbox" class="preview-lead-select" data-id="${escapeHtml(l.id || '')}" onchange="updatePreviewBulkBar()"></td>
-          <td style="color:var(--muted);font-size:13px;">${total - i}</td>
-          <td><strong>${escapeHtml(l.name || '-')}</strong></td>
-          <td><span class="muted">${escapeHtml(l.phone || '-')}</span></td>
-          <td><span class="muted">${escapeHtml(l.email || '-')}</span></td>
-          <td><span class="badge" style="background:rgba(99,102,241,0.1);color:#6366F1;border:1px solid rgba(99,102,241,0.2);font-size:12px;">${escapeHtml(l.state || '-')}</span></td>
-          <td style="font-size:12px;color:var(--muted);">${dateStr}</td>
-          <td style="display:flex;gap:6px;align-items:center;">
-            ${wa}
-            <button class="mini-button" style="background:rgba(239,68,68,0.12);color:#ef4444;border-color:rgba(239,68,68,0.3);" onclick="deletePreviewLead('${escapeHtml(l.id || '')}', this)" title="删除这条记录">🗑</button>
-          </td>
-        </tr>
-      `;
-    }).join('');
+    filterPreviewLeadsTable();
 
   } catch (err) {
     console.error('loadPreviewLeads error:', err);
@@ -3360,12 +3332,62 @@ window.loadPreviewLeads = async function() {
   }
 };
 
+window._previewLeadsCache = [];
+
+window.filterPreviewLeadsTable = function() {
+  const query = (document.getElementById('previewSearchInput')?.value || '').trim().toLowerCase();
+  const leads = window._previewLeadsCache || [];
+  const filtered = !query ? leads : leads.filter(l => 
+    (l.name || '').toLowerCase().includes(query) ||
+    (l.phone || '').toLowerCase().includes(query) ||
+    (l.email || '').toLowerCase().includes(query) ||
+    (l.state || '').toLowerCase().includes(query)
+  );
+  renderPreviewLeadsRows(filtered, leads.length);
+};
+
+function renderPreviewLeadsRows(leads, totalCount) {
+  const tbody = document.getElementById('previewLeadsBody');
+  if (!tbody) return;
+  if (!leads.length) {
+    tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:60px;color:var(--muted)">📋 暂时没有符合条件的记录<br/><small style="opacity:0.6">当有用户通过 champ-preview 链接报名后，记录将自动同步到这里。</small></td></tr>`;
+    return;
+  }
+  const selAll = document.getElementById('previewSelectAll');
+  if (selAll) selAll.checked = false;
+  updatePreviewBulkBar();
+
+  tbody.innerHTML = leads.map((l, i) => {
+    const date = new Date(l.createdAt || l.date);
+    const dateStr = isNaN(date.getTime()) ? (l.date || '-') : new Intl.DateTimeFormat('zh-MY', {
+      year:'numeric',month:'short',day:'2-digit',
+      hour:'2-digit',minute:'2-digit'
+    }).format(date);
+    const wa = l.phone ? `<a href="https://wa.me/${l.phone.replace(/[^\d]/g,'')}" target="_blank" class="mini-button" style="background:#25D366;color:#fff;border-color:#25D366;text-decoration:none;">WA</a>` : '-';
+    return `
+      <tr data-lead-id="${escapeHtml(l.id || '')}">
+        <td><input type="checkbox" class="preview-lead-select" data-id="${escapeHtml(l.id || '')}" onchange="updatePreviewBulkBar()"></td>
+        <td style="color:var(--muted);font-size:13px;">${totalCount - i}</td>
+        <td><strong>${escapeHtml(l.name || '-')}</strong></td>
+        <td><span class="muted">${escapeHtml(l.phone || '-')}</span></td>
+        <td><span class="muted">${escapeHtml(l.email || '-')}</span></td>
+        <td><span class="badge" style="background:rgba(99,102,241,0.1);color:#6366F1;border:1px solid rgba(99,102,241,0.2);font-size:12px;">${escapeHtml(l.state || '-')}</span></td>
+        <td style="font-size:12px;color:var(--muted);">${dateStr}</td>
+        <td style="display:flex;gap:6px;align-items:center;">
+          ${wa}
+          <button class="mini-button" style="background:rgba(239,68,68,0.12);color:#ef4444;border-color:rgba(239,68,68,0.3);" onclick="deletePreviewLead('${escapeHtml(l.id || '')}', this)" title="删除这条记录">🗑</button>
+        </td>
+      </tr>
+    `;
+  }).join('');
+}
+
 window.exportPreviewLeadsCSV = async function() {
   try {
     let leads = [];
     if (_db) {
       const snap = await _db.collection('preview_leads').orderBy('createdAt', 'desc').get();
-      leads = snap.docs.map(doc => doc.data());
+      leads = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
     } else {
       leads = JSON.parse(localStorage.getItem('preview_leads_static') || '[]');
     }

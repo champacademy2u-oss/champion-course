@@ -506,6 +506,14 @@
           <!-- Stats bar -->
           <div id="previewLeadsStats" style="display:flex; gap:20px; padding: 16px 0; border-bottom: 1px solid var(--line); margin-bottom: 16px; flex-wrap:wrap;"></div>
 
+          <!-- Filter / Search bar -->
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; gap:12px; flex-wrap:wrap;">
+            <div class="search-wrap" style="max-width:360px; width:100%;">
+              <span>⌕</span>
+              <input id="previewSearchInput" type="search" placeholder="搜索姓名、电话、Email、州属..." oninput="filterPreviewLeadsTable()" />
+            </div>
+          </div>
+
           <!-- Table -->
           <div class="table-wrap">
             <table id="previewLeadsTable">
