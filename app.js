@@ -1862,6 +1862,7 @@ function switchView(view, targetCourse) {
   if (view === "followup") renderFollowUpList();
   if (view === "videos") renderVideos();
   if (view === "landingLeads") loadLandingLeads();
+  if (view === "previewLeads") loadPreviewLeads();
 }
 
 
@@ -2968,6 +2969,7 @@ let _unsubscribePreviews = null;
 let _unsubscribeVideos = null;
 let _unsubscribeTemplates = null;
 let _unsubscribeLayout = null;
+let _unsubscribePreviewLeads = null;
 
 function setupRealTimeSync() {
   if (!_db) return;
@@ -2978,6 +2980,7 @@ function setupRealTimeSync() {
   if (_unsubscribeVideos) _unsubscribeVideos();
   if (_unsubscribeTemplates) _unsubscribeTemplates();
   if (_unsubscribeLayout) _unsubscribeLayout();
+  if (_unsubscribePreviewLeads) _unsubscribePreviewLeads();
 
   // ── Leads ──
   _unsubscribeLeads = _db.collection('leads').onSnapshot(snap => {
@@ -3031,6 +3034,15 @@ function setupRealTimeSync() {
     render();
     console.log('[Sync] Layout updated from cloud.');
   }, err => console.warn('[Sync] layout onSnapshot error:', err));
+
+  // ── Preview Leads ──
+  _unsubscribePreviewLeads = _db.collection('preview_leads').onSnapshot(snap => {
+    if (snap.docChanges().every(c => c.doc.metadata.hasPendingWrites)) return;
+    if (document.getElementById('previewLeadsView')?.classList.contains('active')) {
+      loadPreviewLeads();
+    }
+    console.log('[Sync] Preview leads updated from cloud.');
+  }, err => console.warn('[Sync] preview_leads onSnapshot error:', err));
 
   console.log('[Firebase] Real-time sync listeners active.');
 }
@@ -3250,6 +3262,216 @@ window.deleteSelectedLandingLeads = async function() {
     loadLandingLeads();
   } catch (err) {
     console.error('deleteSelectedLandingLeads error:', err);
+    toast('❌ 删除失败，请重试');
+  }
+};
+
+
+// ──────────────────────────────────────────────────────
+// Preview Leads Admin — reads from Firebase Firestore (preview_leads)
+// ──────────────────────────────────────────────────────
+
+window.loadPreviewLeads = async function() {
+  const tbody = document.getElementById('previewLeadsBody');
+  const statsBar = document.getElementById('previewLeadsStats');
+  if (!tbody) return;
+
+  tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:40px;color:var(--muted)">⏳ 加载中...</td></tr>`;
+
+  try {
+    let leads = [];
+
+    if (_db) {
+      // Firebase mode: read from Firestore
+      const snap = await _db.collection('preview_leads').orderBy('createdAt', 'desc').get();
+      leads = snap.docs.map(doc => doc.data());
+    } else {
+      // Fallback: local storage
+      leads = JSON.parse(localStorage.getItem('preview_leads_static') || '[]');
+    }
+
+    const total = leads.length;
+
+    if (statsBar) {
+      const today = leads.filter(l => {
+        const d = new Date(l.createdAt || l.date);
+        const now = new Date();
+        return d.toDateString() === now.toDateString();
+      }).length;
+
+      const states = {};
+      leads.forEach(l => { if (l.state) states[l.state] = (states[l.state] || 0) + 1; });
+      const topState = Object.entries(states).sort((a,b) => b[1]-a[1])[0];
+
+      statsBar.innerHTML = `
+        <div style="background:rgba(99,102,241,0.1);border:1px solid rgba(99,102,241,0.2);border-radius:10px;padding:12px 20px;display:flex;flex-direction:column;gap:2px;">
+          <span style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.06em;">总报名人数</span>
+          <strong style="font-size:22px;color:#6366F1;">${total}</strong>
+        </div>
+        <div style="background:rgba(16,185,129,0.1);border:1px solid rgba(16,185,129,0.2);border-radius:10px;padding:12px 20px;display:flex;flex-direction:column;gap:2px;">
+          <span style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.06em;">今日新增</span>
+          <strong style="font-size:22px;color:#10B981;">${today}</strong>
+        </div>
+        ${topState ? `<div style="background:rgba(245,166,35,0.1);border:1px solid rgba(245,166,35,0.2);border-radius:10px;padding:12px 20px;display:flex;flex-direction:column;gap:2px;">
+          <span style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.06em;">最多州属</span>
+          <strong style="font-size:16px;color:#F5A623;">${escapeHtml(topState[0])} (${topState[1]})</strong>
+        </div>` : ''}
+      `;
+    }
+
+    if (!leads.length) {
+      tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:60px;color:var(--muted)">📋 暂时没有报名记录<br/><small style="opacity:0.6">当有用户通过 champ-preview 链接报名后，记录将自动同步到这里。</small></td></tr>`;
+      return;
+    }
+
+    // Reset select-all checkbox
+    const selAll = document.getElementById('previewSelectAll');
+    if (selAll) selAll.checked = false;
+    updatePreviewBulkBar();
+
+    tbody.innerHTML = leads.map((l, i) => {
+      const date = new Date(l.createdAt || l.date);
+      const dateStr = isNaN(date.getTime()) ? (l.date || '-') : new Intl.DateTimeFormat('zh-MY', {
+        year:'numeric',month:'short',day:'2-digit',
+        hour:'2-digit',minute:'2-digit'
+      }).format(date);
+      const wa = l.phone ? `<a href="https://wa.me/${l.phone.replace(/[^\d]/g,'')}" target="_blank" class="mini-button" style="background:#25D366;color:#fff;border-color:#25D366;text-decoration:none;">WA</a>` : '-';
+      return `
+        <tr data-lead-id="${escapeHtml(l.id || '')}">
+          <td><input type="checkbox" class="preview-lead-select" data-id="${escapeHtml(l.id || '')}" onchange="updatePreviewBulkBar()"></td>
+          <td style="color:var(--muted);font-size:13px;">${total - i}</td>
+          <td><strong>${escapeHtml(l.name || '-')}</strong></td>
+          <td><span class="muted">${escapeHtml(l.phone || '-')}</span></td>
+          <td><span class="muted">${escapeHtml(l.email || '-')}</span></td>
+          <td><span class="badge" style="background:rgba(99,102,241,0.1);color:#6366F1;border:1px solid rgba(99,102,241,0.2);font-size:12px;">${escapeHtml(l.state || '-')}</span></td>
+          <td style="font-size:12px;color:var(--muted);">${dateStr}</td>
+          <td style="display:flex;gap:6px;align-items:center;">
+            ${wa}
+            <button class="mini-button" style="background:rgba(239,68,68,0.12);color:#ef4444;border-color:rgba(239,68,68,0.3);" onclick="deletePreviewLead('${escapeHtml(l.id || '')}', this)" title="删除这条记录">🗑</button>
+          </td>
+        </tr>
+      `;
+    }).join('');
+
+  } catch (err) {
+    console.error('loadPreviewLeads error:', err);
+    tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:40px;color:#ef4444;">⚠️ 加载失败，请刷新重试</td></tr>`;
+    if (statsBar) statsBar.innerHTML = '';
+  }
+};
+
+window.exportPreviewLeadsCSV = async function() {
+  try {
+    let leads = [];
+    if (_db) {
+      const snap = await _db.collection('preview_leads').orderBy('createdAt', 'desc').get();
+      leads = snap.docs.map(doc => doc.data());
+    } else {
+      leads = JSON.parse(localStorage.getItem('preview_leads_static') || '[]');
+    }
+    if (!leads.length) { toast('暂时没有数据可以导出'); return; }
+
+    const headers = ['编号','姓名','电话','Email','州属','报名时间'];
+    const rows = leads.map((l, i) => [
+      i + 1,
+      l.name,
+      l.phone,
+      l.email,
+      l.state,
+      l.createdAt ? new Date(l.createdAt).toLocaleString('zh-MY') : (l.date || ''),
+    ]);
+
+    const csvContent = [headers, ...rows]
+      .map(row => row.map(cell => `"${String(cell ?? '').replace(/"/g, '""')}"`).join(','))
+      .join('\n');
+
+    const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `preview-leads-${new Date().toISOString().slice(0,10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast(`✅ 成功导出 ${leads.length} 条记录`);
+  } catch {
+    toast('❌ 导出失败，请重试');
+  }
+};
+
+function updatePreviewBulkBar() {
+  const checkboxes = document.querySelectorAll('.preview-lead-select');
+  const selected   = document.querySelectorAll('.preview-lead-select:checked');
+  const bar        = document.getElementById('previewBulkBar');
+  const countEl    = document.getElementById('previewSelectedCount');
+  const selAll     = document.getElementById('previewSelectAll');
+  if (!bar) return;
+  if (selected.length > 0) {
+    bar.style.display = 'flex';
+    countEl.textContent = `${selected.length} 选中`;
+  } else {
+    bar.style.display = 'none';
+  }
+  if (selAll) {
+    selAll.checked = checkboxes.length > 0 && selected.length === checkboxes.length;
+    selAll.indeterminate = selected.length > 0 && selected.length < checkboxes.length;
+  }
+}
+
+window.toggleSelectAllPreviewLeads = function(masterCb) {
+  document.querySelectorAll('.preview-lead-select').forEach(cb => { cb.checked = masterCb.checked; });
+  updatePreviewBulkBar();
+};
+
+window.clearPreviewSelection = function() {
+  document.querySelectorAll('.preview-lead-select').forEach(cb => { cb.checked = false; });
+  const selAll = document.getElementById('previewSelectAll');
+  if (selAll) { selAll.checked = false; selAll.indeterminate = false; }
+  updatePreviewBulkBar();
+};
+
+window.deletePreviewLead = async function(id, btn) {
+  if (!id) return;
+  if (!confirm('确定删除这条记录？')) return;
+  if (btn) { btn.disabled = true; btn.textContent = '...'; }
+  try {
+    if (_db) {
+      await _db.collection('preview_leads').doc(id).delete();
+    } else {
+      const leads = JSON.parse(localStorage.getItem('preview_leads_static') || '[]');
+      localStorage.setItem('preview_leads_static', JSON.stringify(leads.filter(l => l.id !== id)));
+    }
+    const row = document.querySelector(`tr[data-lead-id="${id}"]`);
+    if (row) row.remove();
+    updatePreviewBulkBar();
+    loadPreviewLeads();
+    toast('✅ 记录已删除');
+  } catch (err) {
+    console.error('deletePreviewLead error:', err);
+    toast('❌ 删除失败，请重试');
+    if (btn) { btn.disabled = false; btn.textContent = '🗑'; }
+  }
+};
+
+window.deleteSelectedPreviewLeads = async function() {
+  const selected = [...document.querySelectorAll('.preview-lead-select:checked')];
+  if (!selected.length) return;
+  if (!confirm(`确定删除选中的 ${selected.length} 条记录？`)) return;
+
+  const ids = selected.map(cb => cb.dataset.id).filter(Boolean);
+  try {
+    if (_db) {
+      const batch = _db.batch();
+      ids.forEach(id => batch.delete(_db.collection('preview_leads').doc(id)));
+      await batch.commit();
+    } else {
+      const leads = JSON.parse(localStorage.getItem('preview_leads_static') || '[]');
+      const idSet = new Set(ids);
+      localStorage.setItem('preview_leads_static', JSON.stringify(leads.filter(l => !idSet.has(l.id))));
+    }
+    toast(`✅ 已删除 ${ids.length} 条记录`);
+    loadPreviewLeads();
+  } catch (err) {
+    console.error('deleteSelectedPreviewLeads error:', err);
     toast('❌ 删除失败，请重试');
   }
 };
