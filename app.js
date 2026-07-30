@@ -1844,7 +1844,7 @@ function switchView(view, targetCourse) {
   let title = view.charAt(0).toUpperCase() + view.slice(1);
   if (view === "courses") title = "Preview Courses";
   if (view === "previewLeads") title = "Preview Leads";
-  if (view === "landingLeads") title = "Landing Page Leads";
+  if (view === "landingLeads") title = "Ebook Leads";
   if (view === "enrollments") {
     title = state.enrollmentFilter === "all" ? "Combined Course Enrollments" : state.enrollmentFilter;
   }
@@ -3107,7 +3107,7 @@ window.loadLandingLeads = async function() {
     }
 
     if (!leads.length) {
-      tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:60px;color:var(--muted)">📋 暂时没有记录<br/><small style="opacity:0.6">当有客户填写Landing Page表单后，记录将在这里显示。</small></td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:60px;color:var(--muted)">📋 暂时没有记录<br/><small style="opacity:0.6">当有客户填写Ebook Page表单后，记录将在这里显示。</small></td></tr>`;
       return;
     }
 
@@ -3350,7 +3350,7 @@ function renderPreviewLeadsRows(leads, totalCount) {
   const tbody = document.getElementById('previewLeadsBody');
   if (!tbody) return;
   if (!leads.length) {
-    tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:60px;color:var(--muted)">📋 暂时没有符合条件的记录<br/><small style="opacity:0.6">当有用户通过 champ-preview 链接报名后，记录将自动同步到这里。</small></td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:60px;color:var(--muted)">📋 暂时没有符合条件的记录<br/><small style="opacity:0.6">当有用户通过 Preview 页面报名后，记录将自动同步到这里。</small></td></tr>`;
     return;
   }
   const selAll = document.getElementById('previewSelectAll');
