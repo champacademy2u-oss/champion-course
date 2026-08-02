@@ -61,12 +61,33 @@ const defaultTemplates = {
 // ──────────────────────────────────────────
 // Firebase Firestore Cloud Storage
 // All data is synced to Google Firebase cloud.
+// SECURITY: we sign in anonymously (firebase-auth) before any read/write so the
+// locked-down firestore.rules (allow if request.auth != null) are satisfied.
+// If Anonymous Auth is NOT enabled in the Firebase console, signInAnonymously()
+// fails and the app gracefully falls back to localStorage — it never crashes.
 // ──────────────────────────────────────────
 let _db = null;
 let _storage = null;
-try {
-  if (window.FIREBASE_CONFIG) {
+let _authUser = null;
+
+async function initFirebase() {
+  if (!window.FIREBASE_CONFIG) return false;
+  try {
     const fbApp = firebase.initializeApp(window.FIREBASE_CONFIG);
+
+    // Anonymous Auth — required so Firestore rules permit reads/writes.
+    if (firebase.auth) {
+      try {
+        const cred = await firebase.auth(fbApp).signInAnonymously();
+        _authUser = cred.user;
+        console.log('[Firebase] Signed in anonymously:', _authUser?.uid);
+      } catch (authErr) {
+        console.warn('[Firebase] Anonymous sign-in failed (enable Anonymous Auth in console):', authErr.message);
+        // Continue without auth: app uses localStorage fallback. If rules are
+        // deployed as auth-required, Firestore calls will fail and fall back.
+      }
+    }
+
     _db = firebase.firestore(fbApp);
     _db.enablePersistence().catch((err) => {
       console.warn('[Firebase] Offline persistence enable failed:', err.code);
@@ -74,13 +95,15 @@ try {
     try {
       _storage = firebase.storage(fbApp);
       console.log('[Firebase] Cloud Storage initialized.');
-    } catch(storageErr) {
+    } catch (storageErr) {
       console.warn('[Firebase] Cloud Storage failed to init:', storageErr);
     }
-    console.log('[Firebase] Firestore connected with persistence.');
+    console.log('[Firebase] Firestore connected' + (_authUser ? ' (authenticated).' : ' (NO AUTH).'));
+    return true;
+  } catch (e) {
+    console.warn('[Firebase] Failed to init:', e);
+    return false;
   }
-} catch (e) {
-  console.warn('[Firebase] Failed to init:', e);
 }
 
 async function fbSaveLead(lead) {
@@ -2903,7 +2926,9 @@ async function autoLoadBackupFromServer() {
 
 // ─── Firebase startup: load all data from Firestore then render ───
 async function initFromFirebase() {
-  if (!_db) {
+  // Initialize Firebase + sign in anonymously BEFORE any DB read.
+  const initialized = await initFirebase();
+  if (!initialized || !_db) {
     // No Firebase — fall back to localStorage + JSON backup
     initPerformanceFilters();
     fillForms();

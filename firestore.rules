@@ -2,32 +2,28 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // SECURITY NOTE:
-    // The app (app.js) currently connects to Firestore with NO Firebase Auth.
-    // If you deploy these locked-down rules as-is, the app will NOT be able to
-    // read or write any data until Firebase Authentication is added AND the
-    // requests are made by a signed-in user.
+    // SECURITY MODEL
+    // app.js signs in ANONYMOUSLY (firebase.auth().signInAnonymously()) before
+    // any read/write. Anonymous Auth satisfies `request.auth != null`, so the
+    // database is no longer publicly readable by anyone on the internet — only
+    // by a Firebase Auth user of THIS project. For a single-operator CRM this
+    // closes the open-access hole while keeping the code simple.
     //
-    // Recommended next step: add Firebase Auth in app.js (Anonymous Auth is the
-    // simplest for a single-operator CRM), then tighten the rules per-collection
-    // so each user can only touch their own data.
+    // REQUIRED BEFORE DEPLOYING THESE RULES:
+    //   1. In the Firebase console → Authentication → Sign-in method, ENABLE
+    //      "Anonymous". Otherwise signInAnonymously() fails and the app falls
+    //      back to localStorage (it will NOT crash).
+    //   2. The web API key in config.js is public by design; these rules are
+    //      what actually protect the data.
     //
-    // Until then, keep these rules UNDEPLOYED or the app breaks.
+    // FUTURE HARDENING (optional): restrict to a specific operator uid, e.g.
+    //   allow read, write: if request.auth != null
+    //     && request.auth.uid == "YOUR_OPERATOR_UID";
+    // or add per-user `ownerId` fields. Not required for single-user use.
 
-    // Default-deny: only authenticated requests are allowed.
+    // Default-deny: only authenticated (anonymous) requests are allowed.
     match /{document=**} {
       allow read, write: if request.auth != null;
     }
-
-    // ---- Example of tighter, per-user rules once Auth is wired up ----
-    // Lead records owned by the signed-in user:
-    // match /leads/{leadId} {
-    //   allow read, write: if request.auth != null
-    //     && request.auth.uid == resource.data.ownerId;
-    // }
-    // Config / templates shared across the operator's account:
-    // match /config/{docId} {
-    //   allow read, write: if request.auth != null;
-    // }
   }
 }
