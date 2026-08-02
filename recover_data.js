@@ -122,9 +122,17 @@ for (const { path, course: overrideCourse } of CSV_FILES) {
 
     if (!name && !phone && !email) continue;
 
-    // Dedup key: normalize(phone) or normalize(name)
-    const phoneDigits = phone.replace(/[^\d]/g, '');
-    const key = phoneDigits.length >= 8 ? `phone:${phoneDigits}` : `name:${normalize(name)}`;
+    // Dedup key: match the frontend (app.js duplicateKey) — name first, then phone, then email.
+    // This keeps the recovery script and the live app consistent so the same person
+    // does not end up as duplicate records after importing.
+    const nameNorm = normalize(name);
+    const phoneDigits = phone.replace(/[^0-9]/g, "");
+    const emailNorm = normalize(email);
+    let key;
+    if (name && nameNorm !== "unknownlead") key = `name:${nameNorm}`;
+    else if (phoneDigits.length >= 8) key = `phone:${phoneDigits}`;
+    else if (emailNorm) key = `email:${emailNorm}`;
+    else key = `lead:${randomUUID()}`;
 
     if (allLeads.has(key)) {
       // Merge: keep existing, supplement missing fields

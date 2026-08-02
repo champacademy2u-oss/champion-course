@@ -5,8 +5,7 @@ const ASSETS = [
   "./styles.css",
   "./app.js",
   "./config.js",
-  "./manifest.json",
-  "./lead-center-full-backup-2026-07-04-v3.json"
+  "./manifest.json"
 ];
 
 // Install: pre-cache assets

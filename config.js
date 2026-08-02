@@ -1,6 +1,8 @@
 // Configuration for Champion Course Lead Center
 window.CONFIG = {
-  // Original backend for backwards compatibility during migration
+  // Original backend kept for backwards compatibility during migration.
+  // NOTE: the frontend no longer calls this endpoint — leads sync directly
+  // to Firebase from the browser (see app.js). This value is currently unused.
   API_BASE_URL: "https://champion-course.onrender.com",
 };
 

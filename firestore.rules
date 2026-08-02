@@ -1,0 +1,33 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // SECURITY NOTE:
+    // The app (app.js) currently connects to Firestore with NO Firebase Auth.
+    // If you deploy these locked-down rules as-is, the app will NOT be able to
+    // read or write any data until Firebase Authentication is added AND the
+    // requests are made by a signed-in user.
+    //
+    // Recommended next step: add Firebase Auth in app.js (Anonymous Auth is the
+    // simplest for a single-operator CRM), then tighten the rules per-collection
+    // so each user can only touch their own data.
+    //
+    // Until then, keep these rules UNDEPLOYED or the app breaks.
+
+    // Default-deny: only authenticated requests are allowed.
+    match /{document=**} {
+      allow read, write: if request.auth != null;
+    }
+
+    // ---- Example of tighter, per-user rules once Auth is wired up ----
+    // Lead records owned by the signed-in user:
+    // match /leads/{leadId} {
+    //   allow read, write: if request.auth != null
+    //     && request.auth.uid == resource.data.ownerId;
+    // }
+    // Config / templates shared across the operator's account:
+    // match /config/{docId} {
+    //   allow read, write: if request.auth != null;
+    // }
+  }
+}

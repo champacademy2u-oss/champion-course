@@ -4,4 +4,5 @@ node_modules/
 .DS_Store
 recovered-leads.json
 landing-leads.json
+lead-center-full-backup-*.json
 assets/

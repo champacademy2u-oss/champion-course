@@ -147,6 +147,17 @@ const server = http.createServer(async (req, res) => {
 
     // ── GET: List landing leads (admin) ──
     if (req.method === "GET" && pathname === "/api/landing-leads") {
+      // DISCOURAGE public exposure of customer PII. If LANDING_LEADS_API_KEY
+      // is set, require it via ?key= or Authorization: Bearer. If unset, the
+      // endpoint stays open for local use but logs a startup warning.
+      const apiKey = process.env.LANDING_LEADS_API_KEY;
+      if (apiKey) {
+        const url = new URL(req.url, `http://${req.headers.host}`);
+        const provided = url.searchParams.get("key") || (req.headers["authorization"] || "").replace(/^Bearer\s+/i, "");
+        if (provided !== apiKey) {
+          return sendJson(res, 401, { error: "Unauthorized" });
+        }
+      }
       const leads = readLandingLeads();
       return sendJson(res, 200, { leads, total: leads.length });
     }
@@ -182,6 +193,9 @@ function logConfigWarnings() {
   if (!config.driveFolderId) missing.push("GOOGLE_DRIVE_FOLDER_ID");
   if (!config.serviceAccountFile && !config.serviceAccountJson) {
     missing.push("GOOGLE_SERVICE_ACCOUNT_FILE or GOOGLE_SERVICE_ACCOUNT_JSON");
+  }
+  if (!process.env.LANDING_LEADS_API_KEY) {
+    console.warn("LANDING_LEADS_API_KEY is not set — /api/landing-leads is publicly readable (contains customer PII). Set it to require an API key.");
   }
 
   if (missing.length) {
