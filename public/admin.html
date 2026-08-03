@@ -1,0 +1,269 @@
+<!doctype html>
+<html lang="zh-Hans">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>视频后台</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+<main class="shell">
+  <header>
+    <a class="brand" href="/admin">▣ Secure Video Room</a>
+    <p>Vercel + Firebase 云端视频后台</p>
+  </header>
+
+  <section id="login" class="card">
+    <span class="pill">Admin</span>
+    <h1>管理员登录</h1>
+    <p>输入管理员密码后才可以上传视频和查看观看记录。</p>
+    <form id="loginForm">
+      <label>管理员密码<input required name="password" type="password" autocomplete="current-password"></label>
+      <button>进入后台</button>
+      <p id="loginError" class="error"></p>
+    </form>
+  </section>
+
+  <section id="dashboard" hidden>
+    <div class="toolbar">
+      <div>
+        <h1>视频后台</h1>
+        <p class="hint">云端运行中 · 单个视频最大 1GB · 视频直传 Firebase Storage</p>
+      </div>
+      <button class="ghost" id="refreshButton">刷新数据</button>
+    </div>
+
+    <div class="grid stats" id="stats"></div>
+
+    <div class="grid admin-grid">
+      <section class="card">
+        <h2>上传视频</h2>
+        <form id="uploadForm">
+          <label>视频标题<input required name="title" maxlength="100" placeholder="例如：训练营第一课"></label>
+          <label>观看密码<input required name="password" type="text" placeholder="分享给观众的密码"></label>
+          <label>期限（留空为永不过期）<input name="expiresAt" type="datetime-local"></label>
+          <label>视频文件（最大 1GB）<input required name="file" type="file" accept="video/mp4,video/webm,video/quicktime,video/x-m4v"></label>
+          <button id="uploadButton">上传并建立观看链接</button>
+          <div class="progress"><span id="uploadBar"></span></div>
+          <p id="uploadStatus" class="hint"></p>
+        </form>
+      </section>
+
+      <section class="card">
+        <h2>系统设置</h2>
+        <form id="settingsForm">
+          <label>品牌名称<input name="brandName"></label>
+          <label>WhatsApp Community 邀请链接<input name="communityUrl" type="url" placeholder="https://chat.whatsapp.com/..."></label>
+          <label>完成观看 Webhook URL<input name="webhookUrl" type="url" placeholder="Make / Zapier / 你的 API"></label>
+          <button>储存设置</button>
+        </form>
+        <p class="hint">公开视频会通过短期签名链接播放。若观众复制视频地址，链接也会在短时间后失效。</p>
+      </section>
+    </div>
+
+    <section class="card">
+      <div class="section-title">
+        <h2>已发布视频</h2>
+        <span id="videoCount" class="pill">0 个视频</span>
+      </div>
+      <div id="videos"></div>
+    </section>
+
+    <section class="card">
+      <div class="section-title">
+        <h2>观看记录</h2>
+        <span id="viewCount" class="pill">0 人次</span>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>观众</th><th>电话</th><th>视频</th><th>开始观看</th><th>观看时长</th><th>状态</th></tr></thead>
+          <tbody id="views"></tbody>
+        </table>
+      </div>
+    </section>
+  </section>
+</main>
+
+<script type="module">
+import { initializeApp } from 'https://www.gstatic.com/firebasejs/12.15.0/firebase-app.js';
+import { getAuth, signInWithCustomToken } from 'https://www.gstatic.com/firebasejs/12.15.0/firebase-auth.js';
+import { getStorage, ref, uploadBytesResumable } from 'https://www.gstatic.com/firebasejs/12.15.0/firebase-storage.js';
+
+let app;
+let auth;
+let storage;
+let state = {};
+let maxVideoSize = 1024 * 1024 * 1024;
+const loginPanel = document.getElementById('login');
+const dashboardPanel = document.getElementById('dashboard');
+const loginFormEl = document.getElementById('loginForm');
+const loginErrorEl = document.getElementById('loginError');
+const uploadFormEl = document.getElementById('uploadForm');
+const uploadButtonEl = document.getElementById('uploadButton');
+const uploadBarEl = document.getElementById('uploadBar');
+const uploadStatusEl = document.getElementById('uploadStatus');
+const settingsFormEl = document.getElementById('settingsForm');
+const refreshButtonEl = document.getElementById('refreshButton');
+const statsEl = document.getElementById('stats');
+const videosEl = document.getElementById('videos');
+const viewsEl = document.getElementById('views');
+const videoCountEl = document.getElementById('videoCount');
+const viewCountEl = document.getElementById('viewCount');
+
+const api = async (url, options = {}) => {
+  const headers = new Headers(options.headers || {});
+  if (auth?.currentUser) headers.set('Authorization', 'Bearer ' + await auth.currentUser.getIdToken());
+  const res = await fetch(url, { ...options, headers });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || '操作失败');
+  return data;
+};
+
+const esc = value => String(value ?? '').replace(/[&<>"]/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[char]));
+const seconds = value => Math.floor(value / 60) + ' 分 ' + Math.floor(value % 60) + ' 秒';
+const dateText = value => value ? new Date(value).toLocaleString() : '永不过期';
+const setProgress = (percent, text) => {
+  uploadBarEl.style.width = Math.max(0, Math.min(100, percent)) + '%';
+  uploadStatusEl.textContent = text;
+};
+
+async function init() {
+  const config = await fetch('/api/config').then(res => res.json());
+  maxVideoSize = config.maxVideoSize;
+  app = initializeApp(config.firebase);
+  auth = getAuth(app);
+  storage = getStorage(app);
+}
+
+async function adminLogin(event) {
+  event.preventDefault();
+  loginErrorEl.textContent = '';
+  try {
+    const { token } = await fetch('/api/admin-token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password: event.target.password.value })
+    }).then(async res => {
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || '无法登录');
+      return data;
+    });
+    await signInWithCustomToken(auth, token);
+    loginPanel.hidden = true;
+    dashboardPanel.hidden = false;
+    await boot();
+  } catch (error) {
+    loginErrorEl.textContent = error.message;
+  }
+}
+
+async function boot() {
+  state = await api('/api/admin-data');
+  render();
+}
+
+function render() {
+  const settings = state.settings;
+  settingsFormEl.brandName.value = settings.brandName || '';
+  settingsFormEl.communityUrl.value = settings.communityUrl || '';
+  settingsFormEl.webhookUrl.value = settings.webhookUrl || '';
+  videoCountEl.textContent = state.stats.videos + ' 个视频';
+  viewCountEl.textContent = state.stats.views + ' 人次';
+  statsEl.innerHTML =
+    '<div class="stat"><b>在线</b><span>服务状态</span></div>' +
+    '<div class="stat"><b>' + esc(state.system.platform) + '</b><span>平台</span></div>' +
+    '<div class="stat"><b>' + esc(state.system.uploadTotal) + '</b><span>视频总容量</span></div>' +
+    '<div class="stat"><b>' + state.stats.completed + '</b><span>完成观看</span></div>';
+
+  videosEl.innerHTML = state.videos.length ? state.videos.map(video => {
+    const url = location.origin + '/watch/' + video.id;
+    return '<article class="video-row"><div><strong>' + esc(video.title) + '</strong>' +
+      '<small>' + esc(video.sizeText) + ' · 上传：' + dateText(video.createdAt) + ' · 到期：' + dateText(video.expiresAt) + ' · ' + (video.expired ? '已过期' : '可观看') + '</small>' +
+      '<small>' + video.viewCount + ' 人观看 · ' + video.completedCount + ' 人完成 · ' + seconds(video.totalWatchedSeconds) + '</small>' +
+      '<code>' + esc(url) + '</code></div><div class="actions">' +
+      '<button class="small" onclick="copyLink(&quot;' + video.id + '&quot;)">复制链接</button>' +
+      '<a class="small button ghost-link" href="/watch/' + video.id + '" target="_blank" rel="noopener">预览观看页</a>' +
+      '<button class="small danger" onclick="removeVideo(&quot;' + video.id + '&quot;)">删除视频</button>' +
+      '</div></article>';
+  }).join('') : '<p class="hint">尚未上传视频。</p>';
+
+  viewsEl.innerHTML = state.views.length ? state.views.map(view =>
+    '<tr><td>' + esc(view.name) + '</td><td>' + esc(view.phone) + '</td><td>' + esc(view.videoTitle) + '</td><td>' + dateText(view.startedAt) + '</td><td>' + seconds(view.watchedSeconds || 0) + '</td><td>' + (view.completedAt ? '已完成' : '观看中') + '</td></tr>'
+  ).join('') : '<tr><td colspan="6" class="hint">还没有观看记录。</td></tr>';
+}
+
+window.copyLink = async id => {
+  await navigator.clipboard.writeText(location.origin + '/watch/' + id);
+  alert('观看链接已复制');
+};
+
+window.removeVideo = async id => {
+  if (!confirm('确定删除这个视频和相关观看记录？')) return;
+  await api('/api/videos?id=' + encodeURIComponent(id), { method: 'DELETE' });
+  await boot();
+};
+
+async function upload(event) {
+  event.preventDefault();
+  const form = event.target;
+  const file = form.file.files[0];
+  if (!file) return setProgress(0, '请选择视频文件');
+  if (file.size > maxVideoSize) return setProgress(0, '视频文件不可超过 1GB');
+  uploadButtonEl.disabled = true;
+  setProgress(2, '准备上传到 Firebase Storage…');
+  const id = crypto.randomUUID();
+  const cleanName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+  const storagePath = 'videos/' + id + '/' + cleanName;
+  const task = uploadBytesResumable(ref(storage, storagePath), file, { contentType: file.type || 'video/mp4' });
+  task.on('state_changed', snapshot => {
+    const percent = Math.round(snapshot.bytesTransferred / snapshot.totalBytes * 100);
+    setProgress(percent, '正在上传 ' + percent + '% · ' + Math.round(snapshot.bytesTransferred / 1024 / 1024) + 'MB / ' + Math.round(snapshot.totalBytes / 1024 / 1024) + 'MB');
+  }, error => {
+    uploadButtonEl.disabled = false;
+    setProgress(0, error.message || '上传失败');
+  }, async () => {
+    try {
+      const video = await api('/api/videos', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id,
+          title: form.title.value,
+          password: form.password.value,
+          expiresAt: form.expiresAt.value,
+          storagePath,
+          originalName: file.name,
+          contentType: file.type || 'video/mp4',
+          size: file.size
+        })
+      });
+      setProgress(100, '完成！观看链接：' + location.origin + '/watch/' + video.video.id);
+      form.reset();
+      await boot();
+    } catch (error) {
+      setProgress(0, error.message);
+    } finally {
+      uploadButtonEl.disabled = false;
+    }
+  });
+}
+
+async function saveSettings(event) {
+  event.preventDefault();
+  await api('/api/settings', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(Object.fromEntries(new FormData(event.target)))
+  });
+  alert('设置已储存');
+  await boot();
+}
+
+loginFormEl.addEventListener('submit', adminLogin);
+uploadFormEl.addEventListener('submit', upload);
+settingsFormEl.addEventListener('submit', saveSettings);
+refreshButtonEl.addEventListener('click', boot);
+init().catch(error => loginErrorEl.textContent = error.message);
+</script>
+</body>
+</html>

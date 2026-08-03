@@ -55,3 +55,15 @@ Ali Tan,+60123456789,ali@example.com,Business Owner
 - Email provider, for example SendGrid, Mailgun, Gmail API, or SMTP
 - Database, for example Supabase, Firebase, Airtable, or MySQL
 - Scheduler / automation worker
+
+## Vercel + Firebase 视频后台
+
+这个仓库现在也包含一个可部署到 Vercel 的安全视频后台：
+
+- `/admin`：管理员登录、上传视频、复制观看链接、查看观看记录。
+- `/watch/:id`：观众输入姓名、电话和观看密码后观看视频。
+- `api/`：Vercel Serverless Functions，负责管理员验证、视频资料、观看记录、短期签名播放链接。
+- `public/`：云端后台和观看页。
+- `firebase-rules/storage.rules`：Firebase Storage 安全规则范本。
+
+部署需要在 Vercel 设置环境变量，参考 `.env.vercel.example`。视频文件由浏览器直传 Firebase Storage，避免触碰 Vercel Function 4.5MB request body 限制；Vercel API 只负责验证和记录。

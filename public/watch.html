@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="zh-Hans">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>安全观看</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+<main class="watch-shell">
+  <header><a class="brand" href="/admin">▣ Secure Video Room</a></header>
+
+  <section id="gate" class="card">
+    <span id="expiry" class="pill">正在载入</span>
+    <h1 id="videoTitle">正在载入…</h1>
+    <p id="videoHint">请输入资料以取得观看权限。</p>
+    <form id="watchForm">
+      <label>姓名<input required name="name" maxlength="80" autocomplete="name"></label>
+      <label>电话号码<input required name="phone" maxlength="30" inputmode="tel" autocomplete="tel"></label>
+      <label>观看密码<input required name="password" type="password"></label>
+      <button id="startButton">开始观看</button>
+      <p id="error" class="error"></p>
+    </form>
+  </section>
+
+  <section id="playerArea" hidden>
+    <div class="video-box">
+      <video id="player" controls controlsList="nodownload" disablePictureInPicture playsinline></video>
+    </div>
+    <div class="watch-info">
+      <span id="watchProgress" class="pill">观看进度 0%</span>
+      <h1 id="playerTitle"></h1>
+      <p id="progress">观看中，请保持此页面开启。</p>
+      <a id="community" class="button community-button" target="_blank" rel="noopener" hidden>完成观看，加入 WhatsApp Community</a>
+    </div>
+  </section>
+</main>
+
+<script>
+const videoId = location.pathname.split('/').filter(Boolean).pop() || new URLSearchParams(location.search).get('id');
+let viewId = '';
+let viewToken = '';
+const gateEl = document.getElementById('gate');
+const playerAreaEl = document.getElementById('playerArea');
+const playerEl = document.getElementById('player');
+const videoTitleEl = document.getElementById('videoTitle');
+const playerTitleEl = document.getElementById('playerTitle');
+const videoHintEl = document.getElementById('videoHint');
+const expiryEl = document.getElementById('expiry');
+const watchFormEl = document.getElementById('watchForm');
+const startButtonEl = document.getElementById('startButton');
+const errorEl = document.getElementById('error');
+const progressEl = document.getElementById('progress');
+const watchProgressEl = document.getElementById('watchProgress');
+const communityEl = document.getElementById('community');
+
+async function api(url, options = {}) {
+  const res = await fetch(url, options);
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || '无法继续');
+  return data;
+}
+
+function expiryText(value) {
+  return value ? '到期：' + new Date(value).toLocaleString() : '永不过期';
+}
+
+async function loadVideo() {
+  try {
+    const video = await api('/api/public-video?id=' + encodeURIComponent(videoId));
+    videoTitleEl.textContent = video.title;
+    expiryEl.textContent = expiryText(video.expiresAt);
+  } catch (error) {
+    videoTitleEl.textContent = '此视频目前无法观看';
+    videoHintEl.textContent = '链接可能已过期，或视频已被管理员删除。';
+    expiryEl.textContent = '无法观看';
+    errorEl.textContent = error.message;
+    startButtonEl.disabled = true;
+  }
+}
+
+async function enter(event) {
+  event.preventDefault();
+  errorEl.textContent = '';
+  startButtonEl.disabled = true;
+  try {
+    const result = await api('/api/watch-start', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ videoId, ...Object.fromEntries(new FormData(event.target)) })
+    });
+    viewId = result.viewId;
+    viewToken = result.viewToken;
+    gateEl.hidden = true;
+    playerAreaEl.hidden = false;
+    playerTitleEl.textContent = result.video.title;
+    playerEl.src = result.signedUrl;
+    if (result.communityUrl) communityEl.href = result.communityUrl;
+    playerEl.play().catch(() => {});
+  } catch (error) {
+    errorEl.textContent = error.message === '观看密码不正确' ? '观看密码不正确，请检查后再试。' : error.message;
+    startButtonEl.disabled = false;
+  }
+}
+
+function heartbeat(completed = false) {
+  if (!viewId || !viewToken) return;
+  api('/api/watch-update', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ viewId, viewToken, watchedSeconds: Math.floor(playerEl.currentTime || 0), completed })
+  }).then(result => {
+    if (result.communityUrl && completed) {
+      communityEl.href = result.communityUrl;
+      communityEl.hidden = false;
+      progressEl.textContent = '你已完成观看。欢迎加入我们的社群！';
+      watchProgressEl.textContent = '观看进度 100%';
+    }
+  }).catch(() => {});
+}
+
+function updateProgress() {
+  if (!playerEl.duration) return;
+  const percent = Math.min(100, Math.round(playerEl.currentTime / playerEl.duration * 100));
+  watchProgressEl.textContent = '观看进度 ' + percent + '%';
+}
+
+watchFormEl.addEventListener('submit', enter);
+playerEl.addEventListener('timeupdate', updateProgress);
+playerEl.addEventListener('ended', () => heartbeat(true));
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) heartbeat(false);
+});
+setInterval(() => heartbeat(false), 15000);
+loadVideo();
+</script>
+</body>
+</html>
