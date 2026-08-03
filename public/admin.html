@@ -13,7 +13,7 @@
     <p>Vercel + Firebase 云端视频后台</p>
   </header>
 
-  <section id="login" class="card">
+  <section id="login" class="card" hidden>
     <span class="pill">Admin</span>
     <h1>管理员登录</h1>
     <p>输入管理员密码后才可以上传视频和查看观看记录。</p>
@@ -127,9 +127,13 @@ async function init() {
   maxVideoSize = config.maxVideoSize;
   isPublicAdmin = Boolean(config.adminLoginDisabled);
   if (isPublicAdmin) {
-    await boot();
     loginPanel.hidden = true;
     dashboardPanel.hidden = false;
+    try {
+      await boot();
+    } catch (error) {
+      renderLoadError(error);
+    }
     return;
   }
   if (adminToken) {
@@ -142,7 +146,9 @@ async function init() {
       sessionStorage.removeItem('videoRoomAdminToken');
       loginErrorEl.textContent = error.message;
     }
+    return;
   }
+  loginPanel.hidden = false;
 }
 
 async function adminLogin(event) {
@@ -203,6 +209,21 @@ function render() {
   viewsEl.innerHTML = state.views.length ? state.views.map(view =>
     '<tr><td>' + esc(view.name) + '</td><td>' + esc(view.phone) + '</td><td>' + esc(view.videoTitle) + '</td><td>' + dateText(view.startedAt) + '</td><td>' + seconds(view.watchedSeconds || 0) + '</td><td>' + (view.completedAt ? '已完成' : '观看中') + '</td></tr>'
   ).join('') : '<tr><td colspan="6" class="hint">还没有观看记录。</td></tr>';
+}
+
+function renderLoadError(error) {
+  state = {
+    settings: { brandName: '', communityUrl: '', webhookUrl: '' },
+    videos: [],
+    views: [],
+    stats: { videos: 0, views: 0, completed: 0 },
+    system: { platform: 'Vercel + Firebase', uploadTotal: '0 MB' }
+  };
+  statsEl.innerHTML = '<div class="stat"><b>需要 Firebase 设置</b><span>' + esc(error.message) + '</span></div>';
+  videoCountEl.textContent = '0 个视频';
+  viewCountEl.textContent = '0 人次';
+  videosEl.innerHTML = '<p class="error">Firebase Firestore 还没配置完成，所以暂时不能显示视频列表。</p>';
+  viewsEl.innerHTML = '<tr><td colspan="6" class="hint">Firebase 设置完成后会显示观看记录。</td></tr>';
 }
 
 window.copyLink = async id => {
