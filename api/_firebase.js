@@ -55,6 +55,10 @@ function webConfig() {
   };
 }
 
+function adminLoginDisabled() {
+  return String(process.env.ADMIN_LOGIN_DISABLED || '').toLowerCase() === 'true';
+}
+
 function sendJson(res, status, value) {
   res.statusCode = status;
   res.setHeader('Content-Type', 'application/json; charset=utf-8');
@@ -131,6 +135,7 @@ function createAdminSession() {
 }
 
 async function requireAdmin(req) {
+  if (adminLoginDisabled()) return { role: 'public-admin' };
   const header = req.headers.authorization || '';
   const token = header.startsWith('Bearer ') ? header.slice(7) : '';
   if (!token) throw new Error('未授权');
@@ -190,6 +195,7 @@ function maxVideoSize() {
 
 export {
   bucket,
+  adminLoginDisabled,
   createAdminSession,
   db,
   fieldValue,

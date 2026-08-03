@@ -15,6 +15,7 @@
 9. 在 Leads 页面点击 `Bulk WhatsApp`，会用同一段 WhatsApp 文案打开所有有电话的客户聊天。
 10. 在 Leads 页面点击 `Bulk Email`，会用 BCC 把同一封 email 发给所有有 email 的客户。
 11. 跟进完成后点击 `Done`，系统会进入下一次 Day 3 或 Day 7 follow-up。
+12. 左侧 `Zoom` 页面可以保存每场活动的名称、日期时间、Zoom 报名链接，以及 WhatsApp / Email 通知内容。
 
 ## 测试
 
@@ -66,4 +67,4 @@ Ali Tan,+60123456789,ali@example.com,Business Owner
 - `public/`：云端后台和观看页。
 - `firebase-rules/storage.rules`：Firebase Storage 安全规则范本。
 
-部署需要在 Vercel 设置环境变量，参考 `.env.vercel.example`。视频文件通过 Vercel API 产生的短期 signed URL 由浏览器直传 Firebase Storage，避免触碰 Vercel Function 4.5MB request body 限制；Vercel API 只负责验证、签名和记录，不需要先启用 Firebase Auth。
+部署需要在 Vercel 设置环境变量，参考 `.env.vercel.example`。如果 `ADMIN_LOGIN_DISABLED=true`，后台会公开访问；正式对客户开放前建议改回 `false` 并设置强管理员密码。视频文件通过 Vercel API 产生的短期 signed URL 由浏览器直传 Firebase Storage，避免触碰 Vercel Function 4.5MB request body 限制；Vercel API 只负责验证、签名和记录，不需要先启用 Firebase Auth。
