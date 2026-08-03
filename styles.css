@@ -61,6 +61,7 @@ button {
   display: flex;
   flex-direction: column;
   gap: 28px;
+  overflow-y: auto;
 }
 
 .brand {
@@ -801,6 +802,136 @@ tr:last-child td {
   line-height: 1.6;
 }
 
+.zoom-panel {
+  display: grid;
+  gap: 22px;
+}
+
+.zoom-heading {
+  align-items: flex-start;
+  margin-bottom: 0;
+}
+
+.zoom-subtitle {
+  max-width: 720px;
+  margin: 6px 0 0;
+  font-size: 13px;
+}
+
+.zoom-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.zoom-status-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.zoom-status-card {
+  display: grid;
+  gap: 6px;
+  min-height: 116px;
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--soft);
+}
+
+.zoom-status-card span,
+.zoom-status-card small {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.zoom-status-card strong {
+  font-size: 18px;
+  color: var(--brand);
+}
+
+.zoom-status-card strong.status-pending {
+  color: #c05621;
+}
+
+.zoom-settings-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 18px;
+  align-items: start;
+}
+
+.zoom-form-card {
+  display: grid;
+  gap: 16px;
+  padding: 20px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #fff;
+}
+
+.zoom-form-card h4 {
+  margin: 0;
+  font-size: 15px;
+}
+
+.zoom-field-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.zoom-field-full {
+  grid-column: 1 / -1;
+}
+
+.zoom-channel-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.zoom-channel-row label {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.zoom-channel-row input {
+  min-height: 0;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+}
+
+.zoom-security-note {
+  padding: 12px 14px;
+  border: 1px solid #bfdbfe;
+  border-radius: 8px;
+  background: #eff6ff;
+  color: #1e40af;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.zoom-template-help {
+  margin: -4px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.7;
+}
+
+.zoom-template-help code {
+  color: var(--brand-dark);
+}
+
 .toast {
   position: fixed;
   right: 22px;
@@ -835,6 +966,11 @@ tr:last-child td {
   .nav-item {
     justify-content: center;
     padding: 0 8px;
+  }
+
+  .zoom-status-grid,
+  .zoom-settings-grid {
+    grid-template-columns: 1fr;
   }
 
   .sidebar-note {

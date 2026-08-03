@@ -37,6 +37,9 @@
         <a href="https://mail.google.com/mail/u/4/#inbox" target="_blank" class="nav-item" title="Open Gmail" style="text-decoration: none;">
           <span>📧</span> Mailbox
         </a>
+        <button class="nav-item" data-view="zoom" title="Zoom">
+          <span>🎥</span> Zoom
+        </button>
         <button class="nav-item" data-view="videos" title="Video Library">
           <span>🎬</span> Videos
         </button>
@@ -440,6 +443,91 @@
         </div>
       </section>
 
+      <!-- ── ZOOM EVENT SETTINGS ── -->
+      <section class="view" id="zoomView">
+        <div class="panel wide zoom-panel">
+          <div class="panel-heading zoom-heading">
+            <div>
+              <h3>🎥 Zoom 报名与发送设置</h3>
+              <p class="muted zoom-subtitle">每场活动只需在这里更换 Zoom 链接。客户自动发送功能会在 WhatsApp Business 与 Email API 接通后启用。</p>
+            </div>
+            <div class="zoom-actions">
+              <button class="text-button" id="copyZoomLinkBtn" type="button">复制 Zoom 链接</button>
+              <button class="text-button primary" id="saveZoomSettingsBtn" type="button">保存本次活动</button>
+            </div>
+          </div>
+
+          <div class="zoom-status-grid" aria-label="Zoom 设置状态">
+            <div class="zoom-status-card">
+              <span>Zoom 链接</span>
+              <strong id="zoomLinkStatus">尚未添加</strong>
+              <small id="zoomUpdatedAt">等待本次活动资料</small>
+            </div>
+            <div class="zoom-status-card">
+              <span>WhatsApp 自动发送</span>
+              <strong class="status-pending">等待连接</strong>
+              <small>需要 WhatsApp Business API</small>
+            </div>
+            <div class="zoom-status-card">
+              <span>Email 自动发送</span>
+              <strong class="status-pending">等待连接</strong>
+              <small>需要 Email 发送服务</small>
+            </div>
+          </div>
+
+          <div class="zoom-settings-grid">
+            <div class="zoom-form-card">
+              <h4>本次 Zoom 活动</h4>
+              <div class="zoom-field-grid">
+                <label class="template-field zoom-field-full">
+                  <span>活动名称</span>
+                  <input id="zoomEventName" type="text" placeholder="例如：Champion Preview 分享会" autocomplete="off" />
+                </label>
+                <label class="template-field">
+                  <span>活动日期</span>
+                  <input id="zoomEventDate" type="date" />
+                </label>
+                <label class="template-field">
+                  <span>活动时间</span>
+                  <input id="zoomEventTime" type="time" />
+                </label>
+                <label class="template-field zoom-field-full">
+                  <span>Zoom 报名链接</span>
+                  <input id="zoomRegistrationUrl" type="url" inputmode="url" placeholder="https://us06web.zoom.us/meeting/register/..." autocomplete="off" />
+                </label>
+              </div>
+
+              <div class="zoom-channel-row">
+                <span>报名成功后的发送方式</span>
+                <label><input id="zoomSendWhatsapp" type="checkbox" checked /> WhatsApp</label>
+                <label><input id="zoomSendEmail" type="checkbox" checked /> Email</label>
+              </div>
+
+              <div class="zoom-security-note">
+                管理员 WhatsApp 号码与 API 密钥不会写进公开网页代码；连接发送服务时会放在服务器的私密设置中。
+              </div>
+            </div>
+
+            <div class="zoom-form-card">
+              <h4>客户收到的内容</h4>
+              <label class="template-field">
+                <span>WhatsApp 内容</span>
+                <textarea id="zoomWhatsappMessage" rows="6" placeholder="客户报名后收到的 WhatsApp 内容"></textarea>
+              </label>
+              <label class="template-field">
+                <span>Email 标题</span>
+                <input id="zoomEmailSubject" type="text" placeholder="Zoom 报名确认" />
+              </label>
+              <label class="template-field">
+                <span>Email 内容</span>
+                <textarea id="zoomEmailBody" rows="7" placeholder="客户报名后收到的 Email 内容"></textarea>
+              </label>
+              <p class="zoom-template-help">可使用：<code>{{name}}</code>、<code>{{event}}</code>、<code>{{date}}</code>、<code>{{time}}</code>、<code>{{zoom_link}}</code></p>
+            </div>
+          </div>
+        </div>
+      </section>
+
       <!-- ── EBOOK LEADS ADMIN VIEW ── -->
       <section class="view" id="ebookLeadsView">
         <div class="panel wide">
@@ -546,7 +634,7 @@
           <div class="panel-heading">
             <div>
               <h3>🎯 Preview Leads</h3>
-              <p class="muted" style="font-size:13px; margin-top:4px;">Champ Preview 报名名单 — 客户通过网页报名后自动记录</p>
+              <p class="muted" style="font-size:13px; margin-top:4px;">Champ Learning 报名名单 — 客户通过 Landing Page (champ-learning) 报名后自动记录</p>
             </div>
             <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
               <div id="previewBulkBar" style="display:none; align-items:center; gap:8px; background:rgba(239,68,68,0.08); border:1px solid rgba(239,68,68,0.3); border-radius:8px; padding:6px 12px;">

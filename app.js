@@ -16,6 +16,7 @@ const storageKeys = {
   templates: "lead_center_templates",
   previews: "lead_center_previews",
   videos: "lead_center_videos",
+  zoomSettings: "lead_center_zoom_settings",
 };
 
 const KNOWN_COURSES = [
@@ -56,6 +57,19 @@ const defaultTemplates = {
   bulkWhatsapp: "Hi, thanks for your interest in Champion Preview Course. Here is the info.",
   emailSubject: "Champion Preview Course information",
   emailBody: "Hi {{name}},\n\nThanks for your interest in {{course}}.\n\nBest regards",
+};
+
+const defaultZoomSettings = {
+  eventName: "",
+  eventDate: "",
+  eventTime: "",
+  registrationUrl: "",
+  sendWhatsapp: true,
+  sendEmail: true,
+  whatsappMessage: "Hi {{name}}，您已成功报名 {{event}}。\n\n日期：{{date}}\n时间：{{time}}\nZoom 报名链接：{{zoom_link}}",
+  emailSubject: "{{event}}｜Zoom 报名确认",
+  emailBody: "Hi {{name}}，\n\n感谢您报名 {{event}}。\n\n日期：{{date}}\n时间：{{time}}\nZoom 报名链接：{{zoom_link}}\n\nChampion Academy",
+  updatedAt: "",
 };
 
 // ──────────────────────────────────────────
@@ -206,6 +220,7 @@ async function saveToFile() {
       templates: state.templates,
       previews: state.previews,
       videos: state.videos.map(({ blobUrl, ...v }) => v),
+      zoomSettings: state.zoomSettings,
       customGroups: loadJson("lead_center_custom_groups", []),
       courseOrder: loadJson("lead_center_course_order", []),
     };
@@ -238,6 +253,10 @@ async function loadFromFile(handle) {
     if (Array.isArray(data.videos)) {
       state.videos = data.videos;
       saveJson(storageKeys.videos, state.videos);
+    }
+    if (data.zoomSettings) {
+      state.zoomSettings = normalizeZoomSettings(data.zoomSettings);
+      saveJson(storageKeys.zoomSettings, state.zoomSettings);
     }
     if (Array.isArray(data.customGroups))
       localStorage.setItem("lead_center_custom_groups", JSON.stringify(data.customGroups));
@@ -310,6 +329,7 @@ const state = {
   editingLeadId: null,
   previews: loadJson(storageKeys.previews, []),
   videos: loadJson(storageKeys.videos, []),
+  zoomSettings: normalizeZoomSettings(loadJson(storageKeys.zoomSettings, defaultZoomSettings)),
 };
 
 state.leads = mergeDuplicateLeads(state.leads.map(sanitizeLead));
@@ -396,7 +416,20 @@ const elements = {
   perfEnd: document.querySelector("#perfEnd"),
   perfRevenue: document.querySelector("#perfRevenue"),
   perfProfit: document.querySelector("#perfProfit"),
-  perfClosing: document.querySelector("#perfClosing")
+  perfClosing: document.querySelector("#perfClosing"),
+  saveZoomSettingsBtn: document.querySelector("#saveZoomSettingsBtn"),
+  copyZoomLinkBtn: document.querySelector("#copyZoomLinkBtn"),
+  zoomEventName: document.querySelector("#zoomEventName"),
+  zoomEventDate: document.querySelector("#zoomEventDate"),
+  zoomEventTime: document.querySelector("#zoomEventTime"),
+  zoomRegistrationUrl: document.querySelector("#zoomRegistrationUrl"),
+  zoomSendWhatsapp: document.querySelector("#zoomSendWhatsapp"),
+  zoomSendEmail: document.querySelector("#zoomSendEmail"),
+  zoomWhatsappMessage: document.querySelector("#zoomWhatsappMessage"),
+  zoomEmailSubject: document.querySelector("#zoomEmailSubject"),
+  zoomEmailBody: document.querySelector("#zoomEmailBody"),
+  zoomLinkStatus: document.querySelector("#zoomLinkStatus"),
+  zoomUpdatedAt: document.querySelector("#zoomUpdatedAt")
 };
 
 const templateFields = [
@@ -437,7 +470,119 @@ function saveJson(key, value) {
       fbSaveCollection('videos', value).catch(()=>{});
     } else if (key === storageKeys.templates) {
       fbSaveConfig('templates', value).catch(()=>{});
+    } else if (key === storageKeys.zoomSettings) {
+      fbSaveConfig('zoom', value).catch(()=>{});
     }
+  }
+}
+
+function normalizeZoomSettings(value) {
+  const data = value && typeof value === "object" ? value : {};
+  return {
+    eventName: clean(data.eventName),
+    eventDate: clean(data.eventDate),
+    eventTime: clean(data.eventTime),
+    registrationUrl: clean(data.registrationUrl),
+    sendWhatsapp: data.sendWhatsapp !== false,
+    sendEmail: data.sendEmail !== false,
+    whatsappMessage: clean(data.whatsappMessage) || defaultZoomSettings.whatsappMessage,
+    emailSubject: clean(data.emailSubject) || defaultZoomSettings.emailSubject,
+    emailBody: clean(data.emailBody) || defaultZoomSettings.emailBody,
+    updatedAt: clean(data.updatedAt),
+  };
+}
+
+function renderZoomSettings() {
+  const settings = state.zoomSettings;
+  if (!settings || !elements.zoomEventName) return;
+
+  elements.zoomEventName.value = settings.eventName;
+  elements.zoomEventDate.value = settings.eventDate;
+  elements.zoomEventTime.value = settings.eventTime;
+  elements.zoomRegistrationUrl.value = settings.registrationUrl;
+  elements.zoomSendWhatsapp.checked = settings.sendWhatsapp;
+  elements.zoomSendEmail.checked = settings.sendEmail;
+  elements.zoomWhatsappMessage.value = settings.whatsappMessage;
+  elements.zoomEmailSubject.value = settings.emailSubject;
+  elements.zoomEmailBody.value = settings.emailBody;
+
+  const isReady = Boolean(settings.registrationUrl);
+  elements.zoomLinkStatus.textContent = isReady ? "已添加" : "尚未添加";
+  elements.zoomLinkStatus.style.color = isReady ? "var(--brand)" : "#c05621";
+  elements.copyZoomLinkBtn.disabled = !isReady;
+  elements.copyZoomLinkBtn.setAttribute("aria-disabled", String(!isReady));
+
+  if (settings.updatedAt) {
+    const updated = new Date(settings.updatedAt);
+    elements.zoomUpdatedAt.textContent = Number.isNaN(updated.getTime())
+      ? "活动设置已保存"
+      : `最后更新：${new Intl.DateTimeFormat("zh-MY", { dateStyle: "medium", timeStyle: "short" }).format(updated)}`;
+  } else {
+    elements.zoomUpdatedAt.textContent = "等待本次活动资料";
+  }
+}
+
+function zoomUrlIsValid(value) {
+  if (!value) return true;
+  try {
+    return new URL(value).protocol === "https:";
+  } catch {
+    return false;
+  }
+}
+
+async function saveZoomSettings() {
+  const registrationUrl = elements.zoomRegistrationUrl.value.trim();
+  if (!zoomUrlIsValid(registrationUrl)) {
+    alert("请输入以 https:// 开头的完整 Zoom 报名链接。");
+    elements.zoomRegistrationUrl.focus();
+    return;
+  }
+
+  const settings = normalizeZoomSettings({
+    eventName: elements.zoomEventName.value,
+    eventDate: elements.zoomEventDate.value,
+    eventTime: elements.zoomEventTime.value,
+    registrationUrl,
+    sendWhatsapp: elements.zoomSendWhatsapp.checked,
+    sendEmail: elements.zoomSendEmail.checked,
+    whatsappMessage: elements.zoomWhatsappMessage.value,
+    emailSubject: elements.zoomEmailSubject.value,
+    emailBody: elements.zoomEmailBody.value,
+    updatedAt: new Date().toISOString(),
+  });
+
+  elements.saveZoomSettingsBtn.disabled = true;
+  elements.saveZoomSettingsBtn.textContent = "保存中...";
+  state.zoomSettings = settings;
+  localStorage.setItem(storageKeys.zoomSettings, JSON.stringify(settings));
+
+  try {
+    if (_db) await fbSaveConfig("zoom", settings);
+    renderZoomSettings();
+    toast(registrationUrl ? "✅ Zoom 活动资料已保存" : "✅ Zoom 活动草稿已保存，之后再加入链接");
+  } finally {
+    elements.saveZoomSettingsBtn.disabled = false;
+    elements.saveZoomSettingsBtn.textContent = "保存本次活动";
+  }
+}
+
+async function copyZoomLink() {
+  const value = state.zoomSettings.registrationUrl;
+  if (!value) {
+    toast("请先加入并保存 Zoom 链接");
+    return;
+  }
+
+  try {
+    await navigator.clipboard.writeText(value);
+    toast("✅ Zoom 链接已复制");
+  } catch {
+    const input = elements.zoomRegistrationUrl;
+    input.focus();
+    input.select();
+    document.execCommand("copy");
+    toast("✅ Zoom 链接已复制");
   }
 }
 
@@ -1819,6 +1964,7 @@ function handleBackup() {
     templates: state.templates,
     previews: state.previews || [],
     videos: state.videos || [],
+    zoomSettings: state.zoomSettings,
     customGroups: JSON.parse(localStorage.getItem('lead_center_custom_groups') || 'null'),
     courseOrder: JSON.parse(localStorage.getItem('lead_center_course_order') || 'null'),
     exportDate: new Date().toISOString()
@@ -1843,11 +1989,16 @@ async function handleRestore(event) {
       state.templates = { ...defaultTemplates, ...(data.templates || {}) };
       saveJson(storageKeys.leads, state.leads);
       saveJson(storageKeys.templates, state.templates);
+      if (data.zoomSettings) {
+        state.zoomSettings = normalizeZoomSettings(data.zoomSettings);
+        saveJson(storageKeys.zoomSettings, state.zoomSettings);
+      }
       // Push to Firebase before reloading so the data is in the cloud
       if (_db) {
         toast('⏳ 正在上传数据到云端，请稍候...');
         await fbSaveLeadsBatch(state.leads);
         await fbSaveConfig('templates', state.templates);
+        if (data.zoomSettings) await fbSaveConfig('zoom', state.zoomSettings);
         if (data.previews) await fbSaveCollection('previews', data.previews);
       }
       location.reload();
@@ -1869,6 +2020,7 @@ function switchView(view, targetCourse) {
   if (view === "previewLeads") title = "Preview Leads";
   if (view === "landingLeads") title = "Landing Leads";
   if (view === "ebookLeads") title = "Ebook Leads";
+  if (view === "zoom") title = "Zoom";
   if (view === "enrollments") {
     title = state.enrollmentFilter === "all" ? "Combined Course Enrollments" : state.enrollmentFilter;
   }
@@ -1887,6 +2039,7 @@ function switchView(view, targetCourse) {
   if (view === "enrollments") renderEnrollments();
   if (view === "followup") renderFollowUpList();
   if (view === "videos") renderVideos();
+  if (view === "zoom") renderZoomSettings();
   if (view === "ebookLeads") loadLandingLeads();
   if (view === "landingLeads") loadChampPreviewLeads();
   if (view === "previewLeads") loadPreviewLeads();
@@ -2431,6 +2584,8 @@ elements.csvInput.addEventListener("change", async (event) => {
 elements.exportBtn.addEventListener("click", exportLeads);
 elements.bulkWhatsappBtn.addEventListener("click", bulkWhatsapp);
 elements.bulkEmailBtn.addEventListener("click", bulkEmail);
+if (elements.saveZoomSettingsBtn) elements.saveZoomSettingsBtn.addEventListener("click", saveZoomSettings);
+if (elements.copyZoomLinkBtn) elements.copyZoomLinkBtn.addEventListener("click", copyZoomLink);
 
 elements.dueFilter.addEventListener("change", (event) => {
   state.dueFilter = event.target.value;
@@ -2904,6 +3059,10 @@ async function autoLoadBackupFromServer() {
       state.videos = data.videos;
       saveJson(storageKeys.videos, state.videos);
     }
+    if (data.zoomSettings) {
+      state.zoomSettings = normalizeZoomSettings(data.zoomSettings);
+      saveJson(storageKeys.zoomSettings, state.zoomSettings);
+    }
     if (Array.isArray(data.customGroups)) {
       localStorage.setItem('lead_center_custom_groups', JSON.stringify(data.customGroups));
     }
@@ -2969,6 +3128,14 @@ async function initFromFirebase() {
       saveJson(storageKeys.templates, state.templates);
     }
 
+    // Load editable Zoom event settings. No WhatsApp credentials or admin
+    // phone numbers are stored in this public-facing configuration document.
+    const zoomDoc = await _db.collection('config').doc('zoom').get();
+    if (zoomDoc.exists) {
+      state.zoomSettings = normalizeZoomSettings(zoomDoc.data());
+      localStorage.setItem(storageKeys.zoomSettings, JSON.stringify(state.zoomSettings));
+    }
+
     // Load layout config
     const layoutDoc = await _db.collection('config').doc('layout').get();
     if (layoutDoc.exists) {
@@ -2999,6 +3166,7 @@ let _unsubscribeVideos = null;
 let _unsubscribeTemplates = null;
 let _unsubscribeLayout = null;
 let _unsubscribePreviewLeads = null;
+let _unsubscribeZoom = null;
 
 function setupRealTimeSync() {
   if (!_db) return;
@@ -3010,6 +3178,7 @@ function setupRealTimeSync() {
   if (_unsubscribeTemplates) _unsubscribeTemplates();
   if (_unsubscribeLayout) _unsubscribeLayout();
   if (_unsubscribePreviewLeads) _unsubscribePreviewLeads();
+  if (_unsubscribeZoom) _unsubscribeZoom();
 
   // ── Leads ──
   _unsubscribeLeads = _db.collection('leads').onSnapshot(snap => {
@@ -3053,6 +3222,15 @@ function setupRealTimeSync() {
     }
     console.log('[Sync] Templates updated from cloud.');
   }, err => console.warn('[Sync] templates onSnapshot error:', err));
+
+  // ── Zoom event settings ──
+  _unsubscribeZoom = _db.collection('config').doc('zoom').onSnapshot(snap => {
+    if (!snap.exists || snap.metadata.hasPendingWrites) return;
+    state.zoomSettings = normalizeZoomSettings(snap.data());
+    localStorage.setItem(storageKeys.zoomSettings, JSON.stringify(state.zoomSettings));
+    if (document.getElementById('zoomView')?.classList.contains('active')) renderZoomSettings();
+    console.log('[Sync] Zoom settings updated from cloud.');
+  }, err => console.warn('[Sync] Zoom settings onSnapshot error:', err));
 
   // ── Layout (custom groups + course order) ──
   _unsubscribeLayout = _db.collection('config').doc('layout').onSnapshot(snap => {
@@ -3303,6 +3481,17 @@ window.deleteSelectedLandingLeads = async function() {
 // Preview Leads Admin — reads from Firebase Firestore (preview_leads)
 // ──────────────────────────────────────────────────────
 
+const CHAMP_LEARNING_LEAD_SOURCE = 'Champ Learning Landing Page';
+const CHAMP_PREVIEW_LEAD_SOURCE = 'Champ Preview Landing Page';
+
+function isChampLearningLead(lead) {
+  return lead.source === CHAMP_LEARNING_LEAD_SOURCE;
+}
+
+function isChampPreviewLead(lead) {
+  return lead.source === CHAMP_PREVIEW_LEAD_SOURCE;
+}
+
 window.loadPreviewLeads = async function() {
   const tbody = document.getElementById('previewLeadsBody');
   const statsBar = document.getElementById('previewLeadsStats');
@@ -3321,6 +3510,8 @@ window.loadPreviewLeads = async function() {
       // Fallback: local storage
       leads = JSON.parse(localStorage.getItem('preview_leads_static') || '[]');
     }
+
+    leads = leads.filter(isChampLearningLead);
 
     window._previewLeadsCache = leads;
 
@@ -3380,7 +3571,7 @@ function renderPreviewLeadsRows(leads, totalCount) {
   const tbody = document.getElementById('previewLeadsBody');
   if (!tbody) return;
   if (!leads.length) {
-    tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:60px;color:var(--muted)">📋 暂时没有符合条件的记录<br/><small style="opacity:0.6">当有用户通过 Preview 页面报名后，记录将自动同步到这里。</small></td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:60px;color:var(--muted)">📋 暂时没有符合条件的记录<br/><small style="opacity:0.6">当有用户通过 champ-learning 页面报名后，记录将自动同步到这里。</small></td></tr>`;
     return;
   }
   const selAll = document.getElementById('previewSelectAll');
@@ -3421,6 +3612,7 @@ window.exportPreviewLeadsCSV = async function() {
     } else {
       leads = JSON.parse(localStorage.getItem('preview_leads_static') || '[]');
     }
+    leads = leads.filter(isChampLearningLead);
     if (!leads.length) { toast('暂时没有数据可以导出'); return; }
 
     const headers = ['编号','姓名','电话','Email','州属','报名时间'];
@@ -3550,6 +3742,8 @@ window.loadChampPreviewLeads = async function() {
       leads = JSON.parse(localStorage.getItem('preview_leads_static') || '[]');
     }
 
+    leads = leads.filter(isChampPreviewLead);
+
     window._champPreviewLeadsCache = leads;
 
     const total = leads.length;
@@ -3649,6 +3843,7 @@ window.exportChampPreviewLeadsCSV = async function() {
     } else {
       leads = JSON.parse(localStorage.getItem('preview_leads_static') || '[]');
     }
+    leads = leads.filter(isChampPreviewLead);
     if (!leads.length) { toast('暂时没有数据可以导出'); return; }
 
     const headers = ['编号','姓名','电话','Email','州属','报名时间'];
