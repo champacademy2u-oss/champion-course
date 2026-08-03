@@ -1,11 +1,15 @@
 {
-  "rewrites": [
-    { "source": "/admin", "destination": "/admin.html" },
-    { "source": "/watch/:id", "destination": "/watch.html" }
+  "version": 2,
+  "builds": [
+    { "src": "api/*.js", "use": "@vercel/node" },
+    { "src": "public/**", "use": "@vercel/static" }
   ],
-  "functions": {
-    "api/*.js": {
-      "maxDuration": 30
-    }
-  }
+  "routes": [
+    { "src": "/api/(.*)", "dest": "/api/$1.js" },
+    { "src": "/admin", "dest": "/public/admin.html" },
+    { "src": "/watch/([^/]+)", "dest": "/public/watch.html" },
+    { "src": "/styles.css", "dest": "/public/styles.css" },
+    { "src": "/", "dest": "/public/index.html" },
+    { "src": "/(.*)", "dest": "/public/$1" }
+  ]
 }
