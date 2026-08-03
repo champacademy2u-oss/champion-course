@@ -125,9 +125,15 @@ async function init() {
   const config = await fetch('/api/config').then(res => res.json());
   maxVideoSize = config.maxVideoSize;
   if (adminToken) {
-    loginPanel.hidden = true;
-    dashboardPanel.hidden = false;
-    await boot();
+    try {
+      await boot();
+      loginPanel.hidden = true;
+      dashboardPanel.hidden = false;
+    } catch (error) {
+      adminToken = '';
+      sessionStorage.removeItem('videoRoomAdminToken');
+      loginErrorEl.textContent = error.message;
+    }
   }
 }
 
@@ -146,10 +152,12 @@ async function adminLogin(event) {
     });
     adminToken = token;
     sessionStorage.setItem('videoRoomAdminToken', token);
+    await boot();
     loginPanel.hidden = true;
     dashboardPanel.hidden = false;
-    await boot();
   } catch (error) {
+    adminToken = '';
+    sessionStorage.removeItem('videoRoomAdminToken');
     loginErrorEl.textContent = error.message;
   }
 }
