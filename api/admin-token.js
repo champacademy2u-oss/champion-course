@@ -1,4 +1,4 @@
-import { firebaseApp, readJson, sendJson } from './_firebase.js';
+import { createAdminSession, readJson, sendJson } from './_firebase.js';
 
 export default async function handler(req, res) {
   try {
@@ -6,9 +6,7 @@ export default async function handler(req, res) {
     const input = await readJson(req);
     const expected = process.env.ADMIN_PASSWORD || 'admin123';
     if (String(input.password || '') !== expected) return sendJson(res, 401, { error: '管理员密码不正确' });
-    const uid = process.env.ADMIN_UID || 'video-admin';
-    const token = await firebaseApp().auth().createCustomToken(uid, { admin: true });
-    return sendJson(res, 200, { token });
+    return sendJson(res, 200, { token: createAdminSession() });
   } catch (error) {
     return sendJson(res, 400, { error: error.message || '无法登录' });
   }

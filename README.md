@@ -62,8 +62,8 @@ Ali Tan,+60123456789,ali@example.com,Business Owner
 
 - `/admin`：管理员登录、上传视频、复制观看链接、查看观看记录。
 - `/watch/:id`：观众输入姓名、电话和观看密码后观看视频。
-- `api/`：Vercel Serverless Functions，负责管理员验证、视频资料、观看记录、短期签名播放链接。
+- `api/`：Vercel Serverless Functions，负责管理员验证、视频资料、观看记录、短期签名上传和播放链接。
 - `public/`：云端后台和观看页。
 - `firebase-rules/storage.rules`：Firebase Storage 安全规则范本。
 
-部署需要在 Vercel 设置环境变量，参考 `.env.vercel.example`。视频文件由浏览器直传 Firebase Storage，避免触碰 Vercel Function 4.5MB request body 限制；Vercel API 只负责验证和记录。
+部署需要在 Vercel 设置环境变量，参考 `.env.vercel.example`。视频文件通过 Vercel API 产生的短期 signed URL 由浏览器直传 Firebase Storage，避免触碰 Vercel Function 4.5MB request body 限制；Vercel API 只负责验证、签名和记录，不需要先启用 Firebase Auth。

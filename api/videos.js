@@ -16,14 +16,19 @@ export default async function handler(req, res) {
       const originalName = safeName(input.originalName);
       const ext = extension(originalName);
       if (!supported.has(ext)) return sendJson(res, 400, { error: '只支持 MP4、WebM、MOV 或 M4V' });
-      if (!input.title || !input.password || !input.storagePath) return sendJson(res, 400, { error: '请填写标题、观看密码并完成上传' });
+      const videoId = String(input.id || '');
+      const storagePath = String(input.storagePath || '');
+      if (!videoId || !input.title || !input.password || !storagePath) return sendJson(res, 400, { error: '请填写标题、观看密码并完成上传' });
+      if (!storagePath.startsWith(`videos/${videoId}/`)) return sendJson(res, 400, { error: '视频上传路径不正确' });
       if (Number(input.size) > maxVideoSize()) return sendJson(res, 400, { error: '视频文件不可超过 1GB' });
+      const [exists] = await bucket().file(storagePath).exists();
+      if (!exists) return sendJson(res, 400, { error: '视频还没有完整上传，请稍后再试' });
 
       const doc = {
         title: String(input.title).trim().slice(0, 100),
         passwordHash: hashPassword(input.password),
         expiresAt: String(input.expiresAt || ''),
-        storagePath: String(input.storagePath),
+        storagePath,
         originalName,
         contentType: String(input.contentType || 'video/mp4'),
         size: Number(input.size) || 0,
@@ -33,7 +38,7 @@ export default async function handler(req, res) {
         totalWatchedSeconds: 0
       };
 
-      const ref = db().collection('videos').doc(String(input.id));
+      const ref = db().collection('videos').doc(videoId);
       await ref.set(doc);
       return sendJson(res, 201, { video: publicVideo({ id: ref.id, ...doc }) });
     }
@@ -45,9 +50,14 @@ export default async function handler(req, res) {
       const snap = await ref.get();
       if (!snap.exists) return sendJson(res, 404, { error: '找不到视频' });
       const video = snap.data();
+      const removeFile = video.storagePath
+        ? bucket().file(video.storagePath).delete().catch(error => {
+          if (error.code !== 404) throw error;
+        })
+        : Promise.resolve();
       await Promise.all([
         ref.delete(),
-        video.storagePath ? bucket().file(video.storagePath).delete({ ignoreNotFound: true }) : Promise.resolve()
+        removeFile
       ]);
       const views = await db().collection('views').where('videoId', '==', videoId).get();
       const batch = db().batch();

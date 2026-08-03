@@ -85,13 +85,7 @@
 </main>
 
 <script type="module">
-import { initializeApp } from 'https://www.gstatic.com/firebasejs/12.15.0/firebase-app.js';
-import { getAuth, signInWithCustomToken } from 'https://www.gstatic.com/firebasejs/12.15.0/firebase-auth.js';
-import { getStorage, ref, uploadBytesResumable } from 'https://www.gstatic.com/firebasejs/12.15.0/firebase-storage.js';
-
-let app;
-let auth;
-let storage;
+let adminToken = sessionStorage.getItem('videoRoomAdminToken') || '';
 let state = {};
 let maxVideoSize = 1024 * 1024 * 1024;
 const loginPanel = document.getElementById('login');
@@ -112,7 +106,7 @@ const viewCountEl = document.getElementById('viewCount');
 
 const api = async (url, options = {}) => {
   const headers = new Headers(options.headers || {});
-  if (auth?.currentUser) headers.set('Authorization', 'Bearer ' + await auth.currentUser.getIdToken());
+  if (adminToken) headers.set('Authorization', 'Bearer ' + adminToken);
   const res = await fetch(url, { ...options, headers });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data.error || '操作失败');
@@ -130,9 +124,11 @@ const setProgress = (percent, text) => {
 async function init() {
   const config = await fetch('/api/config').then(res => res.json());
   maxVideoSize = config.maxVideoSize;
-  app = initializeApp(config.firebase);
-  auth = getAuth(app);
-  storage = getStorage(app);
+  if (adminToken) {
+    loginPanel.hidden = true;
+    dashboardPanel.hidden = false;
+    await boot();
+  }
 }
 
 async function adminLogin(event) {
@@ -148,7 +144,8 @@ async function adminLogin(event) {
       if (!res.ok) throw new Error(data.error || '无法登录');
       return data;
     });
-    await signInWithCustomToken(auth, token);
+    adminToken = token;
+    sessionStorage.setItem('videoRoomAdminToken', token);
     loginPanel.hidden = true;
     dashboardPanel.hidden = false;
     await boot();
@@ -203,6 +200,22 @@ window.removeVideo = async id => {
   await boot();
 };
 
+function uploadToSignedUrl(uploadUrl, file, contentType) {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open('PUT', uploadUrl);
+    xhr.setRequestHeader('Content-Type', contentType);
+    xhr.upload.onprogress = event => {
+      if (!event.lengthComputable) return;
+      const percent = Math.round(event.loaded / event.total * 100);
+      setProgress(percent, '正在上传 ' + percent + '% · ' + Math.round(event.loaded / 1024 / 1024) + 'MB / ' + Math.round(event.total / 1024 / 1024) + 'MB');
+    };
+    xhr.onload = () => xhr.status >= 200 && xhr.status < 300 ? resolve() : reject(new Error('上传失败：' + xhr.status));
+    xhr.onerror = () => reject(new Error('网络中断，上传失败'));
+    xhr.send(file);
+  });
+}
+
 async function upload(event) {
   event.preventDefault();
   const form = event.target;
@@ -210,42 +223,41 @@ async function upload(event) {
   if (!file) return setProgress(0, '请选择视频文件');
   if (file.size > maxVideoSize) return setProgress(0, '视频文件不可超过 1GB');
   uploadButtonEl.disabled = true;
-  setProgress(2, '准备上传到 Firebase Storage…');
-  const id = crypto.randomUUID();
-  const cleanName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
-  const storagePath = 'videos/' + id + '/' + cleanName;
-  const task = uploadBytesResumable(ref(storage, storagePath), file, { contentType: file.type || 'video/mp4' });
-  task.on('state_changed', snapshot => {
-    const percent = Math.round(snapshot.bytesTransferred / snapshot.totalBytes * 100);
-    setProgress(percent, '正在上传 ' + percent + '% · ' + Math.round(snapshot.bytesTransferred / 1024 / 1024) + 'MB / ' + Math.round(snapshot.totalBytes / 1024 / 1024) + 'MB');
-  }, error => {
+  try {
+    setProgress(2, '准备上传链接…');
+    const uploadPlan = await api('/api/upload-url', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        originalName: file.name,
+        contentType: file.type || 'video/mp4',
+        size: file.size
+      })
+    });
+    await uploadToSignedUrl(uploadPlan.uploadUrl, file, uploadPlan.contentType);
+    setProgress(99, '确认视频资料…');
+    const video = await api('/api/videos', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        id: uploadPlan.id,
+        title: form.title.value,
+        password: form.password.value,
+        expiresAt: form.expiresAt.value,
+        storagePath: uploadPlan.storagePath,
+        originalName: file.name,
+        contentType: uploadPlan.contentType,
+        size: file.size
+      })
+    });
+    setProgress(100, '完成！观看链接：' + location.origin + '/watch/' + video.video.id);
+    form.reset();
+    await boot();
+  } catch (error) {
+    setProgress(0, error.message);
+  } finally {
     uploadButtonEl.disabled = false;
-    setProgress(0, error.message || '上传失败');
-  }, async () => {
-    try {
-      const video = await api('/api/videos', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          id,
-          title: form.title.value,
-          password: form.password.value,
-          expiresAt: form.expiresAt.value,
-          storagePath,
-          originalName: file.name,
-          contentType: file.type || 'video/mp4',
-          size: file.size
-        })
-      });
-      setProgress(100, '完成！观看链接：' + location.origin + '/watch/' + video.video.id);
-      form.reset();
-      await boot();
-    } catch (error) {
-      setProgress(0, error.message);
-    } finally {
-      uploadButtonEl.disabled = false;
-    }
-  });
+  }
 }
 
 async function saveSettings(event) {

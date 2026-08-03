@@ -110,10 +110,38 @@ function verifyPassword(password, stored) {
   return crypto.timingSafeEqual(Buffer.from(candidate), Buffer.from(stored));
 }
 
+function adminSecret() {
+  return process.env.ADMIN_SESSION_SECRET || process.env.ADMIN_PASSWORD || 'admin123';
+}
+
+function base64Url(value) {
+  return Buffer.from(value).toString('base64url');
+}
+
+function signAdminPayload(payload) {
+  return crypto.createHmac('sha256', adminSecret()).update(payload).digest('base64url');
+}
+
+function createAdminSession() {
+  const payload = base64Url(JSON.stringify({
+    role: 'admin',
+    exp: Math.floor(Date.now() / 1000) + 60 * 60 * 12
+  }));
+  return `${payload}.${signAdminPayload(payload)}`;
+}
+
 async function requireAdmin(req) {
   const header = req.headers.authorization || '';
   const token = header.startsWith('Bearer ') ? header.slice(7) : '';
   if (!token) throw new Error('未授权');
+  const [payload, signature] = token.split('.');
+  if (payload && signature) {
+    const expected = signAdminPayload(payload);
+    if (!crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expected))) throw new Error('未授权');
+    const decoded = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8'));
+    if (decoded.role !== 'admin' || Number(decoded.exp) < Math.floor(Date.now() / 1000)) throw new Error('未授权');
+    return decoded;
+  }
   const decoded = await firebaseApp().auth().verifyIdToken(token);
   if (!decoded.admin) throw new Error('未授权');
   return decoded;
@@ -162,6 +190,7 @@ function maxVideoSize() {
 
 export {
   bucket,
+  createAdminSession,
   db,
   fieldValue,
   firebaseApp,
