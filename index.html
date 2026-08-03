@@ -40,9 +40,9 @@
         <button class="nav-item" data-view="zoom" title="Zoom">
           <span>🎥</span> Zoom
         </button>
-        <a href="https://champion-course-video-room.vercel.app/admin" target="_blank" rel="noopener" class="nav-item" title="Open Video Room" style="text-decoration: none;">
+        <button class="nav-item" data-view="videos" title="Videos">
           <span>🎬</span> Videos
-        </a>
+        </button>
         <button class="nav-item" data-view="previewLeads" title="Preview Leads" style="border-top: 1px solid rgba(255,255,255,0.08); margin-top: 8px; padding-top: 8px;">
           <span>🎯</span> Preview Leads
         </button>
@@ -352,21 +352,15 @@
       </section>
 
       <section class="view" id="videosView">
-        <div class="panel wide">
-          <div class="panel-heading">
-            <div>
-              <h3>Secure Video Room</h3>
-              <p class="muted">Video uploads, protected viewing links, expiry settings, and viewer records are now managed in the Vercel video backend.</p>
-            </div>
-            <div style="display: flex; gap: 10px;">
-              <a class="text-button primary" href="https://champion-course-video-room.vercel.app/admin" target="_blank" rel="noopener" style="text-decoration:none;">🎬 Open Video Room</a>
-            </div>
-          </div>
-          <div id="videoGrid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 20px; padding: 20px;">
-            <div class="muted" style="grid-column: 1/-1; text-align: center; padding: 40px;">
-              旧 Video Library 已替换为 Secure Video Room。请使用上方按钮进入新的云端视频后台。
-            </div>
-          </div>
+        <div class="panel wide" style="padding: 0; overflow: hidden; min-height: calc(100vh - 150px);">
+          <iframe
+            src="https://champion-course-video-room.vercel.app/admin"
+            title="Champion Course Video Room Admin"
+            loading="lazy"
+            allow="clipboard-write; fullscreen"
+            referrerpolicy="strict-origin-when-cross-origin"
+            style="display: block; width: 100%; min-height: calc(100vh - 150px); border: 0; background: #fff;"
+          ></iframe>
         </div>
       </section>
 
