@@ -1,0 +1,7 @@
+*
+!api/**
+!public/**
+!package.json
+!package-lock.json
+!vercel.json
+!.env.vercel.example
