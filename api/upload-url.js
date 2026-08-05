@@ -1,4 +1,5 @@
-import { bucket, id, maxVideoSize, readJson, requireAdmin, safeName, sendJson } from './_firebase.js';
+import { id, maxVideoSize, readJson, requireAdmin, safeName, sendJson } from './_firebase.js';
+import { createUploadUrl } from './_r2.js';
 
 const supportedVideos = new Set(['.mp4', '.webm', '.mov', '.m4v']);
 const supportedThumbnails = new Set(['.png', '.jpg', '.jpeg', '.webp']);
@@ -7,16 +8,6 @@ const maxThumbnailSize = 5 * 1024 * 1024;
 function extension(filename) {
   const match = String(filename || '').toLowerCase().match(/\.[a-z0-9]+$/);
   return match ? match[0] : '';
-}
-
-async function signedUpload(storagePath, contentType) {
-  const [uploadUrl] = await bucket().file(storagePath).getSignedUrl({
-    version: 'v4',
-    action: 'write',
-    expires: Date.now() + 1000 * 60 * 30,
-    contentType
-  });
-  return uploadUrl;
 }
 
 export default async function handler(req, res) {
@@ -42,7 +33,7 @@ export default async function handler(req, res) {
       }
       const storagePath = `videos/${videoId}/thumbnail-${Date.now()}-${originalName}`;
       const contentType = String(input.contentType || 'image/png');
-      const uploadUrl = await signedUpload(storagePath, contentType);
+      const uploadUrl = await createUploadUrl(storagePath, contentType);
       return sendJson(res, 200, { kind, videoId, storagePath, uploadUrl, contentType });
     }
 
@@ -52,7 +43,7 @@ export default async function handler(req, res) {
     const videoId = id();
     const storagePath = `videos/${videoId}/${originalName}`;
     const contentType = String(input.contentType || 'video/mp4');
-    const uploadUrl = await signedUpload(storagePath, contentType);
+    const uploadUrl = await createUploadUrl(storagePath, contentType);
 
     return sendJson(res, 200, { kind, id: videoId, storagePath, uploadUrl, contentType });
   } catch (error) {

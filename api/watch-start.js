@@ -1,5 +1,4 @@
 import {
-  bucket,
   db,
   id,
   isExpired,
@@ -9,14 +8,7 @@ import {
   verifyPassword,
   videoDoc
 } from './_firebase.js';
-
-async function signedUrl(storagePath) {
-  const [url] = await bucket().file(storagePath).getSignedUrl({
-    action: 'read',
-    expires: Date.now() + 30 * 60 * 1000
-  });
-  return url;
-}
+import { createReadUrl } from './_r2.js';
 
 export default async function handler(req, res) {
   try {
@@ -52,8 +44,8 @@ export default async function handler(req, res) {
       view: { id: viewRef.id, ...view, token: undefined },
       viewId: viewRef.id,
       viewToken: view.token,
-      signedUrl: await signedUrl(video.storagePath),
-      thumbnailUrl: video.thumbnailPath ? await signedUrl(video.thumbnailPath) : '',
+      signedUrl: await createReadUrl(video.storagePath),
+      thumbnailUrl: video.thumbnailPath ? await createReadUrl(video.thumbnailPath) : '',
       video: { id: video.id, title: video.title, expiresAt: video.expiresAt || '' },
       communityUrl: settings.get('communityUrl') || ''
     });

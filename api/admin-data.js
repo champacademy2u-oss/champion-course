@@ -1,4 +1,5 @@
 import { db, formatBytes, publicVideo, requireAdmin, sendJson } from './_firebase.js';
+import { createReadUrl } from './_r2.js';
 
 export default async function handler(req, res) {
   try {
@@ -11,7 +12,14 @@ export default async function handler(req, res) {
       db().collection('views').orderBy('startedAt', 'desc').limit(300).get()
     ]);
 
-    const videos = videosSnap.docs.map(doc => publicVideo({ id: doc.id, ...doc.data() }));
+    const videos = await Promise.all(videosSnap.docs.map(async doc => {
+      const video = { id: doc.id, ...doc.data() };
+      const [previewUrl, thumbnailPreviewUrl] = await Promise.all([
+        video.storagePath ? createReadUrl(video.storagePath).catch(() => '') : '',
+        video.thumbnailPath ? createReadUrl(video.thumbnailPath).catch(() => '') : ''
+      ]);
+      return { ...publicVideo(video), previewUrl, thumbnailPreviewUrl };
+    }));
     const videoTitles = Object.fromEntries(videos.map(video => [video.id, video.title]));
     const views = viewsSnap.docs.map(doc => {
       const view = { id: doc.id, ...doc.data() };
@@ -34,8 +42,8 @@ export default async function handler(req, res) {
       },
       system: {
         status: 'online',
-        platform: 'Vercel + Firebase',
-        storage: 'Firebase Storage',
+        platform: 'Vercel + Firestore + R2',
+        storage: 'Cloudflare R2',
         uploadTotal: formatBytes(uploadBytes),
         maxVideoSize: '1 GB'
       }

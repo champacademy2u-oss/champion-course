@@ -1,4 +1,5 @@
-import { bucket, db, hashPassword, maxVideoSize, publicVideo, readJson, requireAdmin, safeName, sendJson } from './_firebase.js';
+import { db, hashPassword, maxVideoSize, publicVideo, readJson, requireAdmin, safeName, sendJson } from './_firebase.js';
+import { deleteStoredObject, storedObjectExists } from './_r2.js';
 
 const supported = new Set(['.mp4', '.webm', '.mov', '.m4v']);
 const thumbnailTypes = new Set(['image/png', 'image/jpeg', 'image/webp']);
@@ -16,7 +17,7 @@ async function verifyThumbnail(input, videoId) {
   }
   const contentType = String(input.thumbnailContentType || '');
   if (!thumbnailTypes.has(contentType)) throw new Error('Thumbnail 格式不正确');
-  const [exists] = await bucket().file(thumbnailPath).exists();
+  const exists = await storedObjectExists(thumbnailPath);
   if (!exists) throw new Error('Thumbnail 还没有完整上传，请稍后再试');
   return { thumbnailPath, thumbnailContentType: contentType };
 }
@@ -35,7 +36,7 @@ export default async function handler(req, res) {
       if (!videoId || !input.title || !input.password || !storagePath) return sendJson(res, 400, { error: '请填写标题、观看密码并完成上传' });
       if (!storagePath.startsWith(`videos/${videoId}/`)) return sendJson(res, 400, { error: '视频上传路径不正确' });
       if (Number(input.size) > maxVideoSize()) return sendJson(res, 400, { error: '视频文件不可超过 1GB' });
-      const [exists] = await bucket().file(storagePath).exists();
+      const exists = await storedObjectExists(storagePath);
       if (!exists) return sendJson(res, 400, { error: '视频还没有完整上传，请稍后再试' });
       const thumbnail = await verifyThumbnail(input, videoId);
 
@@ -46,6 +47,7 @@ export default async function handler(req, res) {
         storagePath,
         originalName,
         contentType: String(input.contentType || 'video/mp4'),
+        storageProvider: 'cloudflare-r2',
         size: Number(input.size) || 0,
         ...thumbnail,
         createdAt: new Date().toISOString(),
@@ -73,9 +75,7 @@ export default async function handler(req, res) {
       const patch = { ...thumbnail, thumbnailUpdatedAt: new Date().toISOString() };
       await ref.update(patch);
       if (previousPath && previousPath !== thumbnail.thumbnailPath) {
-        await bucket().file(previousPath).delete().catch(error => {
-          if (error.code !== 404) throw error;
-        });
+        await deleteStoredObject(previousPath).catch(() => {});
       }
       return sendJson(res, 200, { video: publicVideo({ id: ref.id, ...snap.data(), ...patch }) });
     }
@@ -88,11 +88,7 @@ export default async function handler(req, res) {
       if (!snap.exists) return sendJson(res, 404, { error: '找不到视频' });
       const video = snap.data();
       const storagePaths = [video.storagePath, video.thumbnailPath].filter(Boolean);
-      await Promise.all(storagePaths.map(storagePath =>
-        bucket().file(storagePath).delete().catch(error => {
-          if (error.code !== 404) throw error;
-        })
-      ));
+      await Promise.all(storagePaths.map(storagePath => deleteStoredObject(storagePath).catch(() => {})));
       await ref.delete();
       const views = await db().collection('views').where('videoId', '==', videoId).get();
       const batch = db().batch();
