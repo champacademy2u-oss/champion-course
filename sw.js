@@ -1,11 +1,16 @@
-const CACHE_NAME = "lead-center-v6";
+const CACHE_NAME = "lead-center-v7";
 const ASSETS = [
   "./",
   "./index.html",
   "./styles.css",
   "./app.js",
   "./config.js",
-  "./manifest.json"
+  "./manifest.json",
+  "./zoom.html",
+  "./zoom.css",
+  "./zoom.js",
+  "./zoom-og.png",
+  "./logo.png"
 ];
 
 // Install: pre-cache assets

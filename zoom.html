@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="zh-Hans">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="报名 Champion Course 线上 Zoom 分享会，提交后通过 WhatsApp 与 Email 接收活动资料。" />
+    <meta property="og:title" content="Champion Course 线上 Zoom 分享会" />
+    <meta property="og:description" content="把流量、跟进与成交连成一套可以执行的系统。" />
+    <meta property="og:type" content="website" />
+    <meta property="og:image" content="https://champacademy2u-oss.github.io/champion-course/zoom-og.png" />
+    <title>Champion Course｜Zoom 分享会报名</title>
+    <link rel="icon" href="./logo.png" />
+    <link rel="stylesheet" href="./zoom.css" />
+  </head>
+  <body>
+    <header class="site-header">
+      <a class="zoom-brand" href="./zoom.html" aria-label="Champion Course Zoom 报名首页">
+        <img src="./logo.png" alt="" />
+        <span><strong>Champion Course</strong><small>线上分享会</small></span>
+      </a>
+      <button class="header-cta" type="button" data-open-registration disabled>立即报名</button>
+    </header>
+
+    <main>
+      <section class="hero">
+        <div class="hero-copy">
+          <p class="eyebrow"><span></span> 免费线上 Zoom 分享会</p>
+          <h1>把流量、跟进与成交，连成一套<span>可以执行的系统</span></h1>
+          <p class="hero-lead" id="eventSubtitle">正在读取最新活动资料，请稍候……</p>
+
+          <div class="hero-actions">
+            <button class="primary-cta" type="button" data-open-registration disabled>
+              <span>免费报名本场分享会</span>
+              <small>姓名、手机、Email 即可完成</small>
+            </button>
+            <a class="text-link" href="#learn">先看分享内容</a>
+          </div>
+
+          <div class="trust-row" aria-label="报名说明">
+            <span>✓ 不公开 Zoom 链接</span>
+            <span>✓ WhatsApp 与 Email 双重通知</span>
+            <span>✓ 马来西亚时间 GMT+8</span>
+          </div>
+        </div>
+
+        <aside class="event-card" aria-live="polite">
+          <div class="event-card-top">
+            <span class="live-dot"></span>
+            <span id="eventStatus">正在读取活动</span>
+          </div>
+          <h2 id="eventTitle">Champion Course Zoom 分享会</h2>
+          <dl>
+            <div><dt>日期</dt><dd id="eventDate">—</dd></div>
+            <div><dt>时间</dt><dd id="eventTime">—</dd></div>
+            <div><dt>地点</dt><dd>Zoom 线上直播</dd></div>
+            <div id="speakerRow" hidden><dt>分享人</dt><dd id="speakerName">—</dd></div>
+          </dl>
+          <p class="seat-note" id="seatNote" hidden></p>
+          <button class="card-cta" type="button" data-open-registration disabled>保留我的线上名额</button>
+          <p class="event-error" id="eventError" role="status"></p>
+        </aside>
+      </section>
+
+      <section class="content-section" id="learn">
+        <div class="section-heading">
+          <p class="eyebrow">本场分享重点</p>
+          <h2>不是增加更多工具，而是把关键步骤接起来</h2>
+          <p>内容会围绕 Champion Course 现有的获客、跟进与成交框架展开，帮助你看清下一步要做什么。</p>
+        </div>
+        <div class="learning-grid">
+          <article><span>01</span><h3>流量进入之后</h3><p>整理从广告、内容到报名入口的路径，减少客户在中途流失。</p></article>
+          <article><span>02</span><h3>跟进如何持续</h3><p>建立清楚的联系节奏，让每一条名单都有下一步而不是停在表格里。</p></article>
+          <article><span>03</span><h3>报名如何被追踪</h3><p>把报名、通知和活动出席资料集中管理，方便后续检视和优化。</p></article>
+        </div>
+      </section>
+
+      <section class="process-section">
+        <div class="section-heading compact">
+          <p class="eyebrow">报名流程</p>
+          <h2>三步完成，不需要重复填写 Zoom 表格</h2>
+        </div>
+        <ol class="steps">
+          <li><b>1</b><div><strong>填写基本资料</strong><span>姓名、国际区号手机号码与 Email。</span></div></li>
+          <li><b>2</b><div><strong>收到双渠道确认</strong><span>系统把本场 Zoom 资料发送到 WhatsApp 和 Email。</span></div></li>
+          <li><b>3</b><div><strong>开课前收到提醒</strong><span>活动前 24 小时与 1 小时再次提醒，减少错过直播。</span></div></li>
+        </ol>
+        <button class="primary-cta centered" type="button" data-open-registration disabled>
+          <span>我要报名 Zoom 分享会</span><small>报名资料只用于本场活动通知</small>
+        </button>
+      </section>
+
+      <section class="faq-section">
+        <div class="section-heading compact">
+          <p class="eyebrow">常见问题</p>
+          <h2>报名前，你可能想知道</h2>
+        </div>
+        <div class="faq-list">
+          <details><summary>分享会在哪里进行？</summary><p>本场活动通过 Zoom 在线进行。完成报名后，系统会把活动资料发送到你填写的 WhatsApp 与 Email。</p></details>
+          <details><summary>报名后没有收到信息怎么办？</summary><p>请先检查 Email 的垃圾邮件，并确认 WhatsApp 号码包含正确国际区号。管理员后台也能查看发送状态并为你重新发送。</p></details>
+          <details><summary>为什么页面上看不到 Zoom 链接？</summary><p>为了避免链接被公开转发，Zoom 链接只会在报名成功后通过通知发送，不会写进公开网页。</p></details>
+          <details><summary>我的资料会怎样使用？</summary><p>姓名、手机和 Email 用于处理本次报名、发送活动资料与必要提醒；不会因为本次报名自动加入其他营销名单。</p></details>
+        </div>
+      </section>
+
+      <section class="final-cta">
+        <p class="eyebrow">准备好下一步了吗？</p>
+        <h2 id="finalEventTitle">保留本场 Champion Course Zoom 名额</h2>
+        <p>提交一次资料，WhatsApp 与 Email 都会收到确认。</p>
+        <button class="primary-cta centered" type="button" data-open-registration disabled>
+          <span>免费报名</span><small>约 1 分钟完成</small>
+        </button>
+      </section>
+    </main>
+
+    <footer>
+      <div class="zoom-brand footer-brand"><img src="./logo.png" alt="" /><span><strong>Champion Course</strong><small>Champ Academy</small></span></div>
+      <p id="privacy">报名资料仅用于处理本场活动及发送相关通知。© <span id="year"></span> Champion Academy.</p>
+    </footer>
+
+    <div class="mobile-cta"><button type="button" data-open-registration disabled>立即报名 Zoom 分享会</button></div>
+
+    <div class="registration-modal" id="registrationModal" hidden>
+      <div class="modal-backdrop" data-close-registration></div>
+      <section class="registration-dialog" role="dialog" aria-modal="true" aria-labelledby="registrationTitle">
+        <button class="modal-close" type="button" aria-label="关闭报名表单" data-close-registration>×</button>
+        <div id="registrationFormPanel">
+          <p class="eyebrow">STEP 1 · 确认报名资料</p>
+          <h2 id="registrationTitle">免费领取 Zoom 活动资料</h2>
+          <p class="modal-intro" id="modalEventName">填写后将同时发送到 WhatsApp 与 Email。</p>
+          <form id="registrationForm" novalidate>
+            <label>姓名 <span>*</span><input id="registrationName" name="name" type="text" maxlength="80" autocomplete="name" placeholder="请输入您的姓名" required /></label>
+            <label>Email <span>*</span><input id="registrationEmail" name="email" type="email" maxlength="160" autocomplete="email" placeholder="name@example.com" required /></label>
+            <label>WhatsApp 手机号码 <span>*</span></label>
+            <div class="phone-field">
+              <select id="phonePrefix" aria-label="国家或地区区号">
+                <option value="+60">🇲🇾 +60</option><option value="+65">🇸🇬 +65</option><option value="+62">🇮🇩 +62</option>
+                <option value="+66">🇹🇭 +66</option><option value="+86">🇨🇳 +86</option><option value="+852">🇭🇰 +852</option>
+                <option value="+886">🇹🇼 +886</option><option value="+61">🇦🇺 +61</option><option value="+44">🇬🇧 +44</option><option value="+1">🇺🇸 +1</option>
+              </select>
+              <input id="registrationPhone" name="phone" type="tel" maxlength="24" autocomplete="tel-national" inputmode="tel" placeholder="12 345 6789" required />
+            </div>
+            <input id="registrationWebsite" name="website" type="hidden" value="" />
+            <label class="consent"><input id="registrationConsent" name="consent" type="checkbox" required /><span>我同意 Champion Academy 使用以上资料处理本次报名，并通过 WhatsApp 与 Email 发送活动确认及开课提醒。</span></label>
+            <p class="form-error" id="registrationError" role="alert"></p>
+            <button class="submit-registration" id="submitRegistration" type="submit"><span>确认报名并发送 Zoom 资料</span><small>资料不会显示在公开网页</small></button>
+          </form>
+        </div>
+        <div class="success-panel" id="registrationSuccess" hidden>
+          <div class="success-mark">✓</div>
+          <p class="eyebrow">报名完成</p>
+          <h2>请检查 WhatsApp 与 Email</h2>
+          <p id="successMessage">系统已安排发送本场活动资料。</p>
+          <div class="delivery-result" id="deliveryResult"></div>
+          <button class="submit-registration" type="button" data-close-registration><span>完成</span></button>
+        </div>
+      </section>
+    </div>
+
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-check-compat.js"></script>
+    <script src="./config.js"></script>
+    <script src="./zoom.js"></script>
+  </body>
+</html>

@@ -61,14 +61,22 @@ const defaultTemplates = {
 
 const defaultZoomSettings = {
   eventName: "",
+  subtitle: "",
+  speakerName: "",
   eventDate: "",
   eventTime: "",
   registrationUrl: "",
+  status: "draft",
+  seatLimit: 0,
   sendWhatsapp: true,
   sendEmail: true,
+  whatsappTemplateName: "champion_zoom_confirmation",
+  whatsappReminderTemplateName: "champion_zoom_reminder",
   whatsappMessage: "Hi {{name}}，您已成功报名 {{event}}。\n\n日期：{{date}}\n时间：{{time}}\nZoom 报名链接：{{zoom_link}}",
   emailSubject: "{{event}}｜Zoom 报名确认",
   emailBody: "Hi {{name}}，\n\n感谢您报名 {{event}}。\n\n日期：{{date}}\n时间：{{time}}\nZoom 报名链接：{{zoom_link}}\n\nChampion Academy",
+  reminderEmailSubject: "提醒｜{{event}} 即将开始",
+  reminderEmailBody: "Hi {{name}}，\n\n提醒您，{{event}} 将在 {{date}} {{time}} 开始。\n\nZoom 链接：{{zoom_link}}\n\nChampion Academy",
   updatedAt: "",
 };
 
@@ -419,17 +427,35 @@ const elements = {
   perfClosing: document.querySelector("#perfClosing"),
   saveZoomSettingsBtn: document.querySelector("#saveZoomSettingsBtn"),
   copyZoomLinkBtn: document.querySelector("#copyZoomLinkBtn"),
+  newZoomEventBtn: document.querySelector("#newZoomEventBtn"),
+  zoomAdminDashboard: document.querySelector("#zoomAdminDashboard"),
+  zoomEventPicker: document.querySelector("#zoomEventPicker"),
+  zoomEventId: document.querySelector("#zoomEventId"),
   zoomEventName: document.querySelector("#zoomEventName"),
+  zoomEventSubtitle: document.querySelector("#zoomEventSubtitle"),
+  zoomSpeakerName: document.querySelector("#zoomSpeakerName"),
+  zoomSeatLimit: document.querySelector("#zoomSeatLimit"),
   zoomEventDate: document.querySelector("#zoomEventDate"),
   zoomEventTime: document.querySelector("#zoomEventTime"),
+  zoomEventStatus: document.querySelector("#zoomEventStatus"),
   zoomRegistrationUrl: document.querySelector("#zoomRegistrationUrl"),
   zoomSendWhatsapp: document.querySelector("#zoomSendWhatsapp"),
   zoomSendEmail: document.querySelector("#zoomSendEmail"),
+  zoomWhatsappTemplateName: document.querySelector("#zoomWhatsappTemplateName"),
+  zoomWhatsappReminderTemplateName: document.querySelector("#zoomWhatsappReminderTemplateName"),
   zoomWhatsappMessage: document.querySelector("#zoomWhatsappMessage"),
   zoomEmailSubject: document.querySelector("#zoomEmailSubject"),
   zoomEmailBody: document.querySelector("#zoomEmailBody"),
+  zoomReminderEmailSubject: document.querySelector("#zoomReminderEmailSubject"),
+  zoomReminderEmailBody: document.querySelector("#zoomReminderEmailBody"),
   zoomLinkStatus: document.querySelector("#zoomLinkStatus"),
-  zoomUpdatedAt: document.querySelector("#zoomUpdatedAt")
+  zoomUpdatedAt: document.querySelector("#zoomUpdatedAt"),
+  zoomRegistrationCount: document.querySelector("#zoomRegistrationCount"),
+  zoomDeliveryStatus: document.querySelector("#zoomDeliveryStatus"),
+  zoomDeliveryNote: document.querySelector("#zoomDeliveryNote"),
+  zoomSaveState: document.querySelector("#zoomSaveState"),
+  zoomRegistrationsBody: document.querySelector("#zoomRegistrationsBody"),
+  refreshZoomDataBtn: document.querySelector("#refreshZoomDataBtn")
 };
 
 const templateFields = [
@@ -476,113 +502,325 @@ function saveJson(key, value) {
   }
 }
 
+const zoomAdminApiOverride = ["localhost", "127.0.0.1"].includes(location.hostname)
+  ? new URLSearchParams(location.search).get("zoom_api_base")
+  : "";
+const ZOOM_FUNCTIONS_BASE_URL = String(zoomAdminApiOverride || window.ZOOM_PUBLIC_CONFIG?.functionsBaseUrl || "").replace(/\/$/, "");
+const ZOOM_SINGLE_ENDPOINT = !zoomAdminApiOverride && window.ZOOM_PUBLIC_CONFIG?.singleEndpoint === true;
+const zoomAdminState = { events: [], registrations: [], legacy: null, service: {}, selectedId: "", loaded: false, authorized: false, currentUid: "" };
+
 function normalizeZoomSettings(value) {
   const data = value && typeof value === "object" ? value : {};
   return {
-    eventName: clean(data.eventName),
+    eventName: clean(data.title || data.eventName),
+    subtitle: clean(data.subtitle),
+    speakerName: clean(data.speakerName),
     eventDate: clean(data.eventDate),
     eventTime: clean(data.eventTime),
-    registrationUrl: clean(data.registrationUrl),
+    registrationUrl: clean(data.joinUrl || data.registrationUrl),
+    status: ["draft", "published", "closed"].includes(data.status) ? data.status : "draft",
+    seatLimit: Math.max(0, Number(data.seatLimit) || 0),
     sendWhatsapp: data.sendWhatsapp !== false,
     sendEmail: data.sendEmail !== false,
+    whatsappTemplateName: clean(data.whatsappTemplateName) || defaultZoomSettings.whatsappTemplateName,
+    whatsappReminderTemplateName: clean(data.whatsappReminderTemplateName) || defaultZoomSettings.whatsappReminderTemplateName,
     whatsappMessage: clean(data.whatsappMessage) || defaultZoomSettings.whatsappMessage,
     emailSubject: clean(data.emailSubject) || defaultZoomSettings.emailSubject,
     emailBody: clean(data.emailBody) || defaultZoomSettings.emailBody,
+    reminderEmailSubject: clean(data.reminderEmailSubject) || defaultZoomSettings.reminderEmailSubject,
+    reminderEmailBody: clean(data.reminderEmailBody) || defaultZoomSettings.reminderEmailBody,
     updatedAt: clean(data.updatedAt),
   };
 }
 
-function renderZoomSettings() {
-  const settings = state.zoomSettings;
-  if (!settings || !elements.zoomEventName) return;
+function zoomApiUrl(name) {
+  if (!ZOOM_FUNCTIONS_BASE_URL) throw new Error("Zoom 云端服务尚未设置");
+  return ZOOM_SINGLE_ENDPOINT
+    ? `${ZOOM_FUNCTIONS_BASE_URL}?action=${encodeURIComponent(name)}`
+    : `${ZOOM_FUNCTIONS_BASE_URL}/${name}`;
+}
 
+async function zoomAdminRequest(name, options = {}) {
+  const headers = new Headers(options.headers || {});
+  if (!zoomAdminApiOverride) {
+    const token = await zoomFirebaseAdminToken();
+    headers.set("Authorization", `Bearer ${token}`);
+  }
+  const response = await fetch(zoomApiUrl(name), { ...options, headers });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    if (response.status === 401) zoomAdminState.authorized = false;
+    throw new Error(data.error || "Zoom 后台操作失败");
+  }
+  return data;
+}
+
+async function zoomFirebaseAdminToken() {
+  const auth = window.firebase?.auth?.();
+  let user = _authUser || auth?.currentUser || null;
+  if (!user && auth) {
+    user = await new Promise(resolve => {
+      const timeout = window.setTimeout(() => resolve(null), 5000);
+      let unsubscribe = () => {};
+      unsubscribe = auth.onAuthStateChanged(current => {
+        if (!current) return;
+        window.clearTimeout(timeout);
+        unsubscribe();
+        resolve(current);
+      });
+    });
+  }
+  if (user) {
+    zoomAdminState.currentUid = user.uid;
+    window.__zoomAdminUid = user.uid;
+    return user.getIdToken();
+  }
+
+  // Some browsers block the Firebase CDN. Keep the no-password admin flow
+  // working through Firebase's official anonymous-auth REST endpoints.
+  const apiKey = clean(window.FIREBASE_CONFIG?.apiKey);
+  if (!apiKey) throw new Error("无法确认管理员浏览器，请刷新页面再试");
+  const storageKey = "champZoomAdminIdentityV1";
+  let saved = {};
+  try { saved = JSON.parse(localStorage.getItem(storageKey) || "{}"); } catch { saved = {}; }
+
+  let identity;
+  if (saved.refreshToken) {
+    const response = await fetch(`https://securetoken.googleapis.com/v1/token?key=${encodeURIComponent(apiKey)}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({ grant_type: "refresh_token", refresh_token: saved.refreshToken })
+    });
+    identity = await response.json().catch(() => ({}));
+    if (response.ok) {
+      identity = {
+        idToken: identity.id_token,
+        refreshToken: identity.refresh_token,
+        localId: identity.user_id
+      };
+    } else {
+      localStorage.removeItem(storageKey);
+      identity = null;
+    }
+  }
+
+  if (!identity?.idToken) {
+    const response = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=${encodeURIComponent(apiKey)}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ returnSecureToken: true })
+    });
+    identity = await response.json().catch(() => ({}));
+    if (!response.ok || !identity.idToken) throw new Error("无法建立管理员浏览器身份，请稍后再试");
+  }
+
+  localStorage.setItem(storageKey, JSON.stringify({ localId: identity.localId, refreshToken: identity.refreshToken }));
+  zoomAdminState.currentUid = identity.localId;
+  window.__zoomAdminUid = identity.localId;
+  return identity.idToken;
+}
+
+function zoomDateTime(value) {
+  if (!value) return "—";
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? "—" : new Intl.DateTimeFormat("zh-MY", { dateStyle: "medium", timeStyle: "short" }).format(date);
+}
+
+function fillZoomEventForm(event = {}) {
+  const settings = normalizeZoomSettings(event);
+  elements.zoomEventId.value = clean(event.id);
   elements.zoomEventName.value = settings.eventName;
+  elements.zoomEventSubtitle.value = settings.subtitle;
+  elements.zoomSpeakerName.value = settings.speakerName;
+  elements.zoomSeatLimit.value = settings.seatLimit || "";
   elements.zoomEventDate.value = settings.eventDate;
   elements.zoomEventTime.value = settings.eventTime;
+  elements.zoomEventStatus.value = settings.status;
   elements.zoomRegistrationUrl.value = settings.registrationUrl;
   elements.zoomSendWhatsapp.checked = settings.sendWhatsapp;
   elements.zoomSendEmail.checked = settings.sendEmail;
+  elements.zoomWhatsappTemplateName.value = settings.whatsappTemplateName;
+  elements.zoomWhatsappReminderTemplateName.value = settings.whatsappReminderTemplateName;
   elements.zoomWhatsappMessage.value = settings.whatsappMessage;
   elements.zoomEmailSubject.value = settings.emailSubject;
   elements.zoomEmailBody.value = settings.emailBody;
+  elements.zoomReminderEmailSubject.value = settings.reminderEmailSubject;
+  elements.zoomReminderEmailBody.value = settings.reminderEmailBody;
+  elements.copyZoomLinkBtn.disabled = !settings.registrationUrl;
+}
 
-  const isReady = Boolean(settings.registrationUrl);
-  elements.zoomLinkStatus.textContent = isReady ? "已添加" : "尚未添加";
-  elements.zoomLinkStatus.style.color = isReady ? "var(--brand)" : "#c05621";
-  elements.copyZoomLinkBtn.disabled = !isReady;
-  elements.copyZoomLinkBtn.setAttribute("aria-disabled", String(!isReady));
+function zoomDeliveryBadge(status) {
+  const safeStatus = ["sent", "failed", "disabled", "pending"].includes(status) ? status : "pending";
+  const labels = { sent: "已发送", failed: "失败", disabled: "未启用", pending: "处理中" };
+  return `<span class="zoom-delivery-badge ${safeStatus}">${labels[safeStatus]}</span>`;
+}
 
-  if (settings.updatedAt) {
-    const updated = new Date(settings.updatedAt);
-    elements.zoomUpdatedAt.textContent = Number.isNaN(updated.getTime())
-      ? "活动设置已保存"
-      : `最后更新：${new Intl.DateTimeFormat("zh-MY", { dateStyle: "medium", timeStyle: "short" }).format(updated)}`;
-  } else {
-    elements.zoomUpdatedAt.textContent = "等待本次活动资料";
+function renderZoomRegistrations() {
+  const eventTitles = Object.fromEntries(zoomAdminState.events.map(event => [event.id, event.title]));
+  elements.zoomRegistrationsBody.innerHTML = zoomAdminState.registrations.length
+    ? zoomAdminState.registrations.map(registration => {
+        const confirmation = registration.deliveries?.confirmation || {};
+        return `<tr>
+          <td><strong>${escapeHtml(registration.name)}</strong><small>${escapeHtml(registration.phone)} · ${escapeHtml(registration.email)}</small></td>
+          <td>${escapeHtml(eventTitles[registration.eventId] || "已归档活动")}</td>
+          <td>${escapeHtml(zoomDateTime(registration.createdAt))}</td>
+          <td>${zoomDeliveryBadge(confirmation.whatsapp)}</td>
+          <td>${zoomDeliveryBadge(confirmation.email)}</td>
+          <td><button class="text-button zoom-resend-btn" data-registration-id="${escapeHtml(registration.id)}" type="button">重新发送</button></td>
+        </tr>`;
+      }).join("")
+    : '<tr><td colspan="6" class="muted">还没有报名记录</td></tr>';
+}
+
+function renderZoomSettings() {
+  if (!elements.zoomAdminDashboard) return;
+  elements.zoomAdminDashboard.hidden = false;
+  elements.newZoomEventBtn.disabled = false;
+  if (!zoomAdminState.loaded) return;
+
+  const currentValue = zoomAdminState.selectedId;
+  elements.zoomEventPicker.innerHTML = '<option value="">建立新活动</option>' + zoomAdminState.events.map(event =>
+    `<option value="${escapeHtml(event.id)}">${escapeHtml(event.title)} · ${event.status === "published" ? "报名中" : event.status === "closed" ? "已关闭" : "草稿"}</option>`
+  ).join("");
+  elements.zoomEventPicker.value = currentValue;
+
+  const selected = zoomAdminState.events.find(event => event.id === currentValue) || null;
+  if (selected) fillZoomEventForm(selected);
+  else if (!elements.zoomEventName.value) fillZoomEventForm(zoomAdminState.events.length ? {} : (zoomAdminState.legacy || state.zoomSettings));
+
+  const published = zoomAdminState.events.find(event => event.status === "published") || null;
+  elements.zoomLinkStatus.textContent = published ? published.title : "没有发布中的活动";
+  elements.zoomLinkStatus.style.color = published ? "var(--brand)" : "#c05621";
+  elements.zoomUpdatedAt.textContent = published ? `开始：${zoomDateTime(published.startsAt)}` : "请建立或选择活动";
+  elements.zoomRegistrationCount.textContent = String(zoomAdminState.registrations.length);
+  const servicesReady = zoomAdminState.service.whatsappConfigured && zoomAdminState.service.emailConfigured;
+  elements.zoomDeliveryStatus.textContent = servicesReady ? "已连接" : "等待配置";
+  elements.zoomDeliveryStatus.classList.toggle("status-pending", !servicesReady);
+  elements.zoomDeliveryNote.textContent = servicesReady ? "WhatsApp 与 Email 可自动发送" : "完成 Meta 与 Resend 设置后启用";
+  renderZoomRegistrations();
+}
+
+async function loadZoomAdminData() {
+  if (elements.zoomSaveState) elements.zoomSaveState.textContent = "正在读取最新资料…";
+  try {
+    const data = await zoomAdminRequest("adminZoomData");
+    zoomAdminState.events = Array.isArray(data.events) ? data.events : [];
+    zoomAdminState.registrations = Array.isArray(data.registrations) ? data.registrations : [];
+    zoomAdminState.legacy = data.legacy || null;
+    zoomAdminState.service = data.service || {};
+    if (!zoomAdminState.selectedId) {
+      zoomAdminState.selectedId = (zoomAdminState.events.find(event => event.status === "published") || zoomAdminState.events[0] || {}).id || "";
+    }
+    zoomAdminState.authorized = true;
+    zoomAdminState.loaded = true;
+    elements.zoomSaveState.textContent = `最后读取：${new Intl.DateTimeFormat("zh-MY", { timeStyle: "short" }).format(new Date())}`;
+    renderZoomSettings();
+  } catch (error) {
+    zoomAdminState.authorized = false;
+    zoomAdminState.loaded = false;
+    if (!elements.zoomEventName.value) fillZoomEventForm(state.zoomSettings || defaultZoomSettings);
+    if (elements.zoomSaveState) elements.zoomSaveState.textContent = "云端资料尚未连接";
+    renderZoomSettings();
   }
+}
+
+async function initZoomAdmin() {
+  if (!elements.zoomEventName.value) fillZoomEventForm(state.zoomSettings || defaultZoomSettings);
+  renderZoomSettings();
+  if (!zoomAdminState.loaded) await loadZoomAdminData();
+}
+
+function newZoomEvent() {
+  zoomAdminState.selectedId = "";
+  elements.zoomEventPicker.value = "";
+  fillZoomEventForm(defaultZoomSettings);
+  elements.zoomSaveState.textContent = "正在建立新活动";
+  elements.zoomEventName.focus();
 }
 
 function zoomUrlIsValid(value) {
   if (!value) return true;
-  try {
-    return new URL(value).protocol === "https:";
-  } catch {
-    return false;
-  }
+  try { return new URL(value).protocol === "https:"; } catch { return false; }
 }
 
 async function saveZoomSettings() {
-  const registrationUrl = elements.zoomRegistrationUrl.value.trim();
-  if (!zoomUrlIsValid(registrationUrl)) {
-    alert("请输入以 https:// 开头的完整 Zoom 报名链接。");
+  const joinUrl = elements.zoomRegistrationUrl.value.trim();
+  if (!zoomUrlIsValid(joinUrl)) {
+    alert("请输入以 https:// 开头的完整 Zoom 链接。");
     elements.zoomRegistrationUrl.focus();
     return;
   }
+  if (!elements.zoomEventName.value.trim() || !elements.zoomEventDate.value || !elements.zoomEventTime.value) {
+    toast("请填写活动名称、日期和时间");
+    return;
+  }
 
-  const settings = normalizeZoomSettings({
-    eventName: elements.zoomEventName.value,
+  const payload = {
+    id: elements.zoomEventId.value,
+    title: elements.zoomEventName.value,
+    subtitle: elements.zoomEventSubtitle.value,
+    speakerName: elements.zoomSpeakerName.value,
+    seatLimit: Number(elements.zoomSeatLimit.value) || 0,
     eventDate: elements.zoomEventDate.value,
     eventTime: elements.zoomEventTime.value,
-    registrationUrl,
+    status: elements.zoomEventStatus.value,
+    joinUrl,
     sendWhatsapp: elements.zoomSendWhatsapp.checked,
     sendEmail: elements.zoomSendEmail.checked,
+    whatsappTemplateName: elements.zoomWhatsappTemplateName.value,
+    whatsappReminderTemplateName: elements.zoomWhatsappReminderTemplateName.value,
     whatsappMessage: elements.zoomWhatsappMessage.value,
     emailSubject: elements.zoomEmailSubject.value,
     emailBody: elements.zoomEmailBody.value,
-    updatedAt: new Date().toISOString(),
-  });
+    reminderEmailSubject: elements.zoomReminderEmailSubject.value,
+    reminderEmailBody: elements.zoomReminderEmailBody.value
+  };
 
   elements.saveZoomSettingsBtn.disabled = true;
-  elements.saveZoomSettingsBtn.textContent = "保存中...";
-  state.zoomSettings = settings;
-  localStorage.setItem(storageKeys.zoomSettings, JSON.stringify(settings));
-
+  elements.saveZoomSettingsBtn.textContent = "保存中…";
   try {
-    if (_db) await fbSaveConfig("zoom", settings);
-    renderZoomSettings();
-    toast(registrationUrl ? "✅ Zoom 活动资料已保存" : "✅ Zoom 活动草稿已保存，之后再加入链接");
+    const data = await zoomAdminRequest("saveZoomEvent", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+    zoomAdminState.selectedId = data.event.id;
+    elements.zoomSaveState.textContent = "活动已保存";
+    await loadZoomAdminData();
+    toast(data.event.status === "published" ? "✅ 活动已发布，报名页现在开放" : "✅ Zoom 活动已保存");
+  } catch (error) {
+    toast(`❌ ${error.message}`);
   } finally {
     elements.saveZoomSettingsBtn.disabled = false;
-    elements.saveZoomSettingsBtn.textContent = "保存本次活动";
+    elements.saveZoomSettingsBtn.textContent = "保存活动";
   }
 }
 
 async function copyZoomLink() {
-  const value = state.zoomSettings.registrationUrl;
-  if (!value) {
-    toast("请先加入并保存 Zoom 链接");
-    return;
-  }
-
+  const value = elements.zoomRegistrationUrl.value.trim();
+  if (!value) return toast("请先加入 Zoom 链接");
   try {
     await navigator.clipboard.writeText(value);
-    toast("✅ Zoom 链接已复制");
   } catch {
-    const input = elements.zoomRegistrationUrl;
-    input.focus();
-    input.select();
+    elements.zoomRegistrationUrl.focus();
+    elements.zoomRegistrationUrl.select();
     document.execCommand("copy");
-    toast("✅ Zoom 链接已复制");
+  }
+  toast("✅ Zoom 链接已复制");
+}
+
+async function resendZoomRegistration(registrationId) {
+  if (!confirm("确定要重新发送本场 Zoom 资料到这位客户的 WhatsApp 与 Email？")) return;
+  try {
+    await zoomAdminRequest("resendZoomNotification", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ registrationId, stage: "confirmation" })
+    });
+    toast("✅ 已完成重新发送");
+    await loadZoomAdminData();
+  } catch (error) {
+    toast(`❌ ${error.message}`);
   }
 }
 
@@ -2039,7 +2277,7 @@ function switchView(view, targetCourse) {
   if (view === "enrollments") renderEnrollments();
   if (view === "followup") renderFollowUpList();
   if (view === "videos") renderVideos();
-  if (view === "zoom") renderZoomSettings();
+  if (view === "zoom") initZoomAdmin();
   if (view === "ebookLeads") loadLandingLeads();
   if (view === "landingLeads") loadChampPreviewLeads();
   if (view === "previewLeads") loadPreviewLeads();
@@ -2586,6 +2824,30 @@ elements.bulkWhatsappBtn.addEventListener("click", bulkWhatsapp);
 elements.bulkEmailBtn.addEventListener("click", bulkEmail);
 if (elements.saveZoomSettingsBtn) elements.saveZoomSettingsBtn.addEventListener("click", saveZoomSettings);
 if (elements.copyZoomLinkBtn) elements.copyZoomLinkBtn.addEventListener("click", copyZoomLink);
+if (elements.newZoomEventBtn) elements.newZoomEventBtn.addEventListener("click", newZoomEvent);
+if (elements.refreshZoomDataBtn) elements.refreshZoomDataBtn.addEventListener("click", loadZoomAdminData);
+if (elements.zoomEventPicker) elements.zoomEventPicker.addEventListener("change", event => {
+  zoomAdminState.selectedId = event.target.value;
+  const selected = zoomAdminState.events.find(item => item.id === zoomAdminState.selectedId);
+  if (selected) fillZoomEventForm(selected);
+  else newZoomEvent();
+});
+if (elements.zoomRegistrationsBody) elements.zoomRegistrationsBody.addEventListener("click", event => {
+  const button = event.target.closest(".zoom-resend-btn");
+  if (button?.dataset.registrationId) resendZoomRegistration(button.dataset.registrationId);
+});
+document.querySelectorAll(".zoom-copy-template").forEach(button => button.addEventListener("click", async () => {
+  const target = document.getElementById(button.dataset.copyTarget);
+  if (!target) return;
+  try {
+    await navigator.clipboard.writeText(target.value);
+  } catch {
+    target.focus();
+    target.select();
+    document.execCommand("copy");
+  }
+  toast("✅ 模板已复制");
+}));
 
 elements.dueFilter.addEventListener("change", (event) => {
   state.dueFilter = event.target.value;
