@@ -442,81 +442,88 @@
         <div class="panel wide zoom-panel">
           <div class="panel-heading zoom-heading">
             <div>
-              <h3>🎥 Zoom 报名与发送设置</h3>
-              <p class="muted zoom-subtitle">每场活动只需在这里更换 Zoom 链接。客户自动发送功能会在 WhatsApp Business 与 Email API 接通后启用。</p>
+              <h3>🎥 Zoom 活动与报名管理</h3>
+              <p class="muted zoom-subtitle">建立每场活动、发布公开报名页，并查看 WhatsApp 与 Email 的发送状态。</p>
             </div>
             <div class="zoom-actions">
-              <button class="text-button" id="copyZoomLinkBtn" type="button">复制 Zoom 链接</button>
-              <button class="text-button primary" id="saveZoomSettingsBtn" type="button">保存本次活动</button>
+              <a class="text-button" href="./zoom.html?utm_source=facebook&utm_medium=comment&utm_campaign=zoom&keyword=ZOOM" target="_blank" rel="noopener" style="text-decoration:none">打开报名页</a>
+              <button class="text-button" id="newZoomEventBtn" type="button">建立新活动</button>
             </div>
           </div>
 
-          <div class="zoom-status-grid" aria-label="Zoom 设置状态">
-            <div class="zoom-status-card">
-              <span>Zoom 链接</span>
-              <strong id="zoomLinkStatus">尚未添加</strong>
-              <small id="zoomUpdatedAt">等待本次活动资料</small>
-            </div>
-            <div class="zoom-status-card">
-              <span>WhatsApp 自动发送</span>
-              <strong class="status-pending">等待连接</strong>
-              <small>需要 WhatsApp Business API</small>
-            </div>
-            <div class="zoom-status-card">
-              <span>Email 自动发送</span>
-              <strong class="status-pending">等待连接</strong>
-              <small>需要 Email 发送服务</small>
-            </div>
-          </div>
-
-          <div class="zoom-settings-grid">
-            <div class="zoom-form-card">
-              <h4>本次 Zoom 活动</h4>
-              <div class="zoom-field-grid">
-                <label class="template-field zoom-field-full">
-                  <span>活动名称</span>
-                  <input id="zoomEventName" type="text" placeholder="例如：Champion Preview 分享会" autocomplete="off" />
-                </label>
-                <label class="template-field">
-                  <span>活动日期</span>
-                  <input id="zoomEventDate" type="date" />
-                </label>
-                <label class="template-field">
-                  <span>活动时间</span>
-                  <input id="zoomEventTime" type="time" />
-                </label>
-                <label class="template-field zoom-field-full">
-                  <span>Zoom 报名链接</span>
-                  <input id="zoomRegistrationUrl" type="url" inputmode="url" placeholder="https://us06web.zoom.us/meeting/register/..." autocomplete="off" />
-                </label>
+          <div id="zoomAdminDashboard">
+            <div class="zoom-status-grid" aria-label="Zoom 设置状态">
+              <div class="zoom-status-card">
+                <span>当前活动</span>
+                <strong id="zoomLinkStatus">尚未建立</strong>
+                <small id="zoomUpdatedAt">等待活动资料</small>
               </div>
-
-              <div class="zoom-channel-row">
-                <span>报名成功后的发送方式</span>
-                <label><input id="zoomSendWhatsapp" type="checkbox" checked /> WhatsApp</label>
-                <label><input id="zoomSendEmail" type="checkbox" checked /> Email</label>
+              <div class="zoom-status-card">
+                <span>报名人数</span>
+                <strong id="zoomRegistrationCount">0</strong>
+                <small>最近记录会显示在下方</small>
               </div>
-
-              <div class="zoom-security-note">
-                管理员 WhatsApp 号码与 API 密钥不会写进公开网页代码；连接发送服务时会放在服务器的私密设置中。
+              <div class="zoom-status-card">
+                <span>双渠道发送</span>
+                <strong id="zoomDeliveryStatus" class="status-pending">等待配置</strong>
+                <small id="zoomDeliveryNote">WhatsApp Cloud API + Resend</small>
               </div>
             </div>
 
-            <div class="zoom-form-card">
-              <h4>客户收到的内容</h4>
-              <label class="template-field">
-                <span>WhatsApp 内容</span>
-                <textarea id="zoomWhatsappMessage" rows="6" placeholder="客户报名后收到的 WhatsApp 内容"></textarea>
+            <div class="zoom-event-picker-row">
+              <label>选择活动
+                <select id="zoomEventPicker"><option value="">建立新活动</option></select>
               </label>
-              <label class="template-field">
-                <span>Email 标题</span>
-                <input id="zoomEmailSubject" type="text" placeholder="Zoom 报名确认" />
-              </label>
-              <label class="template-field">
-                <span>Email 内容</span>
-                <textarea id="zoomEmailBody" rows="7" placeholder="客户报名后收到的 Email 内容"></textarea>
-              </label>
-              <p class="zoom-template-help">可使用：<code>{{name}}</code>、<code>{{event}}</code>、<code>{{date}}</code>、<code>{{time}}</code>、<code>{{zoom_link}}</code></p>
+              <span id="zoomSaveState"></span>
+            </div>
+
+            <div class="zoom-settings-grid">
+              <div class="zoom-form-card">
+                <h4>活动与报名页资料</h4>
+                <input id="zoomEventId" type="hidden" />
+                <div class="zoom-field-grid">
+                  <label class="template-field zoom-field-full"><span>活动名称</span><input id="zoomEventName" type="text" maxlength="120" placeholder="例如：Champion Preview 分享会" /></label>
+                  <label class="template-field zoom-field-full"><span>报名页副标题</span><input id="zoomEventSubtitle" type="text" maxlength="240" placeholder="本场分享会将帮助客户了解什么" /></label>
+                  <label class="template-field"><span>分享人</span><input id="zoomSpeakerName" type="text" maxlength="100" placeholder="留空则不显示" /></label>
+                  <label class="template-field"><span>真实名额</span><input id="zoomSeatLimit" type="number" min="0" max="100000" placeholder="0 = 不显示名额" /></label>
+                  <label class="template-field"><span>活动日期</span><input id="zoomEventDate" type="date" /></label>
+                  <label class="template-field"><span>活动时间（GMT+8）</span><input id="zoomEventTime" type="time" /></label>
+                  <label class="template-field"><span>活动状态</span><select id="zoomEventStatus"><option value="draft">草稿</option><option value="published">发布报名</option><option value="closed">关闭报名</option></select></label>
+                  <label class="template-field zoom-field-full"><span>Zoom 加入链接（不会公开显示）</span><input id="zoomRegistrationUrl" type="url" inputmode="url" placeholder="https://us06web.zoom.us/j/..." autocomplete="off" /></label>
+                </div>
+                <div class="zoom-channel-row"><span>自动发送</span><label><input id="zoomSendWhatsapp" type="checkbox" checked /> WhatsApp</label><label><input id="zoomSendEmail" type="checkbox" checked /> Email</label></div>
+                <div class="zoom-security-note">每次只能发布一场活动。发布新活动后，上一场会自动关闭；客户资料、Zoom 链接和服务密钥不会写进公开报名页。</div>
+                <div class="zoom-actions"><button class="text-button" id="copyZoomLinkBtn" type="button">复制 Zoom 链接</button><button class="text-button primary" id="saveZoomSettingsBtn" type="button">保存活动</button></div>
+              </div>
+
+              <div class="zoom-form-card">
+                <h4>通知内容与核准模板</h4>
+                <div class="zoom-field-grid">
+                  <label class="template-field"><span>WhatsApp 报名模板名称</span><input id="zoomWhatsappTemplateName" type="text" placeholder="champion_zoom_confirmation" /></label>
+                  <label class="template-field"><span>WhatsApp 提醒模板名称</span><input id="zoomWhatsappReminderTemplateName" type="text" placeholder="champion_zoom_reminder" /></label>
+                </div>
+                <label class="template-field"><span>WhatsApp 内容预览／人工发送模板</span><textarea id="zoomWhatsappMessage" rows="5"></textarea></label>
+                <label class="template-field"><span>Email 报名确认标题</span><input id="zoomEmailSubject" type="text" /></label>
+                <label class="template-field"><span>Email 报名确认内容</span><textarea id="zoomEmailBody" rows="6"></textarea></label>
+                <label class="template-field"><span>Email 提醒标题</span><input id="zoomReminderEmailSubject" type="text" /></label>
+                <label class="template-field"><span>Email 提醒内容</span><textarea id="zoomReminderEmailBody" rows="6"></textarea></label>
+                <p class="zoom-template-help">Email 可使用：<code>{{name}}</code>、<code>{{event}}</code>、<code>{{date}}</code>、<code>{{time}}</code>、<code>{{zoom_link}}</code>。WhatsApp 自动发送内容以 Meta 核准模板为准。</p>
+              </div>
+            </div>
+
+            <div class="zoom-form-card zoom-facebook-card">
+              <div class="zoom-table-heading">
+                <div><h4>Facebook 留言「ZOOM」人工私讯</h4><p>第一版由管理员人工回复，链接已包含来源追踪参数。</p></div>
+              </div>
+              <div class="zoom-settings-grid">
+                <label class="template-field"><span>公开留言回复</span><textarea id="zoomFacebookReply" rows="3" readonly>谢谢您留言 ZOOM，我们已经把报名链接私讯给您，请查看 Inbox／Message Requests。</textarea><button class="text-button zoom-copy-template" data-copy-target="zoomFacebookReply" type="button">复制公开回复</button></label>
+                <label class="template-field"><span>私讯内容</span><textarea id="zoomFacebookDm" rows="4" readonly>您好，这是 Champion Course Zoom 分享会报名链接：&#10;https://champacademy2u-oss.github.io/champion-course/zoom.html?utm_source=facebook&amp;utm_medium=comment&amp;utm_campaign=zoom&amp;keyword=ZOOM&#10;&#10;填写姓名、WhatsApp 和 Email 后，系统会发送本场活动资料。</textarea><button class="text-button zoom-copy-template" data-copy-target="zoomFacebookDm" type="button">复制私讯</button></label>
+              </div>
+            </div>
+
+            <div class="zoom-form-card zoom-registrations-card">
+              <div class="zoom-table-heading"><div><h4>最新报名记录</h4><p>可检查双渠道状态，并为单一客户重新发送。</p></div><button class="text-button" id="refreshZoomDataBtn" type="button">刷新</button></div>
+              <div class="table-wrap"><table class="zoom-registration-table"><thead><tr><th>客户</th><th>活动</th><th>报名时间</th><th>WhatsApp</th><th>Email</th><th>操作</th></tr></thead><tbody id="zoomRegistrationsBody"><tr><td colspan="6" class="muted">还没有报名记录</td></tr></tbody></table></div>
             </div>
           </div>
         </div>

@@ -82,6 +82,11 @@ const server = http.createServer(async (req, res) => {
       return serveFile(res, path.join(__dirname, "landing.html"), "text/html");
     }
 
+    // ── Serve public Zoom registration page ──
+    if (req.method === "GET" && (pathname === "/zoom" || pathname === "/zoom.html")) {
+      return serveFile(res, path.join(__dirname, "zoom.html"), "text/html");
+    }
+
     // ── Serve main app ──
     if (req.method === "GET" && (pathname === "/" || pathname === "/index.html")) {
       return serveFile(res, path.join(__dirname, "index.html"), "text/html");

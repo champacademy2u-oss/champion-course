@@ -15,3 +15,11 @@ window.FIREBASE_CONFIG = {
   appId: "1:337920852937:web:fab67a792d3b15c574de18",
   measurementId: "G-3RZV6TX39W"
 };
+
+// Zoom registration uses Firebase HTTPS Functions so the meeting link,
+// notification credentials and customer records never live in this public file.
+window.ZOOM_PUBLIC_CONFIG = {
+  functionsBaseUrl: "https://champion-course-video-room.vercel.app/api/zoom",
+  singleEndpoint: true,
+  appCheckSiteKey: ""
+};
