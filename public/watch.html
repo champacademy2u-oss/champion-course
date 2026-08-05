@@ -26,6 +26,7 @@
   <section id="playerArea" hidden>
     <div class="video-box">
       <video id="player" controls controlsList="nodownload" disablePictureInPicture playsinline></video>
+      <img id="thumbnailIntro" class="thumbnail-intro" alt="视频开场 Thumbnail" hidden>
     </div>
     <div class="watch-info">
       <span id="watchProgress" class="pill">观看进度 0%</span>
@@ -40,9 +41,11 @@
 const videoId = location.pathname.split('/').filter(Boolean).pop() || new URLSearchParams(location.search).get('id');
 let viewId = '';
 let viewToken = '';
+let introTimer = null;
 const gateEl = document.getElementById('gate');
 const playerAreaEl = document.getElementById('playerArea');
 const playerEl = document.getElementById('player');
+const thumbnailIntroEl = document.getElementById('thumbnailIntro');
 const videoTitleEl = document.getElementById('videoTitle');
 const playerTitleEl = document.getElementById('playerTitle');
 const videoHintEl = document.getElementById('videoHint');
@@ -79,6 +82,27 @@ async function loadVideo() {
   }
 }
 
+function startPlayback() {
+  if (introTimer) clearTimeout(introTimer);
+  introTimer = null;
+  thumbnailIntroEl.hidden = true;
+  thumbnailIntroEl.onload = null;
+  thumbnailIntroEl.onerror = null;
+  progressEl.textContent = '观看中，请保持此页面开启。';
+  playerEl.play().catch(() => {});
+}
+
+function showThumbnailIntro(url) {
+  if (introTimer) clearTimeout(introTimer);
+  thumbnailIntroEl.hidden = false;
+  progressEl.textContent = '正在显示开场 Thumbnail，3 秒后开始播放。';
+  thumbnailIntroEl.onload = () => {
+    introTimer = setTimeout(startPlayback, 3000);
+  };
+  thumbnailIntroEl.onerror = startPlayback;
+  thumbnailIntroEl.src = url;
+}
+
 async function enter(event) {
   event.preventDefault();
   errorEl.textContent = '';
@@ -96,7 +120,11 @@ async function enter(event) {
     playerTitleEl.textContent = result.video.title;
     playerEl.src = result.signedUrl;
     if (result.communityUrl) communityEl.href = result.communityUrl;
-    playerEl.play().catch(() => {});
+    if (result.thumbnailUrl) {
+      showThumbnailIntro(result.thumbnailUrl);
+    } else {
+      startPlayback();
+    }
   } catch (error) {
     errorEl.textContent = error.message === '观看密码不正确' ? '观看密码不正确，请检查后再试。' : error.message;
     startButtonEl.disabled = false;

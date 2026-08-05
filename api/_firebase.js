@@ -163,6 +163,7 @@ function publicVideo(video) {
     title: video.title,
     expiresAt: video.expiresAt || '',
     originalName: video.originalName || '',
+    hasThumbnail: Boolean(video.thumbnailPath),
     size: Number(video.size) || 0,
     sizeText: formatBytes(Number(video.size) || 0),
     createdAt: video.createdAt || '',
