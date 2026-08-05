@@ -53,6 +53,7 @@ export default async function handler(req, res) {
       viewId: viewRef.id,
       viewToken: view.token,
       signedUrl: await signedUrl(video.storagePath),
+      thumbnailUrl: video.thumbnailPath ? await signedUrl(video.thumbnailPath) : '',
       video: { id: video.id, title: video.title, expiresAt: video.expiresAt || '' },
       communityUrl: settings.get('communityUrl') || ''
     });
