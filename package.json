@@ -11,6 +11,8 @@
     "test": "node --test"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1102.0",
+    "@aws-sdk/s3-request-presigner": "^3.1102.0",
     "dotenv": "^16.4.7",
     "firebase": "^12.15.0",
     "firebase-admin": "^13.5.0",

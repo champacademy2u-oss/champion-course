@@ -10,7 +10,7 @@
 <main class="shell">
   <header>
     <a class="brand" href="/admin">▣ Secure Video Room</a>
-    <p>Vercel + Firebase 云端视频后台</p>
+    <p>Vercel + Firestore + Cloudflare R2 视频后台</p>
   </header>
 
   <section id="login" class="card" hidden>
@@ -28,7 +28,7 @@
     <div class="toolbar">
       <div>
         <h1>视频后台</h1>
-        <p class="hint">云端运行中 · 单个视频最大 1GB · 视频直传 Firebase Storage</p>
+        <p class="hint">云端运行中 · 单个视频最大 1GB · 视频直传 Cloudflare R2</p>
       </div>
       <button class="ghost" id="refreshButton">刷新数据</button>
     </div>
@@ -67,10 +67,13 @@
 
     <section class="card">
       <div class="section-title">
-        <h2>已发布视频</h2>
+        <div>
+          <h2>已发布视频</h2>
+          <p class="section-description">管理课程封面预览、观看数据与分享链接</p>
+        </div>
         <span id="videoCount" class="pill">0 个视频</span>
       </div>
-      <div id="videos"></div>
+      <div id="videos" class="video-library"></div>
     </section>
 
     <section class="card">
@@ -125,6 +128,14 @@ const api = async (url, options = {}) => {
 const esc = value => String(value ?? '').replace(/[&<>"]/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[char]));
 const seconds = value => Math.floor(value / 60) + ' 分 ' + Math.floor(value % 60) + ' 秒';
 const dateText = value => value ? new Date(value).toLocaleString() : '永不过期';
+const shortDate = value => value ? new Date(value).toLocaleDateString('zh-CN', { year: 'numeric', month: 'short', day: 'numeric' }) : '永不过期';
+const previewDuration = value => {
+  const total = Math.max(0, Math.floor(Number(value) || 0));
+  const hours = Math.floor(total / 3600);
+  const minutes = Math.floor(total % 3600 / 60);
+  const secondsValue = String(total % 60).padStart(2, '0');
+  return hours ? hours + ':' + String(minutes).padStart(2, '0') + ':' + secondsValue : minutes + ':' + secondsValue;
+};
 const setProgress = (percent, text) => {
   uploadBarEl.style.width = Math.max(0, Math.min(100, percent)) + '%';
   uploadStatusEl.textContent = text;
@@ -204,17 +215,39 @@ function render() {
 
   videosEl.innerHTML = state.videos.length ? state.videos.map(video => {
     const url = location.origin + '/watch/' + video.id;
-    return '<article class="video-row"><div><strong>' + esc(video.title) + '</strong>' +
-      '<small>' + esc(video.sizeText) + ' · 上传：' + dateText(video.createdAt) + ' · 到期：' + dateText(video.expiresAt) + ' · ' + (video.expired ? '已过期' : '可观看') + '</small>' +
-      '<small>' + video.viewCount + ' 人观看 · ' + video.completedCount + ' 人完成 · ' + seconds(video.totalWatchedSeconds) + '</small>' +
-      '<small>Thumbnail：' + (video.hasThumbnail ? '已设置 · 播放前显示 3 秒' : '未设置') + '</small>' +
-      '<code>' + esc(url) + '</code></div><div class="actions">' +
-      '<button class="small" onclick="copyLink(&quot;' + video.id + '&quot;)">复制链接</button>' +
-      '<a class="small button ghost-link" href="/watch/' + video.id + '" target="_blank" rel="noopener">预览观看页</a>' +
-      '<button class="small" onclick="pickThumbnail(&quot;' + video.id + '&quot;)">' + (video.hasThumbnail ? '更换 Thumbnail' : '上传 Thumbnail') + '</button>' +
-      '<button class="small danger" onclick="removeVideo(&quot;' + video.id + '&quot;)">删除视频</button>' +
-      '</div></article>';
-  }).join('') : '<p class="hint">尚未上传视频。</p>';
+    const previewMedia = video.thumbnailPreviewUrl
+      ? '<img class="video-thumbnail preview-image" src="' + esc(video.thumbnailPreviewUrl) + '" alt="' + esc(video.title) + ' Thumbnail">'
+      : video.previewUrl
+        ? '<video class="video-thumbnail" src="' + esc(video.previewUrl) + '" muted playsinline preload="metadata"></video>'
+        : '';
+    const statusClass = video.expired ? 'expired' : 'active';
+    const statusText = video.expired ? '已过期' : '可观看';
+    return '<article class="video-card" data-video-id="' + esc(video.id) + '">' +
+      '<a class="video-preview" href="/watch/' + esc(video.id) + '" target="_blank" rel="noopener" aria-label="预览 ' + esc(video.title) + '">' +
+        '<div class="preview-art"><span class="preview-mark">CA</span><small>CHAMP ACADEMY · VIDEO ROOM</small></div>' + previewMedia +
+        '<div class="preview-overlay"><span class="video-status ' + statusClass + '"><i></i>' + statusText + '</span><span class="play-button">▶</span></div>' +
+        '<span class="duration-badge">' + (video.hasThumbnail ? 'Thumbnail' : '读取预览…') + '</span>' +
+      '</a>' +
+      '<div class="video-card-body">' +
+        '<div class="video-card-heading"><div><span class="eyebrow">COURSE VIDEO</span><h3>' + esc(video.title) + '</h3></div></div>' +
+        '<div class="video-meta"><span>◫ ' + esc(video.sizeText) + '</span><span>↑ ' + shortDate(video.createdAt) + '</span><span>⌁ ' + shortDate(video.expiresAt) + '</span></div>' +
+        '<div class="thumbnail-state ' + (video.hasThumbnail ? 'is-set' : '') + '">▧ Thumbnail：' + (video.hasThumbnail ? '已设置 · 播放前显示 3 秒' : '自动使用视频画面预览') + '</div>' +
+        '<div class="video-metrics">' +
+          '<div><strong>' + video.viewCount + '</strong><span>观看人数</span></div>' +
+          '<div><strong>' + video.completedCount + '</strong><span>完成观看</span></div>' +
+          '<div><strong>' + seconds(video.totalWatchedSeconds) + '</strong><span>总观看时长</span></div>' +
+        '</div>' +
+        '<div class="share-link"><span>' + esc(url) + '</span><button onclick="copyLink(&quot;' + esc(video.id) + '&quot;)" aria-label="复制观看链接">复制</button></div>' +
+        '<div class="video-card-actions">' +
+          '<a class="video-action primary" href="/watch/' + esc(video.id) + '" target="_blank" rel="noopener"><span>▶</span> 预览观看页</a>' +
+          '<button class="video-action thumbnail-action" onclick="pickThumbnail(&quot;' + esc(video.id) + '&quot;)"><span>▧</span> ' + (video.hasThumbnail ? '更换 Thumbnail' : '上传 Thumbnail') + '</button>' +
+          '<button class="video-action delete" onclick="removeVideo(&quot;' + esc(video.id) + '&quot;)"><span>⌫</span> 删除</button>' +
+        '</div>' +
+      '</div>' +
+    '</article>';
+  }).join('') : '<div class="video-empty"><span>▶</span><h3>还没有已发布视频</h3><p>上传第一支课程视频后，这里会出现预览卡片和观看数据。</p></div>';
+
+  initializeVideoPreviews();
 
   viewsEl.innerHTML = state.views.length ? state.views.map(view =>
     '<tr><td>' + esc(view.name) + '</td><td>' + esc(view.phone) + '</td><td>' + esc(view.videoTitle) + '</td><td>' + dateText(view.startedAt) + '</td><td>' + seconds(view.watchedSeconds || 0) + '</td><td>' + (view.completedAt ? '已完成' : '观看中') + '</td></tr>'
@@ -227,7 +260,7 @@ function renderLoadError(error) {
     videos: [],
     views: [],
     stats: { videos: 0, views: 0, completed: 0 },
-    system: { platform: 'Vercel + Firebase', uploadTotal: '0 MB' }
+    system: { platform: 'Vercel + Firestore + R2', uploadTotal: '0 MB' }
   };
   statsEl.innerHTML = '<div class="stat"><b>需要 Firebase 设置</b><span>' + esc(error.message) + '</span></div>';
   videoCountEl.textContent = '0 个视频';
@@ -246,6 +279,37 @@ window.removeVideo = async id => {
   await api('/api/videos?id=' + encodeURIComponent(id), { method: 'DELETE' });
   await boot();
 };
+
+function initializeVideoPreviews() {
+  videosEl.querySelectorAll('.video-thumbnail').forEach(media => {
+    const preview = media.closest('.video-preview');
+    const duration = preview.querySelector('.duration-badge');
+    if (media.tagName === 'IMG') {
+      const ready = () => preview.classList.add('preview-ready');
+      if (media.complete && media.naturalWidth) ready();
+      else media.addEventListener('load', ready, { once: true });
+      media.addEventListener('error', () => preview.classList.add('preview-error'), { once: true });
+      duration.textContent = 'Thumbnail';
+      return;
+    }
+    media.addEventListener('loadedmetadata', () => {
+      duration.textContent = previewDuration(media.duration);
+      try {
+        media.currentTime = Math.min(5, Math.max(.5, media.duration * .06));
+      } catch {
+        preview.classList.add('preview-ready');
+      }
+    }, { once: true });
+    media.addEventListener('seeked', () => preview.classList.add('preview-ready'), { once: true });
+    media.addEventListener('loadeddata', () => {
+      if (!preview.classList.contains('preview-ready')) preview.classList.add('preview-ready');
+    }, { once: true });
+    media.addEventListener('error', () => {
+      preview.classList.add('preview-error');
+      duration.textContent = '预览';
+    }, { once: true });
+  });
+}
 
 function uploadToSignedUrl(uploadUrl, file, contentType, onProgress = setProgress) {
   return new Promise((resolve, reject) => {
