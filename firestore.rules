@@ -21,9 +21,29 @@ service cloud.firestore {
     //     && request.auth.uid == "YOUR_OPERATOR_UID";
     // or add per-user `ownerId` fields. Not required for single-user use.
 
-    // Default-deny: only authenticated (anonymous) requests are allowed.
-    match /{document=**} {
-      allow read, write: if request.auth != null;
+    function signedIn() {
+      return request.auth != null;
     }
+
+    // Existing CRM collections keep the current anonymous-auth compatibility
+    // model. Email Campaign data below is server-only.
+    match /leads/{document} { allow read, write: if signedIn(); }
+    match /previews/{document} { allow read, write: if signedIn(); }
+    match /videos/{document} { allow read, write: if signedIn(); }
+    match /views/{document} { allow read, write: if signedIn(); }
+    match /settings/{document} { allow read, write: if signedIn(); }
+    match /config/{document} { allow read, write: if signedIn(); }
+    match /preview_leads/{document} { allow read, write: if signedIn(); }
+    match /landing_leads/{document} { allow read, write: if signedIn(); }
+
+    match /email_campaigns/{campaign} { allow read, write: if false; }
+    match /email_campaigns/{campaign}/{document=**} { allow read, write: if false; }
+    match /email_messages/{document} { allow read, write: if false; }
+    match /email_webhook_events/{document} { allow read, write: if false; }
+    match /email_suppressions/{document} { allow read, write: if false; }
+    match /email_delivery_counters/{document} { allow read, write: if false; }
+
+    // New collections remain private until they are reviewed explicitly.
+    match /{document=**} { allow read, write: if false; }
   }
 }

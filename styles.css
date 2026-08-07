@@ -1419,3 +1419,215 @@ input[type="checkbox"].lead-select {
   box-shadow: 0 4px 12px rgba(0,0,0,0.05);
   border-color: var(--brand);
 }
+
+/* Email Campaign Center */
+.email-campaign-panel {
+  display: grid;
+  gap: 18px;
+  min-width: 0;
+}
+
+.email-campaign-panel > *,
+.email-campaign-grid,
+.email-campaign-card,
+.email-field-grid > * {
+  min-width: 0;
+}
+
+.email-campaign-heading,
+.email-section-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.email-campaign-heading h3,
+.email-section-heading h4 {
+  margin: 0 0 5px;
+}
+
+.email-campaign-heading p,
+.email-section-heading p {
+  margin: 0;
+}
+
+.email-campaign-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.email-campaign-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 18px;
+  align-items: start;
+}
+
+.email-campaign-card {
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 20px;
+}
+
+.email-field-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin: 18px 0;
+}
+
+.email-field-full {
+  grid-column: 1 / -1;
+}
+
+.email-audience-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin: 16px 0 12px;
+}
+
+.email-audience-toolbar input[type="search"] {
+  flex: 1 1 220px;
+  min-width: 180px;
+}
+
+.email-select-all,
+.email-consent-confirm {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--text);
+}
+
+.email-consent-confirm {
+  padding: 13px 14px;
+  margin: 15px 0;
+  background: #fff8f1;
+  border: 1px solid #ffe8cc;
+  border-radius: 8px;
+  font-weight: 700;
+}
+
+.email-audience-summary,
+.email-audience-audit {
+  padding: 11px 13px;
+  border-radius: 8px;
+  background: var(--soft);
+  color: var(--muted);
+  font-size: 13px;
+  margin-bottom: 12px;
+}
+
+.email-audience-audit {
+  margin: 12px 0 0;
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  color: #166534;
+  line-height: 1.65;
+}
+
+.email-audience-table-wrap {
+  max-height: 430px;
+  overflow: auto;
+  margin-bottom: 12px;
+}
+
+.email-campaign-table th,
+.email-campaign-table td {
+  vertical-align: middle;
+}
+
+.email-campaign-table td:first-child input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+}
+
+.email-status-badge {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 4px 9px;
+  font-size: 11px;
+  font-weight: 800;
+  background: #eef2f7;
+  color: #475569;
+}
+
+.email-status-badge.status-clicked,
+.email-status-badge.status-completed,
+.email-status-badge.status-delivered { background: #dcfce7; color: #166534; }
+.email-status-badge.status-opened,
+.email-status-badge.status-sending { background: #dbeafe; color: #1d4ed8; }
+.email-status-badge.status-bounced,
+.email-status-badge.status-failed,
+.email-status-badge.status-complained { background: #fee2e2; color: #b91c1c; }
+.email-status-badge.status-paused,
+.email-status-badge.status-unsubscribed { background: #fef3c7; color: #92400e; }
+
+.email-report-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(115px, 1fr));
+  gap: 10px;
+  margin: 18px 0;
+}
+
+.email-report-stat {
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: var(--soft);
+}
+
+.email-report-stat span {
+  display: block;
+  color: var(--muted);
+  font-size: 11px;
+  margin-bottom: 4px;
+}
+
+.email-report-stat strong {
+  font-size: 20px;
+}
+
+.email-send-card {
+  border-left: 4px solid var(--brand);
+}
+
+.email-send-note {
+  margin: 10px 0 0;
+  font-size: 12px;
+}
+
+@media (max-width: 1050px) {
+  .email-campaign-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 680px) {
+  .email-field-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .email-field-full {
+    grid-column: auto;
+  }
+
+  .email-campaign-card {
+    padding: 15px;
+  }
+
+  .email-audience-toolbar > *,
+  .email-audience-toolbar input[type="search"] {
+    width: 100%;
+    min-width: 0;
+  }
+}
