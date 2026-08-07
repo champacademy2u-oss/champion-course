@@ -23,3 +23,7 @@ window.ZOOM_PUBLIC_CONFIG = {
   singleEndpoint: true,
   appCheckSiteKey: ""
 };
+
+window.EMAIL_CAMPAIGN_CONFIG = {
+  apiBaseUrl: "https://champion-course-video-room.vercel.app/api/email-campaigns"
+};

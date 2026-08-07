@@ -34,9 +34,9 @@
         <button class="nav-item" data-view="templates" title="Templates">
           <span>✉</span> Templates
         </button>
-        <a href="https://mail.google.com/mail/u/4/#inbox" target="_blank" class="nav-item" title="Open Gmail" style="text-decoration: none;">
+        <button class="nav-item" data-view="emailCampaigns" title="Email Campaigns">
           <span>📧</span> Mailbox
-        </a>
+        </button>
         <button class="nav-item" data-view="zoom" title="Zoom">
           <span>🎥</span> Zoom
         </button>
@@ -224,7 +224,7 @@
             <option value="all">All Preview Courses</option>
           </select>
           <button class="text-button primary" id="bulkWhatsappBtn">Bulk WhatsApp</button>
-          <button class="text-button" id="bulkEmailBtn">Bulk Email</button>
+          <button class="text-button" id="bulkEmailBtn">Create Email Campaign</button>
           <div class="view-toggle">
             <button class="active" id="tableViewBtn">Table</button>
             <button id="kanbanViewBtn">Kanban</button>
@@ -420,6 +420,102 @@
           </label>
         </div>
         <button class="text-button primary" id="saveTemplatesBtn">Save Templates</button>
+      </section>
+
+      <!-- ── EMAIL CAMPAIGN CENTER ── -->
+      <section class="view" id="emailCampaignsView">
+        <div class="panel wide email-campaign-panel">
+          <div class="panel-heading email-campaign-heading">
+            <div>
+              <h3>📧 Email Campaign Center</h3>
+              <p class="muted">逐人发送并查看送达、开启（估算）、CTA 点击、未点击、退信与退订报告。</p>
+            </div>
+            <div class="email-campaign-actions">
+              <a class="text-button" href="https://mail.google.com/mail/u/4/#inbox" target="_blank" rel="noopener" style="text-decoration:none">打开 Gmail</a>
+              <button class="text-button" id="emailRefreshCampaignsBtn" type="button">刷新</button>
+              <button class="text-button primary" id="emailNewCampaignBtn" type="button">建立 Campaign</button>
+            </div>
+          </div>
+
+          <div class="email-campaign-card">
+            <div class="email-section-heading"><div><h4>Campaign 记录</h4><p>草稿可以继续编辑；发送中可暂停或恢复。</p></div></div>
+            <div class="table-wrap">
+              <table class="email-campaign-table">
+                <thead><tr><th>Campaign</th><th>状态</th><th>有效名单</th><th>更新时间</th><th>操作</th></tr></thead>
+                <tbody id="emailCampaignListBody"><tr><td colspan="5" class="muted">进入 Mailbox 后读取 Campaign。</td></tr></tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="email-campaign-grid">
+            <div class="email-campaign-card">
+              <div class="email-section-heading"><div><h4>1. Email 内容</h4><p>所有内容会由服务器安全转换成品牌邮件。</p></div><span id="emailDraftState" class="muted"></span></div>
+              <input id="emailCampaignId" type="hidden" />
+              <div class="email-field-grid">
+                <label class="template-field email-field-full"><span>Campaign 内部名称</span><input id="emailCampaignName" type="text" maxlength="120" placeholder="例如：8月课程通知" /></label>
+                <label class="template-field email-field-full"><span>Email 标题</span><input id="emailCampaignSubject" type="text" maxlength="200" placeholder="{{name}}，Champion Academy 有一项通知" /></label>
+                <label class="template-field email-field-full"><span>预览文字</span><input id="emailCampaignPreview" type="text" maxlength="240" placeholder="收件箱标题旁显示的简短说明" /></label>
+                <label class="template-field email-field-full"><span>正文（支持 {{name}}）</span><textarea id="emailCampaignBody" rows="9" maxlength="12000" placeholder="Hi {{name}}，&#10;&#10;这里填写需要通知客户的内容。"></textarea></label>
+                <label class="template-field"><span>CTA 按钮文字</span><input id="emailCampaignCtaLabel" type="text" maxlength="80" placeholder="查看详情" /></label>
+                <label class="template-field"><span>CTA HTTPS 链接</span><input id="emailCampaignCtaUrl" type="url" inputmode="url" maxlength="2048" placeholder="https://..." /></label>
+              </div>
+              <div class="email-campaign-actions">
+                <button class="text-button primary" id="emailSaveDraftBtn" type="button">保存草稿</button>
+                <button class="text-button" id="emailSendTestBtn" type="button" disabled>寄测试邮件</button>
+              </div>
+            </div>
+
+            <div class="email-campaign-card">
+              <div class="email-section-heading"><div><h4>2. 收件名单</h4><p>仅显示有 Email 的 Leads、Preview Leads 与 Landing Leads；Ebook Leads 没有 Email。</p></div></div>
+              <div class="email-audience-toolbar">
+                <select id="emailAudienceSourceFilter">
+                  <option value="all">全部来源</option>
+                  <option value="leads">Leads</option>
+                  <option value="preview_learning">Preview Leads</option>
+                  <option value="preview_landing">Landing Leads</option>
+                </select>
+                <input id="emailAudienceSearch" type="search" placeholder="搜索姓名或 Email" />
+                <label class="email-select-all"><input id="emailAudienceSelectAll" type="checkbox" /> 选择目前筛选结果</label>
+              </div>
+              <div id="emailAudienceSummary" class="email-audience-summary">尚未选择收件人。</div>
+              <div class="table-wrap email-audience-table-wrap">
+                <table class="email-campaign-table">
+                  <thead><tr><th></th><th>客户</th><th>Email</th><th>来源</th></tr></thead>
+                  <tbody id="emailAudienceBody"><tr><td colspan="4" class="muted">正在等待名单资料。</td></tr></tbody>
+                </table>
+              </div>
+              <button class="text-button" id="emailPreviewAudienceBtn" type="button" disabled>审核名单</button>
+              <div id="emailAudienceAudit" class="email-audience-audit" hidden></div>
+            </div>
+          </div>
+
+          <div class="email-campaign-card email-send-card">
+            <div class="email-section-heading"><div><h4>3. 最终确认与寄送</h4><p>必须先保存、寄测试邮件并审核名单；系统每批最多处理 25 人。</p></div><strong id="emailSendProgress"></strong></div>
+            <label class="email-consent-confirm"><input id="emailConsentConfirmed" type="checkbox" /> 我确认所选收件人是已同意接收 Email 的现有客户或联系人。</label>
+            <div class="email-campaign-actions">
+              <button class="text-button primary" id="emailStartCampaignBtn" type="button" disabled>确认并开始发送</button>
+              <button class="text-button" id="emailPauseCampaignBtn" type="button" hidden>暂停发送</button>
+            </div>
+            <p class="muted email-send-note">点击开始后才会真实寄送；关闭页面时进度会保留，重新进入 Campaign 可继续。</p>
+          </div>
+
+          <div class="email-campaign-card" id="emailReportCard" hidden>
+            <div class="email-section-heading">
+              <div><h4 id="emailReportTitle">Campaign 报告</h4><p>“开启”受邮件隐私机制影响，仅供参考；CTA 点击是主要指标。</p></div>
+              <div class="email-campaign-actions"><button class="text-button" id="emailRefreshReportBtn" type="button">刷新报告</button><button class="text-button" id="emailExportReportBtn" type="button">Export CSV</button></div>
+            </div>
+            <div id="emailReportStats" class="email-report-stats"></div>
+            <div class="email-audience-toolbar">
+              <select id="emailReportStatusFilter">
+                <option value="all">全部状态</option><option value="clicked">已点击</option><option value="not_clicked">未点击</option><option value="opened">已开启（估算）</option><option value="delivered">已送达</option><option value="sent">已发送</option><option value="bounced">退信</option><option value="failed">失败</option><option value="complained">投诉</option><option value="unsubscribed">已退订</option><option value="queued">排队中</option>
+              </select>
+              <input id="emailReportSearch" type="search" placeholder="搜索姓名或 Email" />
+            </div>
+            <div class="table-wrap">
+              <table class="email-campaign-table"><thead><tr><th>客户</th><th>Email</th><th>状态</th><th>发送</th><th>开启</th><th>点击</th></tr></thead><tbody id="emailReportBody"><tr><td colspan="6" class="muted">尚未读取报告。</td></tr></tbody></table>
+            </div>
+          </div>
+        </div>
       </section>
 
       <section id="followupView" class="view">

@@ -13,9 +13,42 @@
 7. 点击 `WhatsApp` 会打开 WhatsApp 发送预设文案。
 8. 点击 `Email` 会打开你的 email app 并带入标题和内容。
 9. 在 Leads 页面点击 `Bulk WhatsApp`，会用同一段 WhatsApp 文案打开所有有电话的客户聊天。
-10. 在 Leads 页面点击 `Bulk Email`，会用 BCC 把同一封 email 发给所有有 email 的客户。
+10. 在 Leads 页面点击 `Create Email Campaign`，会把目前筛选的客户带入 Mailbox；系统不会再用无法追踪个人结果的 BCC。
 11. 跟进完成后点击 `Done`，系统会进入下一次 Day 3 或 Day 7 follow-up。
 12. 左侧 `Zoom` 页面可以保存每场活动的名称、日期时间、Zoom 报名链接，以及 WhatsApp / Email 通知内容。
+
+## 可追踪 Email Campaign
+
+左侧 `Mailbox` 现在是站内 Campaign 中心，并保留一个次要的 Gmail 快捷入口。每位客户会收到独立 Email，系统通过 Resend Email ID 与已签名 webhook 显示：已发送、已送达、已开启（估算）、CTA 已点击、未点击、退信、失败、投诉与退订。
+
+安全寄送流程固定为：
+
+1. 从 Leads、Preview Leads 或 Landing Leads 勾选客户；Ebook Leads 目前没有 Email，因此不会出现。
+2. 填写 Campaign 名称、标题、预览文字、正文、CTA 按钮和 HTTPS 链接并保存草稿。
+3. 先寄到固定的管理员测试邮箱。
+4. 审核有效、重复、无效、未同意及永久排除人数。
+5. 确认客户已同意接收 Email，再由管理员点击最终发送。
+6. 系统每批处理 25 人；关闭页面不会遗失进度，重新打开 Campaign 可继续。
+
+上线前必须先在 Resend 完成自有寄件域名的 SPF/DKIM 验证，并在域名设置启用 Open Tracking 与 Click Tracking。Webhook URL 是：
+
+`https://champion-course-video-room.vercel.app/api/email-webhook`
+
+Webhook 订阅 `email.sent`、`email.delivered`、`email.opened`、`email.clicked`、`email.bounced`、`email.failed`、`email.complained` 与 `email.suppressed`。开启数据会受图片拦截和隐私代理影响，CTA 点击才是主要指标。
+
+Vercel 环境变量参考 `.env.vercel.example`，至少需要：
+
+- `CRM_ADMIN_UIDS`：允许使用 Email Campaign 的 Firebase UID；
+- `RESEND_API_KEY` 与 `RESEND_WEBHOOK_SECRET`；
+- `EMAIL_FROM`：例如 `Champion Academy <updates@已验证域名>`；
+- `EMAIL_TEST_RECIPIENT`：管理员控制的测试邮箱；
+- `EMAIL_UNSUBSCRIBE_SECRET`：长随机值，只能保存在 Vercel；
+- `EMAIL_DAILY_SEND_LIMIT`：不得高于 Resend 账户的每日额度；
+- `EMAIL_ALLOWED_ORIGINS` 与 `PUBLIC_API_BASE_URL`。
+
+Email Campaign、收件人快照、Webhook、退订与发送上限资料都由 Vercel Firebase Admin SDK 存取，Firestore 浏览器规则明确拒绝直接访问。不要把 Resend Key、Webhook Secret、退订 Secret 或客户名单贴进聊天、写入前端或提交 Git。
+
+正式客户寄送前，只使用管理员控制的测试邮箱完成一次送达、开启、CTA 点击和退订测试；部署或真实群发都需要负责人最后明确批准。
 
 ## 测试
 

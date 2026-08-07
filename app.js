@@ -455,7 +455,39 @@ const elements = {
   zoomDeliveryNote: document.querySelector("#zoomDeliveryNote"),
   zoomSaveState: document.querySelector("#zoomSaveState"),
   zoomRegistrationsBody: document.querySelector("#zoomRegistrationsBody"),
-  refreshZoomDataBtn: document.querySelector("#refreshZoomDataBtn")
+  refreshZoomDataBtn: document.querySelector("#refreshZoomDataBtn"),
+  emailCampaignListBody: document.querySelector("#emailCampaignListBody"),
+  emailRefreshCampaignsBtn: document.querySelector("#emailRefreshCampaignsBtn"),
+  emailNewCampaignBtn: document.querySelector("#emailNewCampaignBtn"),
+  emailCampaignId: document.querySelector("#emailCampaignId"),
+  emailCampaignName: document.querySelector("#emailCampaignName"),
+  emailCampaignSubject: document.querySelector("#emailCampaignSubject"),
+  emailCampaignPreview: document.querySelector("#emailCampaignPreview"),
+  emailCampaignBody: document.querySelector("#emailCampaignBody"),
+  emailCampaignCtaLabel: document.querySelector("#emailCampaignCtaLabel"),
+  emailCampaignCtaUrl: document.querySelector("#emailCampaignCtaUrl"),
+  emailDraftState: document.querySelector("#emailDraftState"),
+  emailSaveDraftBtn: document.querySelector("#emailSaveDraftBtn"),
+  emailSendTestBtn: document.querySelector("#emailSendTestBtn"),
+  emailAudienceSourceFilter: document.querySelector("#emailAudienceSourceFilter"),
+  emailAudienceSearch: document.querySelector("#emailAudienceSearch"),
+  emailAudienceSelectAll: document.querySelector("#emailAudienceSelectAll"),
+  emailAudienceSummary: document.querySelector("#emailAudienceSummary"),
+  emailAudienceBody: document.querySelector("#emailAudienceBody"),
+  emailPreviewAudienceBtn: document.querySelector("#emailPreviewAudienceBtn"),
+  emailAudienceAudit: document.querySelector("#emailAudienceAudit"),
+  emailConsentConfirmed: document.querySelector("#emailConsentConfirmed"),
+  emailStartCampaignBtn: document.querySelector("#emailStartCampaignBtn"),
+  emailPauseCampaignBtn: document.querySelector("#emailPauseCampaignBtn"),
+  emailSendProgress: document.querySelector("#emailSendProgress"),
+  emailReportCard: document.querySelector("#emailReportCard"),
+  emailReportTitle: document.querySelector("#emailReportTitle"),
+  emailRefreshReportBtn: document.querySelector("#emailRefreshReportBtn"),
+  emailExportReportBtn: document.querySelector("#emailExportReportBtn"),
+  emailReportStats: document.querySelector("#emailReportStats"),
+  emailReportStatusFilter: document.querySelector("#emailReportStatusFilter"),
+  emailReportSearch: document.querySelector("#emailReportSearch"),
+  emailReportBody: document.querySelector("#emailReportBody")
 };
 
 const templateFields = [
@@ -508,6 +540,20 @@ const zoomAdminApiOverride = ["localhost", "127.0.0.1"].includes(location.hostna
 const ZOOM_FUNCTIONS_BASE_URL = String(zoomAdminApiOverride || window.ZOOM_PUBLIC_CONFIG?.functionsBaseUrl || "").replace(/\/$/, "");
 const ZOOM_SINGLE_ENDPOINT = !zoomAdminApiOverride && window.ZOOM_PUBLIC_CONFIG?.singleEndpoint === true;
 const zoomAdminState = { events: [], registrations: [], legacy: null, service: {}, selectedId: "", loaded: false, authorized: false, currentUid: "" };
+const EMAIL_CAMPAIGN_API_URL = String(window.EMAIL_CAMPAIGN_CONFIG?.apiBaseUrl || "").replace(/\/$/, "");
+const emailCampaignState = {
+  initialized: false,
+  loading: false,
+  initPromise: null,
+  dirty: false,
+  campaigns: [],
+  candidates: [],
+  selectedKeys: new Set(),
+  activeCampaign: null,
+  audienceAudit: null,
+  report: null,
+  sending: false
+};
 
 function normalizeZoomSettings(value) {
   const data = value && typeof value === "object" ? value : {};
@@ -1163,16 +1209,536 @@ function bulkWhatsapp() {
   toast(`${Math.min(leads.length, 25)} WhatsApp chats opened.${extra}`);
 }
 
-function bulkEmail() {
-  const emails = Array.from(new Set(filteredLeads().map((lead) => lead.email).filter(Boolean)));
-  if (!emails.length) {
+async function bulkEmail() {
+  const leads = filteredLeads().filter(lead => lead.email);
+  if (!leads.length) {
     toast("No email addresses found.");
     return;
   }
-  const subject = state.templates.emailSubject || defaultTemplates.emailSubject;
-  const body = (state.templates.emailBody || defaultTemplates.emailBody).replaceAll("{{name}}", "").replaceAll("{{phone}}", "").replaceAll("{{email}}", "").replaceAll("{{job}}", "");
-  window.location.href = `mailto:?bcc=${encodeURIComponent(emails.join(","))}&subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-  toast(`${emails.length} emails added to BCC.`);
+  switchView("emailCampaigns");
+  await initEmailCampaigns();
+  emailCampaignState.selectedKeys = new Set(leads.map(lead => `leads:${lead.id}`));
+  emailCampaignState.dirty = true;
+  renderEmailAudience();
+  resetEmailAudienceAudit();
+  toast(`${leads.length} 位 Leads 已加入 Email Campaign 名单。`);
+}
+
+function emailCandidateKey(source, sourceId) {
+  return `${source}:${sourceId}`;
+}
+
+function emailCampaignStatusLabel(status) {
+  return ({
+    draft: "草稿",
+    preparing: "准备中",
+    sending: "发送中",
+    paused: "已暂停",
+    completed: "已完成"
+  })[status] || status || "草稿";
+}
+
+function emailRecipientStatusLabel(status) {
+  return ({
+    queued: "排队中",
+    sending: "发送中",
+    sent: "已发送",
+    delivered: "已送达",
+    opened: "已开启（估算）",
+    clicked: "已点击",
+    bounced: "退信",
+    failed: "失败",
+    complained: "投诉",
+    unsubscribed: "已退订"
+  })[status] || status || "排队中";
+}
+
+function emailFormatDate(value) {
+  if (!value) return "-";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "-";
+  return new Intl.DateTimeFormat("zh-MY", {
+    year: "numeric", month: "short", day: "2-digit", hour: "2-digit", minute: "2-digit"
+  }).format(date);
+}
+
+async function emailCampaignRequest(action, options = {}) {
+  if (!EMAIL_CAMPAIGN_API_URL) throw new Error("Email Campaign API 尚未设置");
+  const token = await zoomFirebaseAdminToken();
+  const method = options.method || "GET";
+  const url = new URL(EMAIL_CAMPAIGN_API_URL);
+  url.searchParams.set("action", action);
+  Object.entries(options.query || {}).forEach(([key, value]) => url.searchParams.set(key, value));
+  const response = await fetch(url, {
+    method,
+    headers: {
+      Authorization: `Bearer ${token}`,
+      ...(method === "POST" ? { "Content-Type": "application/json" } : {})
+    },
+    body: method === "POST" ? JSON.stringify(options.body || {}) : undefined
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(data.error || "Email Campaign 操作失败");
+  return data;
+}
+
+function emailCandidateFromLead(lead) {
+  return {
+    source: "leads",
+    sourceId: lead.id,
+    sourceLabel: "Leads",
+    name: lead.name || "-",
+    email: lead.email || "",
+    course: lead.course || ""
+  };
+}
+
+function emailCandidateFromPreview(lead) {
+  const source = lead.source === CHAMP_LEARNING_LEAD_SOURCE ? "preview_learning" : "preview_landing";
+  return {
+    source,
+    sourceId: lead.id,
+    sourceLabel: source === "preview_learning" ? "Preview Leads" : "Landing Leads",
+    name: lead.name || "-",
+    email: lead.email || "",
+    course: lead.course || ""
+  };
+}
+
+async function loadEmailAudienceCandidates() {
+  const candidates = state.leads.filter(lead => lead.id && lead.email).map(emailCandidateFromLead);
+  let previewLeads = [];
+  if (_db) {
+    try {
+      const snap = await _db.collection("preview_leads").get();
+      previewLeads = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    } catch (error) {
+      console.warn("Email audience preview_leads load failed:", error.message);
+    }
+  } else {
+    previewLeads = [
+      ...(window._previewLeadsCache || []),
+      ...(window._champPreviewLeadsCache || [])
+    ];
+  }
+  previewLeads
+    .filter(lead => lead.id && lead.email && [CHAMP_LEARNING_LEAD_SOURCE, CHAMP_PREVIEW_LEAD_SOURCE].includes(lead.source))
+    .forEach(lead => candidates.push(emailCandidateFromPreview(lead)));
+  const seen = new Set();
+  emailCampaignState.candidates = candidates.filter(candidate => {
+    const key = emailCandidateKey(candidate.source, candidate.sourceId);
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+  renderEmailAudience();
+}
+
+function filteredEmailCandidates() {
+  const source = elements.emailAudienceSourceFilter?.value || "all";
+  const query = (elements.emailAudienceSearch?.value || "").trim().toLowerCase();
+  return emailCampaignState.candidates.filter(candidate => {
+    if (source !== "all" && candidate.source !== source) return false;
+    if (!query) return true;
+    return candidate.name.toLowerCase().includes(query) || candidate.email.toLowerCase().includes(query);
+  });
+}
+
+function renderEmailAudience() {
+  if (!elements.emailAudienceBody) return;
+  const candidates = filteredEmailCandidates();
+  if (!candidates.length) {
+    elements.emailAudienceBody.innerHTML = `<tr><td colspan="4" class="muted">没有符合条件且拥有 Email 的客户。</td></tr>`;
+  } else {
+    elements.emailAudienceBody.innerHTML = candidates.map(candidate => {
+      const key = emailCandidateKey(candidate.source, candidate.sourceId);
+      return `<tr><td><input class="email-audience-select" type="checkbox" data-key="${escapeHtml(key)}" ${emailCampaignState.selectedKeys.has(key) ? "checked" : ""}></td><td><strong>${escapeHtml(candidate.name)}</strong>${candidate.course ? `<br><small class="muted">${escapeHtml(candidate.course)}</small>` : ""}</td><td>${escapeHtml(candidate.email)}</td><td>${escapeHtml(candidate.sourceLabel)}</td></tr>`;
+    }).join("");
+  }
+  const selected = emailCampaignState.selectedKeys.size;
+  elements.emailAudienceSummary.textContent = selected
+    ? `已选择 ${selected} 位客户；服务器会再次验证、去重并检查永久排除名单。`
+    : "尚未选择收件人。";
+  const filteredKeys = candidates.map(candidate => emailCandidateKey(candidate.source, candidate.sourceId));
+  elements.emailAudienceSelectAll.checked = Boolean(filteredKeys.length) && filteredKeys.every(key => emailCampaignState.selectedKeys.has(key));
+  elements.emailAudienceSelectAll.indeterminate = filteredKeys.some(key => emailCampaignState.selectedKeys.has(key)) && !elements.emailAudienceSelectAll.checked;
+  updateEmailCampaignWorkflow();
+}
+
+function emailAudienceSelections() {
+  const groups = new Map();
+  emailCampaignState.selectedKeys.forEach(key => {
+    const candidate = emailCampaignState.candidates.find(item => emailCandidateKey(item.source, item.sourceId) === key);
+    if (!candidate) return;
+    if (!groups.has(candidate.source)) groups.set(candidate.source, []);
+    groups.get(candidate.source).push(candidate.sourceId);
+  });
+  return Array.from(groups, ([source, ids]) => ({ source, ids }));
+}
+
+function applyEmailSelections(selections = []) {
+  emailCampaignState.selectedKeys = new Set();
+  selections.forEach(selection => (selection.ids || []).forEach(id => {
+    emailCampaignState.selectedKeys.add(emailCandidateKey(selection.source, id));
+  }));
+  renderEmailAudience();
+}
+
+function emailFormData() {
+  return {
+    id: elements.emailCampaignId.value,
+    internalName: elements.emailCampaignName.value,
+    subject: elements.emailCampaignSubject.value,
+    previewText: elements.emailCampaignPreview.value,
+    bodyText: elements.emailCampaignBody.value,
+    ctaLabel: elements.emailCampaignCtaLabel.value,
+    ctaUrl: elements.emailCampaignCtaUrl.value,
+    selections: emailAudienceSelections()
+  };
+}
+
+function setEmailFormDisabled(disabled) {
+  [
+    elements.emailCampaignName,
+    elements.emailCampaignSubject,
+    elements.emailCampaignPreview,
+    elements.emailCampaignBody,
+    elements.emailCampaignCtaLabel,
+    elements.emailCampaignCtaUrl,
+    elements.emailAudienceSourceFilter,
+    elements.emailAudienceSearch,
+    elements.emailAudienceSelectAll
+  ].forEach(element => { if (element) element.disabled = disabled; });
+  elements.emailAudienceBody?.querySelectorAll("input").forEach(input => { input.disabled = disabled; });
+}
+
+function resetEmailAudienceAudit() {
+  emailCampaignState.audienceAudit = null;
+  if (elements.emailAudienceAudit) {
+    elements.emailAudienceAudit.hidden = true;
+    elements.emailAudienceAudit.textContent = "";
+  }
+  updateEmailCampaignWorkflow();
+}
+
+function updateEmailCampaignWorkflow() {
+  if (!elements.emailSaveDraftBtn) return;
+  const campaign = emailCampaignState.activeCampaign;
+  const status = campaign?.status || "draft";
+  const locked = status !== "draft";
+  const hasDraft = Boolean(elements.emailCampaignId.value);
+  const testCurrent = !emailCampaignState.dirty && Boolean(campaign?.testSentAt && campaign?.testSentContentVersion === campaign?.contentVersion);
+  const hasAudit = Boolean(emailCampaignState.audienceAudit?.stats?.valid);
+  const consent = Boolean(elements.emailConsentConfirmed.checked);
+  setEmailFormDisabled(locked);
+  elements.emailSaveDraftBtn.disabled = locked;
+  elements.emailSendTestBtn.disabled = locked || !hasDraft || emailCampaignState.dirty;
+  elements.emailPreviewAudienceBtn.disabled = locked || !hasDraft || emailCampaignState.dirty || !emailCampaignState.selectedKeys.size;
+  elements.emailPauseCampaignBtn.hidden = status !== "sending";
+  elements.emailStartCampaignBtn.textContent = ["sending", "paused", "preparing"].includes(status) ? "继续发送" : "确认并开始发送";
+  elements.emailStartCampaignBtn.disabled = status === "completed" || (status === "draft" && !(hasDraft && testCurrent && hasAudit && consent));
+  elements.emailDraftState.textContent = !hasDraft ? "尚未保存" : emailCampaignState.dirty ? "有尚未保存的修改" : testCurrent ? "测试邮件已寄出" : "草稿已保存，等待测试";
+}
+
+function markEmailCampaignDirty() {
+  emailCampaignState.dirty = true;
+  resetEmailAudienceAudit();
+  updateEmailCampaignWorkflow();
+}
+
+function newEmailCampaign() {
+  emailCampaignState.activeCampaign = null;
+  emailCampaignState.audienceAudit = null;
+  emailCampaignState.report = null;
+  emailCampaignState.dirty = false;
+  emailCampaignState.selectedKeys = new Set();
+  elements.emailCampaignId.value = "";
+  elements.emailCampaignName.value = "";
+  elements.emailCampaignSubject.value = "{{name}}，Champion Academy 有一项通知";
+  elements.emailCampaignPreview.value = "请查看这项最新通知";
+  elements.emailCampaignBody.value = "Hi {{name}}，\n\n这里填写需要通知客户的内容。\n\nChampion Academy";
+  elements.emailCampaignCtaLabel.value = "查看详情";
+  elements.emailCampaignCtaUrl.value = "";
+  elements.emailConsentConfirmed.checked = false;
+  elements.emailSendProgress.textContent = "";
+  elements.emailReportCard.hidden = true;
+  resetEmailAudienceAudit();
+  renderEmailAudience();
+  updateEmailCampaignWorkflow();
+}
+
+function fillEmailCampaignForm(campaign) {
+  emailCampaignState.activeCampaign = campaign;
+  emailCampaignState.dirty = false;
+  elements.emailCampaignId.value = campaign.id || "";
+  elements.emailCampaignName.value = campaign.internalName || "";
+  elements.emailCampaignSubject.value = campaign.subject || "";
+  elements.emailCampaignPreview.value = campaign.previewText || "";
+  elements.emailCampaignBody.value = campaign.bodyText || "";
+  elements.emailCampaignCtaLabel.value = campaign.ctaLabel || "";
+  elements.emailCampaignCtaUrl.value = campaign.ctaUrl || "";
+  elements.emailConsentConfirmed.checked = Boolean(campaign.startedAt);
+  applyEmailSelections(campaign.selections || []);
+  resetEmailAudienceAudit();
+  updateEmailCampaignWorkflow();
+}
+
+function renderEmailCampaignList() {
+  if (!elements.emailCampaignListBody) return;
+  if (!emailCampaignState.campaigns.length) {
+    elements.emailCampaignListBody.innerHTML = `<tr><td colspan="5" class="muted">还没有 Campaign，点击“建立 Campaign”开始。</td></tr>`;
+    return;
+  }
+  elements.emailCampaignListBody.innerHTML = emailCampaignState.campaigns.map(campaign => `
+    <tr>
+      <td><strong>${escapeHtml(campaign.internalName)}</strong><br><small class="muted">${escapeHtml(campaign.subject)}</small></td>
+      <td><span class="email-status-badge status-${escapeHtml(campaign.status)}">${escapeHtml(emailCampaignStatusLabel(campaign.status))}</span></td>
+      <td>${Number(campaign.audience?.valid) || "-"}</td>
+      <td>${emailFormatDate(campaign.updatedAt)}</td>
+      <td><button class="mini-button email-campaign-open" data-campaign-id="${escapeHtml(campaign.id)}">${campaign.status === "draft" ? "编辑" : "查看"}</button></td>
+    </tr>`).join("");
+}
+
+async function loadEmailCampaigns() {
+  if (!elements.emailCampaignListBody) return;
+  elements.emailCampaignListBody.innerHTML = `<tr><td colspan="5" class="muted">正在读取 Campaign…</td></tr>`;
+  try {
+    const data = await emailCampaignRequest("list");
+    emailCampaignState.campaigns = data.campaigns || [];
+    renderEmailCampaignList();
+  } catch (error) {
+    elements.emailCampaignListBody.innerHTML = `<tr><td colspan="5" style="color:#b91c1c">${escapeHtml(error.message)}</td></tr>`;
+  }
+}
+
+async function initEmailCampaigns() {
+  if (emailCampaignState.loading) return emailCampaignState.initPromise;
+  emailCampaignState.loading = true;
+  emailCampaignState.initPromise = (async () => {
+    try {
+      await Promise.all([loadEmailAudienceCandidates(), loadEmailCampaigns()]);
+      if (!emailCampaignState.initialized) newEmailCampaign();
+      emailCampaignState.initialized = true;
+    } finally {
+      emailCampaignState.loading = false;
+    }
+  })();
+  return emailCampaignState.initPromise;
+}
+
+async function saveEmailCampaignDraft() {
+  elements.emailSaveDraftBtn.disabled = true;
+  elements.emailDraftState.textContent = "保存中…";
+  try {
+    const data = await emailCampaignRequest("save-draft", { method: "POST", body: emailFormData() });
+    emailCampaignState.activeCampaign = data.campaign;
+    emailCampaignState.dirty = false;
+    elements.emailCampaignId.value = data.campaign.id;
+    resetEmailAudienceAudit();
+    await loadEmailCampaigns();
+    toast("✅ Email Campaign 草稿已保存");
+  } catch (error) {
+    toast(`❌ ${error.message}`);
+  } finally {
+    updateEmailCampaignWorkflow();
+  }
+}
+
+async function sendEmailCampaignTest() {
+  if (!confirm("将寄送一封测试邮件到系统预设的管理员测试邮箱。继续吗？")) return;
+  elements.emailSendTestBtn.disabled = true;
+  elements.emailSendTestBtn.textContent = "寄送中…";
+  try {
+    const data = await emailCampaignRequest("send-test", {
+      method: "POST",
+      body: { campaignId: elements.emailCampaignId.value }
+    });
+    emailCampaignState.activeCampaign.testSentAt = data.sentAt;
+    emailCampaignState.activeCampaign.testSentContentVersion = emailCampaignState.activeCampaign.contentVersion;
+    await loadEmailCampaigns();
+    toast("✅ 测试邮件已寄出，请检查收件箱与 CTA 链接");
+  } catch (error) {
+    toast(`❌ ${error.message}`);
+  } finally {
+    elements.emailSendTestBtn.textContent = "寄测试邮件";
+    updateEmailCampaignWorkflow();
+  }
+}
+
+async function previewEmailAudience() {
+  elements.emailPreviewAudienceBtn.disabled = true;
+  elements.emailPreviewAudienceBtn.textContent = "审核中…";
+  try {
+    const data = await emailCampaignRequest("preview-audience", {
+      method: "POST",
+      body: { campaignId: elements.emailCampaignId.value }
+    });
+    emailCampaignState.audienceAudit = data;
+    const stats = data.stats || {};
+    elements.emailAudienceAudit.hidden = false;
+    elements.emailAudienceAudit.textContent = `选中 ${stats.selected || 0}；有效 ${stats.valid || 0}；排除 ${stats.excluded || 0}（Email 无效 ${stats.invalid || 0}、重复 ${stats.duplicate || 0}、永久排除 ${stats.suppressed || 0}、未同意 ${stats.noConsent || 0}、记录不存在 ${stats.missing || 0}）。`;
+    toast("✅ 名单审核完成");
+  } catch (error) {
+    toast(`❌ ${error.message}`);
+  } finally {
+    elements.emailPreviewAudienceBtn.textContent = "审核名单";
+    updateEmailCampaignWorkflow();
+  }
+}
+
+async function openEmailCampaign(campaignId) {
+  const campaign = emailCampaignState.campaigns.find(item => item.id === campaignId);
+  if (!campaign) return;
+  fillEmailCampaignForm(campaign);
+  if (campaign.status !== "draft") await loadEmailCampaignReport(campaign.id);
+  else elements.emailReportCard.hidden = true;
+  document.getElementById("emailCampaignsView")?.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+async function startEmailCampaign() {
+  const campaign = emailCampaignState.activeCampaign;
+  if (!campaign) return;
+  const isResume = ["sending", "paused", "preparing"].includes(campaign.status);
+  const valid = Number(emailCampaignState.audienceAudit?.stats?.valid) || Number(campaign.audience?.valid) || 0;
+  const message = isResume
+    ? "继续处理尚未寄出的收件人吗？"
+    : `将真实寄送给 ${valid} 位有效收件人。寄送后无法撤回，确定继续吗？`;
+  if (!confirm(message)) return;
+  elements.emailStartCampaignBtn.disabled = true;
+  try {
+    const data = await emailCampaignRequest("start", {
+      method: "POST",
+      body: { campaignId: campaign.id, consentConfirmed: elements.emailConsentConfirmed.checked }
+    });
+    emailCampaignState.activeCampaign = { ...campaign, ...(data.campaign || {}), status: "sending" };
+    await loadEmailCampaigns();
+    await processEmailCampaignBatches();
+  } catch (error) {
+    toast(`❌ ${error.message}`);
+    updateEmailCampaignWorkflow();
+  }
+}
+
+async function processEmailCampaignBatches() {
+  if (emailCampaignState.sending) return;
+  emailCampaignState.sending = true;
+  let sent = 0;
+  let failed = 0;
+  updateEmailCampaignWorkflow();
+  try {
+    while (emailCampaignState.sending) {
+      const data = await emailCampaignRequest("send-next", {
+        method: "POST",
+        body: { campaignId: emailCampaignState.activeCampaign.id }
+      });
+      sent += Number(data.sent) || 0;
+      failed += Number(data.failed) || 0;
+      elements.emailSendProgress.textContent = `本次处理：已发送 ${sent}，失败 ${failed}`;
+      await loadEmailCampaignReport(emailCampaignState.activeCampaign.id, { quiet: true });
+      if (data.paused) {
+        emailCampaignState.activeCampaign.status = "paused";
+        toast(`⏸ ${data.reason || "Campaign 已暂停"}`);
+        break;
+      }
+      if (data.completed || !data.hasMore) {
+        emailCampaignState.activeCampaign.status = "completed";
+        toast("✅ Campaign 寄送流程已完成");
+        break;
+      }
+      if (!data.processed) {
+        toast("发送工作仍在处理中，请稍后点击继续发送。");
+        break;
+      }
+    }
+  } catch (error) {
+    toast(`❌ ${error.message}`);
+  } finally {
+    emailCampaignState.sending = false;
+    await loadEmailCampaigns();
+    updateEmailCampaignWorkflow();
+  }
+}
+
+async function pauseEmailCampaign() {
+  if (!emailCampaignState.activeCampaign) return;
+  emailCampaignState.sending = false;
+  elements.emailPauseCampaignBtn.disabled = true;
+  try {
+    const data = await emailCampaignRequest("pause", {
+      method: "POST",
+      body: { campaignId: emailCampaignState.activeCampaign.id }
+    });
+    emailCampaignState.activeCampaign = { ...emailCampaignState.activeCampaign, ...data.campaign };
+    await loadEmailCampaigns();
+    toast("⏸ Campaign 已暂停；当前处理中批次可能仍会完成。");
+  } catch (error) {
+    toast(`❌ ${error.message}`);
+  } finally {
+    elements.emailPauseCampaignBtn.disabled = false;
+    updateEmailCampaignWorkflow();
+  }
+}
+
+function emailReportRecipientIsNotClicked(recipient) {
+  return ["sent", "delivered", "opened"].includes(recipient.status);
+}
+
+function filteredEmailReportRecipients() {
+  const report = emailCampaignState.report;
+  if (!report) return [];
+  const status = elements.emailReportStatusFilter.value;
+  const query = elements.emailReportSearch.value.trim().toLowerCase();
+  return report.recipients.filter(recipient => {
+    if (status === "not_clicked" && !emailReportRecipientIsNotClicked(recipient)) return false;
+    if (status !== "all" && status !== "not_clicked" && recipient.status !== status) return false;
+    return !query || recipient.name.toLowerCase().includes(query) || recipient.email.toLowerCase().includes(query);
+  });
+}
+
+function renderEmailCampaignReport() {
+  const report = emailCampaignState.report;
+  if (!report) return;
+  elements.emailReportCard.hidden = false;
+  elements.emailReportTitle.textContent = `${report.campaign.internalName}｜Campaign 报告`;
+  const summary = report.summary || {};
+  const stats = [
+    ["选中", summary.selected], ["有效", summary.valid], ["排除", summary.excluded], ["已发送", summary.sent],
+    ["已送达", summary.delivered], ["开启（估算）", summary.opened], ["已点击", summary.clicked], ["未点击", summary.notClicked],
+    ["退信", summary.bounced], ["失败", summary.failed], ["投诉", summary.complained], ["退订", summary.unsubscribed]
+  ];
+  elements.emailReportStats.innerHTML = stats.map(([label, value]) => `<div class="email-report-stat"><span>${label}</span><strong>${Number(value) || 0}</strong></div>`).join("");
+  const recipients = filteredEmailReportRecipients();
+  elements.emailReportBody.innerHTML = recipients.length ? recipients.map(recipient => `
+    <tr><td><strong>${escapeHtml(recipient.name)}</strong><br><small class="muted">${escapeHtml(recipient.sourceLabel || recipient.course || "")}</small></td><td>${escapeHtml(recipient.email)}</td><td><span class="email-status-badge status-${escapeHtml(recipient.status)}">${escapeHtml(emailRecipientStatusLabel(recipient.status))}</span>${recipient.lastError ? `<br><small style="color:#b91c1c">${escapeHtml(recipient.lastError)}</small>` : ""}</td><td>${emailFormatDate(recipient.sentAt)}</td><td>${emailFormatDate(recipient.firstOpenedAt)}</td><td>${emailFormatDate(recipient.firstClickedAt)}</td></tr>`).join("") : `<tr><td colspan="6" class="muted">没有符合筛选条件的收件人。</td></tr>`;
+}
+
+async function loadEmailCampaignReport(campaignId, options = {}) {
+  if (!campaignId) return;
+  if (!options.quiet) elements.emailReportBody.innerHTML = `<tr><td colspan="6" class="muted">正在读取报告…</td></tr>`;
+  try {
+    emailCampaignState.report = await emailCampaignRequest("report", { query: { campaignId } });
+    renderEmailCampaignReport();
+  } catch (error) {
+    if (!options.quiet) toast(`❌ ${error.message}`);
+  }
+}
+
+function exportEmailCampaignReport() {
+  if (!emailCampaignState.report) return;
+  const headers = ["name", "email", "source", "status", "sent_at", "delivered_at", "opened_at", "clicked_at", "bounced_at", "failed_at", "complained_at", "unsubscribed_at"];
+  const rows = filteredEmailReportRecipients().map(recipient => [
+    recipient.name, recipient.email, recipient.sourceLabel, emailRecipientStatusLabel(recipient.status), recipient.sentAt,
+    recipient.deliveredAt, recipient.firstOpenedAt, recipient.firstClickedAt, recipient.bouncedAt, recipient.failedAt,
+    recipient.complainedAt, recipient.unsubscribedAt
+  ]);
+  const csv = [headers, ...rows].map(row => row.map(csvCell).join(",")).join("\n");
+  const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `email-campaign-${emailCampaignState.report.campaign.id}-${new Date().toISOString().slice(0, 10)}.csv`;
+  link.click();
+  URL.revokeObjectURL(url);
 }
 
 function markStepDone(id, step) {
@@ -2259,6 +2825,7 @@ function switchView(view, targetCourse) {
   if (view === "landingLeads") title = "Landing Leads";
   if (view === "ebookLeads") title = "Ebook Leads";
   if (view === "zoom") title = "Zoom";
+  if (view === "emailCampaigns") title = "Email Campaigns";
   if (view === "enrollments") {
     title = state.enrollmentFilter === "all" ? "Combined Course Enrollments" : state.enrollmentFilter;
   }
@@ -2278,6 +2845,7 @@ function switchView(view, targetCourse) {
   if (view === "followup") renderFollowUpList();
   if (view === "videos") renderVideos();
   if (view === "zoom") initZoomAdmin();
+  if (view === "emailCampaigns") initEmailCampaigns();
   if (view === "ebookLeads") loadLandingLeads();
   if (view === "landingLeads") loadChampPreviewLeads();
   if (view === "previewLeads") loadPreviewLeads();
@@ -2822,6 +3390,52 @@ elements.csvInput.addEventListener("change", async (event) => {
 elements.exportBtn.addEventListener("click", exportLeads);
 elements.bulkWhatsappBtn.addEventListener("click", bulkWhatsapp);
 elements.bulkEmailBtn.addEventListener("click", bulkEmail);
+if (elements.emailRefreshCampaignsBtn) elements.emailRefreshCampaignsBtn.addEventListener("click", loadEmailCampaigns);
+if (elements.emailNewCampaignBtn) elements.emailNewCampaignBtn.addEventListener("click", newEmailCampaign);
+if (elements.emailSaveDraftBtn) elements.emailSaveDraftBtn.addEventListener("click", saveEmailCampaignDraft);
+if (elements.emailSendTestBtn) elements.emailSendTestBtn.addEventListener("click", sendEmailCampaignTest);
+if (elements.emailPreviewAudienceBtn) elements.emailPreviewAudienceBtn.addEventListener("click", previewEmailAudience);
+if (elements.emailStartCampaignBtn) elements.emailStartCampaignBtn.addEventListener("click", startEmailCampaign);
+if (elements.emailPauseCampaignBtn) elements.emailPauseCampaignBtn.addEventListener("click", pauseEmailCampaign);
+if (elements.emailRefreshReportBtn) elements.emailRefreshReportBtn.addEventListener("click", () => {
+  const campaignId = emailCampaignState.report?.campaign?.id || emailCampaignState.activeCampaign?.id;
+  loadEmailCampaignReport(campaignId);
+});
+if (elements.emailExportReportBtn) elements.emailExportReportBtn.addEventListener("click", exportEmailCampaignReport);
+if (elements.emailCampaignListBody) elements.emailCampaignListBody.addEventListener("click", event => {
+  const button = event.target.closest(".email-campaign-open");
+  if (button?.dataset.campaignId) openEmailCampaign(button.dataset.campaignId);
+});
+if (elements.emailAudienceBody) elements.emailAudienceBody.addEventListener("change", event => {
+  const checkbox = event.target.closest(".email-audience-select");
+  if (!checkbox?.dataset.key) return;
+  if (checkbox.checked) emailCampaignState.selectedKeys.add(checkbox.dataset.key);
+  else emailCampaignState.selectedKeys.delete(checkbox.dataset.key);
+  markEmailCampaignDirty();
+  renderEmailAudience();
+});
+if (elements.emailAudienceSelectAll) elements.emailAudienceSelectAll.addEventListener("change", event => {
+  filteredEmailCandidates().forEach(candidate => {
+    const key = emailCandidateKey(candidate.source, candidate.sourceId);
+    if (event.target.checked) emailCampaignState.selectedKeys.add(key);
+    else emailCampaignState.selectedKeys.delete(key);
+  });
+  markEmailCampaignDirty();
+  renderEmailAudience();
+});
+if (elements.emailAudienceSourceFilter) elements.emailAudienceSourceFilter.addEventListener("change", renderEmailAudience);
+if (elements.emailAudienceSearch) elements.emailAudienceSearch.addEventListener("input", renderEmailAudience);
+if (elements.emailConsentConfirmed) elements.emailConsentConfirmed.addEventListener("change", updateEmailCampaignWorkflow);
+[
+  elements.emailCampaignName,
+  elements.emailCampaignSubject,
+  elements.emailCampaignPreview,
+  elements.emailCampaignBody,
+  elements.emailCampaignCtaLabel,
+  elements.emailCampaignCtaUrl
+].filter(Boolean).forEach(input => input.addEventListener("input", markEmailCampaignDirty));
+if (elements.emailReportStatusFilter) elements.emailReportStatusFilter.addEventListener("change", renderEmailCampaignReport);
+if (elements.emailReportSearch) elements.emailReportSearch.addEventListener("input", renderEmailCampaignReport);
 if (elements.saveZoomSettingsBtn) elements.saveZoomSettingsBtn.addEventListener("click", saveZoomSettings);
 if (elements.copyZoomLinkBtn) elements.copyZoomLinkBtn.addEventListener("click", copyZoomLink);
 if (elements.newZoomEventBtn) elements.newZoomEventBtn.addEventListener("click", newZoomEvent);
