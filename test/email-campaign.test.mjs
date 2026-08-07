@@ -212,7 +212,7 @@ test('Vercel deployment stays within the Hobby serverless function limit', () =>
   const wrapper = fs.readFileSync(new URL('../api/email-campaigns.js', import.meta.url), 'utf8');
   assert.equal(nodeBuilds.length, 12);
   assert.equal(nodeBuilds.some(build => build.src === 'api/*.js'), false);
-  assert.equal(fs.existsSync(new URL('../api/unsubscribe.js', import.meta.url)), false);
+  assert.equal(nodeBuilds.some(build => build.src === 'api/unsubscribe.js'), false);
   assert.match(wrapper, /handleEmailUnsubscribeRequest/);
   assert.deepEqual(config.routes[0], { src: '/api/unsubscribe', dest: '/api/email-campaigns.js' });
 });
