@@ -1,10 +1,22 @@
 {
   "version": 2,
   "builds": [
-    { "src": "api/*.js", "use": "@vercel/node" },
+    { "src": "api/admin-data.js", "use": "@vercel/node" },
+    { "src": "api/admin-token.js", "use": "@vercel/node" },
+    { "src": "api/config.js", "use": "@vercel/node" },
+    { "src": "api/email-campaigns.js", "use": "@vercel/node" },
+    { "src": "api/email-webhook.js", "use": "@vercel/node" },
+    { "src": "api/public-video.js", "use": "@vercel/node" },
+    { "src": "api/settings.js", "use": "@vercel/node" },
+    { "src": "api/upload-url.js", "use": "@vercel/node" },
+    { "src": "api/videos.js", "use": "@vercel/node" },
+    { "src": "api/watch-start.js", "use": "@vercel/node" },
+    { "src": "api/watch-update.js", "use": "@vercel/node" },
+    { "src": "api/zoom.js", "use": "@vercel/node" },
     { "src": "public/**", "use": "@vercel/static" }
   ],
   "routes": [
+    { "src": "/api/unsubscribe", "dest": "/api/email-campaigns.js" },
     { "src": "/api/(.*)", "dest": "/api/$1.js" },
     { "src": "/admin", "dest": "/public/admin.html" },
     { "src": "/watch/([^/]+)", "dest": "/public/watch.html" },
