@@ -205,3 +205,14 @@ test('Mailbox is an in-app view and the old BCC implementation is removed', () =
   assert.match(rules, /email_campaigns/);
   assert.match(rules, /allow read, write: if false/);
 });
+
+test('Vercel deployment stays within the Hobby serverless function limit', () => {
+  const config = JSON.parse(fs.readFileSync(new URL('../vercel.json', import.meta.url), 'utf8'));
+  const nodeBuilds = config.builds.filter(build => build.use === '@vercel/node');
+  const wrapper = fs.readFileSync(new URL('../api/email-campaigns.js', import.meta.url), 'utf8');
+  assert.equal(nodeBuilds.length, 12);
+  assert.equal(nodeBuilds.some(build => build.src === 'api/*.js'), false);
+  assert.equal(nodeBuilds.some(build => build.src === 'api/unsubscribe.js'), false);
+  assert.match(wrapper, /handleEmailUnsubscribeRequest/);
+  assert.deepEqual(config.routes[0], { src: '/api/unsubscribe', dest: '/api/email-campaigns.js' });
+});
