@@ -493,10 +493,11 @@
             <div class="email-section-heading"><div><h4>3. 最终确认与寄送</h4><p>必须先保存、寄测试邮件并审核名单；系统每批最多处理 25 人。</p></div><strong id="emailSendProgress"></strong></div>
             <label class="email-consent-confirm"><input id="emailConsentConfirmed" type="checkbox" /> 我确认所选收件人是已同意接收 Email 的现有客户或联系人。</label>
             <div class="email-campaign-actions">
-              <button class="text-button primary" id="emailStartCampaignBtn" type="button" disabled>确认并开始发送</button>
+              <button class="text-button primary" id="emailStartCampaignBtn" type="button">确认并开始发送</button>
               <button class="text-button" id="emailPauseCampaignBtn" type="button" hidden>暂停发送</button>
             </div>
-            <p class="muted email-send-note">点击开始后才会真实寄送；关闭页面时进度会保留，重新进入 Campaign 可继续。</p>
+            <p class="muted email-send-note" id="emailStartRequirement">下一步：请先建立 Campaign，填写内容并保存草稿。</p>
+            <p class="muted email-send-note">Resend 测试模式只能使用「寄测试邮件」；「确认并开始发送」仅适用于已验证自有域名的正式寄送。</p>
           </div>
 
           <div class="email-campaign-card" id="emailReportCard" hidden>
@@ -1002,6 +1003,6 @@
     <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-storage-compat.js"></script>
     <script src="./config.js"></script>
-    <script src="./app.js?v=20260809-lead-email"></script>
+    <script src="./app.js?v=20260809-email-guidance"></script>
   </body>
 </html>

@@ -479,6 +479,7 @@ const elements = {
   emailAudienceAudit: document.querySelector("#emailAudienceAudit"),
   emailConsentConfirmed: document.querySelector("#emailConsentConfirmed"),
   emailStartCampaignBtn: document.querySelector("#emailStartCampaignBtn"),
+  emailStartRequirement: document.querySelector("#emailStartRequirement"),
   emailPauseCampaignBtn: document.querySelector("#emailPauseCampaignBtn"),
   emailSendProgress: document.querySelector("#emailSendProgress"),
   emailReportCard: document.querySelector("#emailReportCard"),
@@ -1422,6 +1423,22 @@ function resetEmailAudienceAudit() {
   updateEmailCampaignWorkflow();
 }
 
+function emailCampaignStartBlocker() {
+  const campaign = emailCampaignState.activeCampaign;
+  if (!campaign) return "请先建立 Campaign，填写内容并保存草稿。";
+  if (campaign.status === "completed") return "这个 Campaign 已完成发送。";
+  if (["sending", "paused", "preparing"].includes(campaign.status)) return "";
+  if (!elements.emailCampaignId.value) return "请先点击「保存草稿」。";
+  if (emailCampaignState.dirty) return "内容有修改，请先重新保存草稿。";
+  const testCurrent = Boolean(campaign.testSentAt && campaign.testSentContentVersion === campaign.contentVersion);
+  if (!testCurrent) return "请先点击「寄测试邮件」，并在管理员测试邮箱确认收到。";
+  if (!emailCampaignState.selectedKeys.size) return "请先选择至少一位已同意接收 Email 的收件人。";
+  if (!emailCampaignState.audienceAudit?.stats) return "请先点击「审核名单」。";
+  if (!(Number(emailCampaignState.audienceAudit.stats.valid) > 0)) return "名单审核后没有可发送的有效收件人。";
+  if (!elements.emailConsentConfirmed.checked) return "请先勾选收件人同意确认。";
+  return "";
+}
+
 function updateEmailCampaignWorkflow() {
   if (!elements.emailSaveDraftBtn) return;
   const campaign = emailCampaignState.activeCampaign;
@@ -1429,15 +1446,20 @@ function updateEmailCampaignWorkflow() {
   const locked = status !== "draft";
   const hasDraft = Boolean(elements.emailCampaignId.value);
   const testCurrent = !emailCampaignState.dirty && Boolean(campaign?.testSentAt && campaign?.testSentContentVersion === campaign?.contentVersion);
-  const hasAudit = Boolean(emailCampaignState.audienceAudit?.stats?.valid);
-  const consent = Boolean(elements.emailConsentConfirmed.checked);
   setEmailFormDisabled(locked);
   elements.emailSaveDraftBtn.disabled = locked;
   elements.emailSendTestBtn.disabled = locked || !hasDraft || emailCampaignState.dirty;
   elements.emailPreviewAudienceBtn.disabled = locked || !hasDraft || emailCampaignState.dirty || !emailCampaignState.selectedKeys.size;
   elements.emailPauseCampaignBtn.hidden = status !== "sending";
   elements.emailStartCampaignBtn.textContent = ["sending", "paused", "preparing"].includes(status) ? "继续发送" : "确认并开始发送";
-  elements.emailStartCampaignBtn.disabled = status === "completed" || (status === "draft" && !(hasDraft && testCurrent && hasAudit && consent));
+  const startBlocker = emailCampaignStartBlocker();
+  elements.emailStartCampaignBtn.disabled = status === "completed";
+  elements.emailStartCampaignBtn.title = startBlocker;
+  if (elements.emailStartRequirement) {
+    elements.emailStartRequirement.textContent = startBlocker
+      ? `下一步：${startBlocker}`
+      : "所有寄送前检查已完成，可以确认发送。";
+  }
   elements.emailDraftState.textContent = !hasDraft ? "尚未保存" : emailCampaignState.dirty ? "有尚未保存的修改" : testCurrent ? "测试邮件已寄出" : "草稿已保存，等待测试";
 }
 
@@ -1604,7 +1626,12 @@ async function openEmailCampaign(campaignId) {
 
 async function startEmailCampaign() {
   const campaign = emailCampaignState.activeCampaign;
-  if (!campaign) return;
+  const blocker = emailCampaignStartBlocker();
+  if (blocker) {
+    toast(`ℹ️ ${blocker}`);
+    elements.emailStartRequirement?.scrollIntoView({ behavior: "smooth", block: "center" });
+    return;
+  }
   const isResume = ["sending", "paused", "preparing"].includes(campaign.status);
   const valid = Number(emailCampaignState.audienceAudit?.stats?.valid) || Number(campaign.audience?.valid) || 0;
   const message = isResume
