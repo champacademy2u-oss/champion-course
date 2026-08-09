@@ -1447,7 +1447,7 @@ function markEmailCampaignDirty() {
   updateEmailCampaignWorkflow();
 }
 
-function newEmailCampaign() {
+function newEmailCampaign({ revealEditor = false } = {}) {
   emailCampaignState.activeCampaign = null;
   emailCampaignState.audienceAudit = null;
   emailCampaignState.report = null;
@@ -1466,6 +1466,12 @@ function newEmailCampaign() {
   resetEmailAudienceAudit();
   renderEmailAudience();
   updateEmailCampaignWorkflow();
+
+  if (revealEditor) {
+    elements.emailCampaignName.scrollIntoView({ behavior: "smooth", block: "center" });
+    window.setTimeout(() => elements.emailCampaignName.focus({ preventScroll: true }), 300);
+    toast("✍️ 新 Campaign 已建立，请填写 Email 内容。");
+  }
 }
 
 function fillEmailCampaignForm(campaign) {
@@ -3401,7 +3407,7 @@ elements.exportBtn.addEventListener("click", exportLeads);
 elements.bulkWhatsappBtn.addEventListener("click", bulkWhatsapp);
 elements.bulkEmailBtn.addEventListener("click", bulkEmail);
 if (elements.emailRefreshCampaignsBtn) elements.emailRefreshCampaignsBtn.addEventListener("click", loadEmailCampaigns);
-if (elements.emailNewCampaignBtn) elements.emailNewCampaignBtn.addEventListener("click", newEmailCampaign);
+if (elements.emailNewCampaignBtn) elements.emailNewCampaignBtn.addEventListener("click", () => newEmailCampaign({ revealEditor: true }));
 if (elements.emailSaveDraftBtn) elements.emailSaveDraftBtn.addEventListener("click", saveEmailCampaignDraft);
 if (elements.emailSendTestBtn) elements.emailSendTestBtn.addEventListener("click", sendEmailCampaignTest);
 if (elements.emailPreviewAudienceBtn) elements.emailPreviewAudienceBtn.addEventListener("click", previewEmailAudience);
