@@ -397,6 +397,7 @@ const elements = {
   newLeadFields: document.querySelector("#newLeadFields"),
   nameInput: document.querySelector("#nameInput"),
   phoneInput: document.querySelector("#phoneInput"),
+  emailInput: document.querySelector("#emailInput"),
   closeModal: document.querySelector("#closeModal"),
   cancelNote: document.querySelector("#cancelNote"),
   saveNote: document.querySelector("#saveNote"),
@@ -2630,6 +2631,7 @@ function openNotes(id) {
   
   elements.nameInput.value = lead.name || "";
   elements.phoneInput.value = lead.phone || "";
+  elements.emailInput.value = lead.email || "";
   elements.newLeadFields.style.display = "block";
 
   if (isNew) {
@@ -2671,6 +2673,12 @@ function closeNotes() {
 
 function saveNote() {
   const isNew = !state.editingLeadId;
+  const email = clean(elements.emailInput.value);
+  if (email && !elements.emailInput.checkValidity()) {
+    toast("Please enter a valid email address.");
+    elements.emailInput.focus();
+    return;
+  }
   let lead;
   
   if (isNew) {
@@ -2681,6 +2689,7 @@ function saveNote() {
     lead = sanitizeLead({
       name,
       phone: elements.phoneInput.value.trim(),
+      email,
       course: elements.courseInput.value,
       amountPaid: elements.amountInput.value,
       profit: elements.profitInput.value,
@@ -2709,6 +2718,7 @@ function saveNote() {
     if (noteText) addHistory(lead.id, "note", noteText);
     lead.name = elements.nameInput.value.trim() || lead.name;
     lead.phone = elements.phoneInput.value.trim() || lead.phone;
+    lead.email = email;
     lead.course = elements.courseInput.value;
     lead.amountPaid = elements.amountInput.value;
     lead.profit = elements.profitInput.value;
