@@ -480,6 +480,7 @@ const elements = {
   emailConsentConfirmed: document.querySelector("#emailConsentConfirmed"),
   emailStartCampaignBtn: document.querySelector("#emailStartCampaignBtn"),
   emailStartRequirement: document.querySelector("#emailStartRequirement"),
+  emailProviderNote: document.querySelector("#emailProviderNote"),
   emailPauseCampaignBtn: document.querySelector("#emailPauseCampaignBtn"),
   emailSendProgress: document.querySelector("#emailSendProgress"),
   emailReportCard: document.querySelector("#emailReportCard"),
@@ -554,6 +555,7 @@ const emailCampaignState = {
   activeCampaign: null,
   audienceAudit: null,
   report: null,
+  service: null,
   sending: false
 };
 
@@ -1430,12 +1432,19 @@ function emailCampaignStartBlocker() {
   if (["sending", "paused", "preparing"].includes(campaign.status)) return "";
   if (!elements.emailCampaignId.value) return "请先点击「保存草稿」。";
   if (emailCampaignState.dirty) return "内容有修改，请先重新保存草稿。";
-  const testCurrent = Boolean(campaign.testSentAt && campaign.testSentContentVersion === campaign.contentVersion);
+  const testCurrent = Boolean(
+    campaign.testSentAt
+    && campaign.testSentContentVersion === campaign.contentVersion
+    && campaign.testProvider === emailCampaignState.service?.provider
+  );
   if (!testCurrent) return "请先点击「寄测试邮件」，并在管理员测试邮箱确认收到。";
   if (!emailCampaignState.selectedKeys.size) return "请先选择至少一位已同意接收 Email 的收件人。";
   if (!emailCampaignState.audienceAudit?.stats) return "请先点击「审核名单」。";
   if (!(Number(emailCampaignState.audienceAudit.stats.valid) > 0)) return "名单审核后没有可发送的有效收件人。";
   if (!elements.emailConsentConfirmed.checked) return "请先勾选收件人同意确认。";
+  if (emailCampaignState.service && !emailCampaignState.service.canSendCampaign) {
+    return emailCampaignState.service.message || "Email 发送服务尚未完成配置。";
+  }
   return "";
 }
 
@@ -1445,7 +1454,11 @@ function updateEmailCampaignWorkflow() {
   const status = campaign?.status || "draft";
   const locked = status !== "draft";
   const hasDraft = Boolean(elements.emailCampaignId.value);
-  const testCurrent = !emailCampaignState.dirty && Boolean(campaign?.testSentAt && campaign?.testSentContentVersion === campaign?.contentVersion);
+  const testCurrent = !emailCampaignState.dirty && Boolean(
+    campaign?.testSentAt
+    && campaign?.testSentContentVersion === campaign?.contentVersion
+    && campaign?.testProvider === emailCampaignState.service?.provider
+  );
   setEmailFormDisabled(locked);
   elements.emailSaveDraftBtn.disabled = locked;
   elements.emailSendTestBtn.disabled = locked || !hasDraft || emailCampaignState.dirty;
@@ -1459,6 +1472,10 @@ function updateEmailCampaignWorkflow() {
     elements.emailStartRequirement.textContent = startBlocker
       ? `下一步：${startBlocker}`
       : "所有寄送前检查已完成，可以确认发送。";
+  }
+  if (elements.emailProviderNote) {
+    elements.emailProviderNote.textContent = emailCampaignState.service?.message
+      || "正在读取 Email 发送服务状态。";
   }
   elements.emailDraftState.textContent = !hasDraft ? "尚未保存" : emailCampaignState.dirty ? "有尚未保存的修改" : testCurrent ? "测试邮件已寄出" : "草稿已保存，等待测试";
 }
@@ -1534,7 +1551,9 @@ async function loadEmailCampaigns() {
   try {
     const data = await emailCampaignRequest("list");
     emailCampaignState.campaigns = data.campaigns || [];
+    emailCampaignState.service = data.service || null;
     renderEmailCampaignList();
+    updateEmailCampaignWorkflow();
   } catch (error) {
     elements.emailCampaignListBody.innerHTML = `<tr><td colspan="5" style="color:#b91c1c">${escapeHtml(error.message)}</td></tr>`;
   }
@@ -1584,6 +1603,7 @@ async function sendEmailCampaignTest() {
     });
     emailCampaignState.activeCampaign.testSentAt = data.sentAt;
     emailCampaignState.activeCampaign.testSentContentVersion = emailCampaignState.activeCampaign.contentVersion;
+    emailCampaignState.activeCampaign.testProvider = data.provider;
     await loadEmailCampaigns();
     toast("✅ 测试邮件已寄出，请检查收件箱与 CTA 链接");
   } catch (error) {

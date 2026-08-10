@@ -17,6 +17,32 @@
 11. 跟进完成后点击 `Done`，系统会进入下一次 Day 3 或 Day 7 follow-up。
 12. 左侧 `Zoom` 页面可以保存每场活动的名称、日期时间、Zoom 报名链接，以及 WhatsApp / Email 通知内容。
 
+## Zoom 报名与双渠道通知
+
+- 公开报名页：`zoom.html`。客户只填写姓名、国际区号手机号码和 Email。
+- 管理后台：主系统左侧 `Zoom`。管理员可以建立草稿、发布／关闭活动、查看报名与重新发送。
+- 云端接口：`functions/` 内的 Firebase HTTPS Functions。公开接口不会返回 Zoom 链接。
+- 自动通知：报名后立即发送，并由排程在开课前 24 小时和 1 小时提醒。
+- WhatsApp 使用 Meta 核准模板；Email 使用 Resend。真正发送前需要先完成账号和域名审核。
+
+上线前的 Firebase 设置：
+
+1. 在 Firebase Authentication 启用 Anonymous 登录，让现有主系统可以取得稳定的浏览器身份。
+2. 在 `functions/` 安装依赖，并依照 `functions/.env.example` 设置非敏感参数。
+3. 把管理员浏览器的 Firebase UID 设为 Functions 的 `ZOOM_ADMIN_UIDS`；页面不会显示登录或验证步骤，服务器会在后台静默确认权限。
+4. 使用 Firebase Secret Manager 设置 `WHATSAPP_ACCESS_TOKEN`、`WHATSAPP_PHONE_NUMBER_ID` 与 `RESEND_API_KEY`。
+5. 在 `config.js` 填入 Firebase App Check 的 reCAPTCHA site key，并把 `APP_CHECK_ENFORCED` 改为 `true`。
+6. 部署 Functions 与 `firestore.rules` 后，先用测试活动、测试号码及测试邮箱验证，再发布真实活动。
+7. Google Cloud 的预算只能发出告警；系统另以 `DAILY_SEND_LIMIT` 限制每日自动发送次数。
+
+如果更换浏览器或清除 Firebase 登录资料，新的 UID 需要追加到 `ZOOM_ADMIN_UIDS`，多个 UID 以逗号分隔。
+
+Meta 的两个核准模板都需要依序设置 5 个正文变量：客户姓名、活动名称、日期、时间、Zoom 链接。模板名称分别由 `WHATSAPP_TEMPLATE_CONFIRMATION` 与 `WHATSAPP_TEMPLATE_REMINDER` 指定。
+
+Facebook 留言关键词使用 `ZOOM`。人工私讯链接范例：
+
+`zoom.html?utm_source=facebook&utm_medium=comment&utm_campaign=zoom&keyword=ZOOM`
+
 ## 可追踪 Email Campaign
 
 左侧 `Mailbox` 现在是站内 Campaign 中心，并保留一个次要的 Gmail 快捷入口。每位客户会收到独立 Email，系统通过 Resend Email ID 与已签名 webhook 显示：已发送、已送达、已开启（估算）、CTA 已点击、未点击、退信、失败、投诉与退订。
@@ -30,7 +56,7 @@
 5. 确认客户已同意接收 Email，再由管理员点击最终发送。
 6. 系统每批处理 25 人；关闭页面不会遗失进度，重新打开 Campaign 可继续。
 
-上线前必须先在 Resend 完成自有寄件域名的 SPF/DKIM 验证，并在域名设置启用 Open Tracking 与 Click Tracking。Webhook URL 是：
+没有自有域名时，可暂时把 `EMAIL_FROM` 设为 `Champion Academy <onboarding@resend.dev>`，但系统只允许寄到管理员测试邮箱的测试邮件；不会允许开始真实名单寄送。正式上线前必须先在 Resend 完成自有寄件域名的 SPF/DKIM 验证，把 `EMAIL_FROM` 改为 `Champion Academy <updates@已验证域名>`，并在域名设置启用 Open Tracking 与 Click Tracking。Webhook URL 是：
 
 `https://champion-course-video-room.vercel.app/api/email-webhook`
 
@@ -41,6 +67,7 @@ Vercel 环境变量参考 `.env.vercel.example`，至少需要：
 - `CRM_ADMIN_UIDS`：允许使用 Email Campaign 的 Firebase UID；
 - `RESEND_API_KEY` 与 `RESEND_WEBHOOK_SECRET`；
 - `EMAIL_FROM`：例如 `Champion Academy <updates@已验证域名>`；
+- `EMAIL_REPLY_TO`：客户点击回复时收到邮件的官方邮箱，可使用 Gmail；
 - `EMAIL_TEST_RECIPIENT`：管理员控制的测试邮箱；
 - `EMAIL_UNSUBSCRIBE_SECRET`：长随机值，只能保存在 Vercel；
 - `EMAIL_DAILY_SEND_LIMIT`：不得高于 Resend 账户的每日额度；
@@ -49,6 +76,17 @@ Vercel 环境变量参考 `.env.vercel.example`，至少需要：
 Email Campaign、收件人快照、Webhook、退订与发送上限资料都由 Vercel Firebase Admin SDK 存取，Firestore 浏览器规则明确拒绝直接访问。不要把 Resend Key、Webhook Secret、退订 Secret 或客户名单贴进聊天、写入前端或提交 Git。
 
 正式客户寄送前，只使用管理员控制的测试邮箱完成一次送达、开启、CTA 点击和退订测试；部署或真实群发都需要负责人最后明确批准。
+
+### 使用 Gmail API 寄送
+
+如果 EMAIL_PROVIDER=gmail，系统会通过管理员授权的 Gmail 账号逐封寄送，不再调用 Resend。需要在 Google Cloud 启用 Gmail API，建立 OAuth 2.0 Client，并以 gmail.send scope 取得 offline refresh token。服务器端需要设置：
+
+- GMAIL_SENDER_EMAIL：实际寄件 Gmail；
+- GMAIL_CLIENT_ID、GMAIL_CLIENT_SECRET 与 GMAIL_REFRESH_TOKEN：只保存在 Vercel；
+- EMAIL_TRACKING_SECRET：签署开启像素及 CTA 跳转链接；
+- 其余 Campaign、管理员、退订和每日上限变量继续沿用。
+
+Gmail API 只确认 Gmail 已接受发送请求，不提供可靠的收件服务器送达回执。系统自行记录开启（估算）、CTA 点击、未点击和退订；不会在追踪入口保存 IP 或 User-Agent。个人 Gmail 有每日和反垃圾限制，不应把此功能当作大批量营销发送平台。
 
 ## 测试
 
@@ -90,14 +128,15 @@ Ali Tan,+60123456789,ali@example.com,Business Owner
 - Database, for example Supabase, Firebase, Airtable, or MySQL
 - Scheduler / automation worker
 
-## Vercel + Firebase 视频后台
+## Vercel + Firestore + Cloudflare R2 视频后台
 
 这个仓库现在也包含一个可部署到 Vercel 的安全视频后台：
 
-- `/admin`：管理员登录、上传视频、复制观看链接、查看观看记录。
+- `/admin`：管理员登录、上传视频、首帧预览、编辑视频名称、复制观看链接、查看观看记录。
 - `/watch/:id`：观众输入姓名、电话和观看密码后观看视频。
 - `api/`：Vercel Serverless Functions，负责管理员验证、视频资料、观看记录、短期签名上传和播放链接。
 - `public/`：云端后台和观看页。
-- `firebase-rules/storage.rules`：Firebase Storage 安全规则范本。
+- Firestore：保存视频资料、观看密码、期限和观看记录。
+- Cloudflare R2：保存实际视频文件，并通过短期签名链接上传与播放。
 
-部署需要在 Vercel 设置环境变量，参考 `.env.vercel.example`。如果 `ADMIN_LOGIN_DISABLED=true`，后台会公开访问；正式对客户开放前建议改回 `false` 并设置强管理员密码。视频文件通过 Vercel API 产生的短期 signed URL 由浏览器直传 Firebase Storage，避免触碰 Vercel Function 4.5MB request body 限制；Vercel API 只负责验证、签名和记录，不需要先启用 Firebase Auth。
+部署需要在 Vercel 设置环境变量，参考 `.env.vercel.example`。R2 Bucket 必须允许 `https://champion-course-video-room.vercel.app` 使用 `PUT`、`GET` 和 `HEAD`，并允许 `Content-Type` 请求头。如果 `ADMIN_LOGIN_DISABLED=true`，后台会公开访问；正式对客户开放前建议改回 `false` 并设置强管理员密码。视频文件通过 Vercel API 产生的短期 signed URL 由浏览器直传 Cloudflare R2，避免触碰 Vercel Function request body 限制；Vercel API 只负责验证、签名和记录。
