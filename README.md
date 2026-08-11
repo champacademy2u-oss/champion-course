@@ -16,7 +16,7 @@
 10. 在 Leads 页面点击 `Create Email Campaign`，会把目前筛选的客户带入 Mailbox；系统不会再用无法追踪个人结果的 BCC。
 11. 跟进完成后点击 `Done`，系统会进入下一次 Day 3 或 Day 7 follow-up。
 12. 左侧 `Zoom` 页面可以保存每场活动的名称、日期时间、Zoom 报名链接，以及 WhatsApp / Email 通知内容。
-13. `Preview Courses` 的自动课程组展开后，可用每位 Lead 右侧的 `DELETE` 单笔删除名单；确认后会同步删除 Firestore 记录，云端失败时不会从页面移除。
+13. `Preview Courses` 的自动课程组展开后，可单笔 `DELETE`，也可勾选多位 Lead、使用 `Select all` 和 `DELETE SELECTED` 批量删除；确认后会同步删除 Firestore 记录，云端失败时不会从页面移除。
 
 ## Zoom 报名与双渠道通知
 

@@ -160,8 +160,8 @@ async function fbSaveLeadsBatch(leads) {
     }
   }
 }
-async function fbDeleteLeadsBatch(ids) {
-  if (!_db) return;
+async function fbDeleteLeadsBatch(ids, options = {}) {
+  if (!_db) return false;
   const CHUNK_SIZE = 400;
   for (let i = 0; i < ids.length; i += CHUNK_SIZE) {
     const chunk = ids.slice(i, i + CHUNK_SIZE);
@@ -173,8 +173,10 @@ async function fbDeleteLeadsBatch(ids) {
       await batch.commit();
     } catch (e) {
       console.warn('fbDeleteLeadsBatch chunk error:', e);
+      if (options.throwOnError) throw e;
     }
   }
+  return true;
 }
 async function fbSaveCollection(collectionName, items) {
   if (!_db) return;
@@ -339,6 +341,7 @@ const state = {
   courseFilter: "all",
   enrollmentFilter: "all",
   enrollSelectedIds: new Set(),
+  courseSelectedIds: new Set(),
   selectedIds: new Set(),
   editingLeadId: null,
   previews: loadJson(storageKeys.previews, []),
@@ -1964,6 +1967,11 @@ function setupDragAndDrop() {
 }
 
 function renderCourseView() {
+  const currentLeadIds = new Set(state.leads.map(lead => lead.id));
+  state.courseSelectedIds.forEach(id => {
+    if (!currentLeadIds.has(id)) state.courseSelectedIds.delete(id);
+  });
+
   // Get groups from leads
   const leadGroups = state.leads.reduce((acc, lead) => {
     const course = lead.course || "No Preview Course Assigned";
@@ -2009,6 +2017,8 @@ function renderCourseView() {
       const leads = leadGroups[course] || [];
       const sanitizedId = "course-list-" + btoa(unescape(encodeURIComponent(course))).replace(/[/+=]/g, "");
       const isEmpty = leads.length === 0;
+      const selectedCount = leads.filter(lead => state.courseSelectedIds.has(lead.id)).length;
+      const escapedCourse = course.replace(/'/g, "\\'");
       
       return `
       <div class="course-card" 
@@ -2037,10 +2047,40 @@ function renderCourseView() {
               <p style="margin:0; font-size:12px; color:#b7791f;">Drag leads here or use <b>Import</b>.</p>
             </div>
           ` : `
+          <div class="course-selection-toolbar">
+            <label class="course-select-all">
+              <input
+                id="select-all-${sanitizedId}"
+                type="checkbox"
+                ${selectedCount === leads.length ? "checked" : ""}
+                onchange="toggleCourseGroupSelection('${sanitizedId}', this.checked)"
+              />
+              <span>Select all</span>
+            </label>
+            <div class="course-selection-summary">
+              <span id="selected-count-${sanitizedId}">${selectedCount} selected</span>
+              <button
+                id="delete-selected-${sanitizedId}"
+                class="mini-tag danger course-delete-selected"
+                onclick="deleteSelectedCourseLeads('${escapedCourse}', '${sanitizedId}', this)"
+                ${selectedCount ? "" : "disabled"}
+              >🗑 DELETE SELECTED</button>
+            </div>
+          </div>
           <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
             <tbody>
               ${leads.sort((a,b) => a.name.localeCompare(b.name)).map(l => `
                 <tr style="border-bottom: 1px solid #f7fafc;">
+                  <td class="course-lead-check-cell">
+                    <input
+                      class="course-lead-checkbox"
+                      type="checkbox"
+                      value="${l.id}"
+                      ${state.courseSelectedIds.has(l.id) ? "checked" : ""}
+                      onchange="toggleCourseLeadSelection('${l.id}', '${sanitizedId}', this.checked)"
+                      aria-label="Select lead"
+                    />
+                  </td>
                   <td style="padding: 12px 20px; font-weight: 600; color: #2d3748;">${escapeHtml(l.name)}</td>
                   <td style="padding: 12px 20px; color: #718096;">${l.phone}</td>
                   <td style="padding: 12px 20px; text-align: right; display:flex; justify-content:flex-end; gap:6px;">
@@ -2114,6 +2154,7 @@ window.deleteEntireGroup = function(courseName) {
   
   // Remove leads
   const toDelete = state.leads.filter(l => (l.course || "No Preview Course Assigned") === courseName);
+  toDelete.forEach(lead => state.courseSelectedIds.delete(lead.id));
   state.leads = state.leads.filter(l => (l.course || "No Preview Course Assigned") !== courseName);
   saveJson(storageKeys.leads, state.leads);
   if (toDelete.length > 0) {
@@ -2148,6 +2189,7 @@ window.deleteCourseLead = async function(leadId, button) {
 
   try {
     await fbDeleteLead(leadId);
+    state.courseSelectedIds.delete(leadId);
     state.leads = state.leads.filter(item => item.id !== leadId);
     saveJson(storageKeys.leads, state.leads);
     render();
@@ -2158,6 +2200,86 @@ window.deleteCourseLead = async function(leadId, button) {
       button.textContent = originalText;
     }
     toast("Delete failed. Lead was not removed.");
+  }
+};
+
+function updateCourseSelectionToolbar(listId) {
+  const list = document.getElementById(listId);
+  if (!list) return;
+
+  const checkboxes = Array.from(list.querySelectorAll(".course-lead-checkbox"));
+  const selectedCount = checkboxes.filter(checkbox => checkbox.checked).length;
+  const selectAll = document.getElementById(`select-all-${listId}`);
+  const count = document.getElementById(`selected-count-${listId}`);
+  const deleteButton = document.getElementById(`delete-selected-${listId}`);
+
+  if (selectAll) {
+    selectAll.checked = checkboxes.length > 0 && selectedCount === checkboxes.length;
+    selectAll.indeterminate = selectedCount > 0 && selectedCount < checkboxes.length;
+  }
+  if (count) count.textContent = `${selectedCount} selected`;
+  if (deleteButton) deleteButton.disabled = selectedCount === 0;
+}
+
+window.toggleCourseLeadSelection = function(leadId, listId, checked) {
+  if (checked) state.courseSelectedIds.add(leadId);
+  else state.courseSelectedIds.delete(leadId);
+  updateCourseSelectionToolbar(listId);
+};
+
+window.toggleCourseGroupSelection = function(listId, checked) {
+  const list = document.getElementById(listId);
+  if (!list) return;
+
+  list.querySelectorAll(".course-lead-checkbox").forEach(checkbox => {
+    checkbox.checked = checked;
+    if (checked) state.courseSelectedIds.add(checkbox.value);
+    else state.courseSelectedIds.delete(checkbox.value);
+  });
+  updateCourseSelectionToolbar(listId);
+};
+
+window.deleteSelectedCourseLeads = async function(courseName, listId, button) {
+  const courseLeadIds = new Set(
+    state.leads
+      .filter(lead => (lead.course || "No Preview Course Assigned") === courseName)
+      .map(lead => lead.id),
+  );
+  const selectedIds = Array.from(state.courseSelectedIds).filter(id => courseLeadIds.has(id));
+  if (!selectedIds.length) {
+    toast("Select at least one lead.");
+    return;
+  }
+
+  if (!confirm(`Delete ${selectedIds.length} selected lead(s) from "${courseName}"? This cannot be undone.`)) return;
+
+  const originalText = button?.textContent || "🗑 DELETE SELECTED";
+  if (button) {
+    button.disabled = true;
+    button.textContent = "DELETING...";
+  }
+
+  try {
+    await fbDeleteLeadsBatch(selectedIds, { throwOnError: true });
+    const selectedIdSet = new Set(selectedIds);
+    state.leads = state.leads.filter(lead => !selectedIdSet.has(lead.id));
+    selectedIds.forEach(id => state.courseSelectedIds.delete(id));
+    saveJson(storageKeys.leads, state.leads);
+    render();
+
+    const list = document.getElementById(listId);
+    if (list) {
+      list.style.display = "block";
+      const arrow = document.getElementById(`arrow-${listId}`);
+      if (arrow) arrow.style.transform = "rotate(180deg)";
+    }
+    toast(`${selectedIds.length} lead(s) deleted.`);
+  } catch (error) {
+    if (button) {
+      button.disabled = false;
+      button.textContent = originalText;
+    }
+    toast("Delete failed. Selected leads were not removed.");
   }
 };
 

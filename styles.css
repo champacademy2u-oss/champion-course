@@ -776,6 +776,66 @@ tr:last-child td {
   opacity: 0.65;
 }
 
+.course-selection-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 16px;
+  background: #f8fafc;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.course-select-all,
+.course-selection-summary {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.course-select-all {
+  color: #334155;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.course-select-all input,
+.course-lead-checkbox {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--brand);
+  cursor: pointer;
+}
+
+.course-selection-summary > span {
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.course-delete-selected {
+  min-width: 128px;
+}
+
+.course-lead-check-cell {
+  width: 44px;
+  padding: 12px 0 12px 16px;
+  text-align: center;
+}
+
+@media (max-width: 640px) {
+  .course-selection-toolbar {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .course-selection-summary {
+    justify-content: space-between;
+    width: 100%;
+  }
+}
+
 .template-grid,
 .settings-layout {
   display: grid;
