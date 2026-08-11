@@ -133,8 +133,14 @@ async function fbSaveLead(lead) {
   try { await _db.collection('leads').doc(lead.id).set(lead); } catch(e) { console.warn('fbSaveLead error:', e); }
 }
 async function fbDeleteLead(id) {
-  if (!_db) return;
-  try { await _db.collection('leads').doc(id).delete(); } catch(e) { console.warn('fbDeleteLead error:', e); }
+  if (!_db) return false;
+  try {
+    await _db.collection('leads').doc(id).delete();
+    return true;
+  } catch(e) {
+    console.warn('fbDeleteLead error:', e);
+    throw e;
+  }
 }
 async function fbSaveLeadsBatch(leads) {
   if (!_db) return;
@@ -2037,8 +2043,9 @@ function renderCourseView() {
                 <tr style="border-bottom: 1px solid #f7fafc;">
                   <td style="padding: 12px 20px; font-weight: 600; color: #2d3748;">${escapeHtml(l.name)}</td>
                   <td style="padding: 12px 20px; color: #718096;">${l.phone}</td>
-                  <td style="padding: 12px 20px; text-align: right;">
+                  <td style="padding: 12px 20px; text-align: right; display:flex; justify-content:flex-end; gap:6px;">
                     <button class="mini-tag" onclick="openLeadDetails('${l.id}')">EDIT</button>
+                    <button class="mini-tag danger" onclick="deleteCourseLead('${l.id}', this)" title="Delete Lead">🗑 DELETE</button>
                   </td>
                 </tr>
               `).join("")}
@@ -2121,6 +2128,37 @@ window.deleteEntireGroup = function(courseName) {
   
   render();
   toast(`Deleted group: ${courseName}`);
+};
+
+window.deleteCourseLead = async function(leadId, button) {
+  const lead = state.leads.find(item => item.id === leadId);
+  if (!lead) {
+    toast("Lead not found.");
+    return;
+  }
+
+  const leadLabel = lead.name || "this lead";
+  if (!confirm(`Delete "${leadLabel}" from this course group? This cannot be undone.`)) return;
+
+  const originalText = button?.textContent || "🗑 DELETE";
+  if (button) {
+    button.disabled = true;
+    button.textContent = "DELETING...";
+  }
+
+  try {
+    await fbDeleteLead(leadId);
+    state.leads = state.leads.filter(item => item.id !== leadId);
+    saveJson(storageKeys.leads, state.leads);
+    render();
+    toast("Lead deleted.");
+  } catch (error) {
+    if (button) {
+      button.disabled = false;
+      button.textContent = originalText;
+    }
+    toast("Delete failed. Lead was not removed.");
+  }
 };
 
 window.renameCourseGroup = function(oldName) {

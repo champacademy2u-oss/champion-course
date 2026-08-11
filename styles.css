@@ -759,6 +759,23 @@ tr:last-child td {
   border-color: var(--brand);
 }
 
+.mini-tag.danger {
+  color: #b42318;
+  border-color: #fecaca;
+  background: #fff7f7;
+}
+
+.mini-tag.danger:hover {
+  color: #fff;
+  border-color: #b42318;
+  background: #b42318;
+}
+
+.mini-tag:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
+
 .template-grid,
 .settings-layout {
   display: grid;

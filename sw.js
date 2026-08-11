@@ -1,9 +1,9 @@
-const CACHE_NAME = "lead-center-v10";
+const CACHE_NAME = "lead-center-v11";
 const ASSETS = [
   "./",
   "./index.html",
-  "./styles.css",
-  "./app.js?v=20260809-gmail-tracking",
+  "./styles.css?v=20260811-lead-delete",
+  "./app.js?v=20260811-lead-delete",
   "./config.js",
   "./manifest.json",
   "./zoom.html",
