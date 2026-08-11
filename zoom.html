@@ -10,7 +10,7 @@
     <meta property="og:image" content="https://champacademy2u-oss.github.io/champion-course/zoom-og.png" />
     <title>企业赚钱机器｜Zoom 分享会报名</title>
     <link rel="icon" href="./logo.png" />
-    <link rel="stylesheet" href="./zoom.css?v=20260811" />
+    <link rel="stylesheet" href="./zoom.css?v=20260811-5" />
   </head>
   <body>
     <header class="site-header">
@@ -44,27 +44,32 @@
           </div>
         </div>
 
-        <aside class="event-card" aria-live="polite">
-          <div class="event-card-top">
-            <span class="live-dot"></span>
-            <span id="eventStatus">正在读取活动</span>
-          </div>
-          <h2 id="eventTitle">企业赚钱机器 Zoom 分享会</h2>
-          <p class="event-summary" id="eventSubtitle">正在读取最新活动资料，请稍候……</p>
-          <dl>
-            <div><dt>日期</dt><dd id="eventDate">—</dd></div>
-            <div><dt>时间</dt><dd id="eventTime">—</dd></div>
-            <div><dt>地点</dt><dd>Zoom 线上直播</dd></div>
-            <div id="speakerRow" hidden><dt>分享人</dt><dd id="speakerName">—</dd></div>
-          </dl>
-          <p class="seat-note" id="seatNote" hidden></p>
-          <button class="card-cta" type="button" data-open-registration disabled>保留我的线上名额</button>
-          <p class="event-error" id="eventError" role="status"></p>
-        </aside>
+        <div class="hero-stage">
+          <figure class="hero-portrait">
+            <img src="./ryan-lim-portrait.jpg" alt="Ryan Lim 军师" width="900" height="1200" decoding="async" fetchpriority="high" />
+          </figure>
+          <aside class="event-card" aria-live="polite">
+            <div class="event-card-top">
+              <span class="live-dot"></span>
+              <span id="eventStatus">正在读取活动</span>
+            </div>
+            <h2 id="eventTitle">「打造企业赚钱机器」线上 Zoom 分享</h2>
+            <p class="event-summary" id="eventSubtitle">正在读取最新活动资料，请稍候……</p>
+            <dl>
+              <div><dt>日期</dt><dd id="eventDate">28/08/2026</dd></div>
+              <div><dt>时间</dt><dd id="eventTime">8:30pm till Late （ 8pm入场 ）</dd></div>
+              <div><dt>地点</dt><dd>Zoom 线上直播</dd></div>
+              <div id="speakerRow" hidden><dt>分享人</dt><dd id="speakerName">—</dd></div>
+            </dl>
+            <p class="seat-note" id="seatNote" hidden></p>
+            <button class="card-cta" type="button" data-open-registration disabled>保留我的线上名额</button>
+            <p class="event-error" id="eventError" role="status"></p>
+          </aside>
+        </div>
       </section>
 
       <section class="content-section" id="learn">
-        <div class="section-heading">
+        <div class="section-heading strategy-heading">
           <p class="eyebrow">企业赚钱战略</p>
           <h2>看清什么该做，也看清什么不该做</h2>
           <p>好的战略不是把所有事情都做完，而是集中资源在能带来高价值客户、稳定成交与健康利润的关键动作。</p>
@@ -95,17 +100,23 @@
       </section>
 
       <section class="speaker-section">
-        <div class="speaker-intro">
-          <p class="eyebrow">本场主讲人</p>
-          <h2>Ryan Lim <span>军师</span></h2>
-          <p>上市公司 Marketing 操盘手／Marketing Director</p>
+        <figure class="speaker-photo">
+          <img src="./ryan-lim-guinness.jpg" alt="Ryan Lim 手持 Guinness World Records 证书" width="1066" height="1600" loading="lazy" decoding="async" />
+          <figcaption>Ryan Lim · 本场主讲人</figcaption>
+        </figure>
+        <div class="speaker-content">
+          <div class="speaker-intro">
+            <p class="eyebrow">本场主讲人</p>
+            <h2>Ryan Lim <span>军师</span></h2>
+            <p>上市公司 Marketing 操盘手／Marketing Director</p>
+          </div>
+          <ul class="speaker-proof">
+            <li><strong>9000万+</strong><span>广告费经验</span></li>
+            <li><strong>100家+</strong><span>行业第一</span></li>
+            <li><strong>100万+</strong><span>FB 专业版主</span></li>
+            <li><strong>10大成功案例</strong><span>总业绩高达15亿</span></li>
+          </ul>
         </div>
-        <ul class="speaker-proof">
-          <li><strong>9000万+</strong><span>广告费经验</span></li>
-          <li><strong>100家+</strong><span>行业第一</span></li>
-          <li><strong>100万+</strong><span>FB 专业版主</span></li>
-          <li><strong>10大成功案例</strong><span>总业绩高达15亿</span></li>
-        </ul>
       </section>
 
       <section class="process-section">
@@ -193,6 +204,6 @@
     <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-check-compat.js"></script>
     <script src="./config.js"></script>
-    <script src="./zoom.js?v=20260811"></script>
+    <script src="./zoom.js?v=20260811-2"></script>
   </body>
 </html>
