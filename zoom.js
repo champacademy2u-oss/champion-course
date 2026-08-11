@@ -41,7 +41,7 @@
     document.getElementById("eventTitle").textContent = event.title;
     document.getElementById("finalEventTitle").textContent = `保留「${event.title}」线上名额`;
     document.getElementById("modalEventName").textContent = `报名：${event.title}。完成后将同时发送到 WhatsApp 与 Email。`;
-    document.getElementById("eventSubtitle").textContent = event.subtitle || "用一场线上分享，把获客、跟进和报名流程看得更清楚。";
+    document.getElementById("eventSubtitle").textContent = event.subtitle || "建立你的赚钱系统，让企业自动化运转，业绩与利润持续增长。";
     document.getElementById("eventDate").textContent = dateText(event.eventDate);
     document.getElementById("eventTime").textContent = `${event.eventTime}（GMT+8）`;
     document.getElementById("eventStatus").textContent = event.registrationOpen ? "报名开放中" : "报名已结束";
