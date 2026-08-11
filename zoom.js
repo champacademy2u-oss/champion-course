@@ -32,18 +32,35 @@
     return new Intl.DateTimeFormat("zh-MY", { year: "numeric", month: "long", day: "numeric", weekday: "short" }).format(date);
   }
 
+  function eventDisplay(event) {
+    const isMoneyMachineSession = event.eventDate === "2026-08-28" && event.eventTime === "20:30";
+    if (isMoneyMachineSession) {
+      return {
+        title: "「打造企业赚钱机器」线上 Zoom 分享",
+        date: "28/08/2026",
+        time: "8:30pm till Late （ 8pm入场 ）"
+      };
+    }
+    return {
+      title: event.title,
+      date: dateText(event.eventDate),
+      time: `${event.eventTime}（GMT+8）`
+    };
+  }
+
   function setRegistrationEnabled(enabled) {
     openButtons.forEach(button => { button.disabled = !enabled; });
   }
 
   function renderEvent(event) {
     activeEvent = event;
-    document.getElementById("eventTitle").textContent = event.title;
-    document.getElementById("finalEventTitle").textContent = `保留「${event.title}」线上名额`;
-    document.getElementById("modalEventName").textContent = `报名：${event.title}。完成后将同时发送到 WhatsApp 与 Email。`;
+    const display = eventDisplay(event);
+    document.getElementById("eventTitle").textContent = display.title;
+    document.getElementById("finalEventTitle").textContent = `保留「${display.title}」线上名额`;
+    document.getElementById("modalEventName").textContent = `报名：${display.title}。完成后将同时发送到 WhatsApp 与 Email。`;
     document.getElementById("eventSubtitle").textContent = event.subtitle || "建立你的赚钱系统，让企业自动化运转，业绩与利润持续增长。";
-    document.getElementById("eventDate").textContent = dateText(event.eventDate);
-    document.getElementById("eventTime").textContent = `${event.eventTime}（GMT+8）`;
+    document.getElementById("eventDate").textContent = display.date;
+    document.getElementById("eventTime").textContent = display.time;
     document.getElementById("eventStatus").textContent = event.registrationOpen ? "报名开放中" : "报名已结束";
     if (event.speakerName) {
       document.getElementById("speakerRow").hidden = false;
