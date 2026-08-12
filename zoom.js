@@ -1,6 +1,8 @@
 (() => {
   "use strict";
 
+  document.documentElement.classList.add("motion-ready");
+
   const config = window.ZOOM_PUBLIC_CONFIG || {};
   const localApiOverride = ["localhost", "127.0.0.1"].includes(location.hostname)
     ? new URLSearchParams(location.search).get("api_base")
@@ -16,6 +18,45 @@
   let activeEvent = null;
   let lastFocused = null;
   let appCheck = null;
+
+  function setupMotion() {
+    const revealSelectors = [
+      ".strategy-heading",
+      ".strategy-card",
+      ".profit-banner",
+      ".speaker-photo",
+      ".speaker-intro",
+      ".speaker-proof li",
+      ".process-section .section-heading",
+      ".steps li",
+      ".process-section .primary-cta",
+      ".faq-section .section-heading",
+      ".faq-list details",
+      ".final-cta > *"
+    ];
+    const items = [...document.querySelectorAll(revealSelectors.join(","))];
+    items.forEach((item, index) => {
+      item.classList.add("reveal-item");
+      item.style.setProperty("--reveal-delay", `${Math.min(index % 5, 4) * 65}ms`);
+    });
+
+    window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(() => document.documentElement.classList.add("motion-loaded"));
+    });
+
+    if (!("IntersectionObserver" in window)) {
+      items.forEach(item => item.classList.add("is-visible"));
+      return;
+    }
+    const observer = new IntersectionObserver(entries => {
+      entries.forEach(entry => {
+        if (!entry.isIntersecting) return;
+        entry.target.classList.add("is-visible");
+        observer.unobserve(entry.target);
+      });
+    }, { rootMargin: "0px 0px -8%", threshold: 0.12 });
+    items.forEach(item => observer.observe(item));
+  }
 
   document.getElementById("year").textContent = new Date().getFullYear();
 
@@ -204,5 +245,6 @@
     if (event.key === "Escape" && !modal.hidden) closeModal();
   });
 
+  setupMotion();
   loadEvent();
 })();
