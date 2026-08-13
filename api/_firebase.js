@@ -174,6 +174,21 @@ function publicVideo(video) {
   };
 }
 
+function normalizeExpiresAt(value) {
+  const raw = String(value ?? '').trim();
+  if (!raw) return '';
+
+  // datetime-local inputs do not include a timezone. Champion Course operates
+  // in Malaysia, so interpret those values as Asia/Kuala_Lumpur (+08:00)
+  // before storing one unambiguous ISO timestamp.
+  const candidate = raw.includes('T') && !/(?:z|[+-]\d{2}:\d{2})$/i.test(raw)
+    ? `${raw}+08:00`
+    : raw;
+  const timestamp = Date.parse(candidate);
+  if (Number.isNaN(timestamp)) throw new Error('观看期限格式不正确');
+  return new Date(timestamp).toISOString();
+}
+
 function isExpired(video) {
   return Boolean(video?.expiresAt) && new Date(video.expiresAt) <= new Date();
 }
@@ -207,6 +222,7 @@ export {
   isExpired,
   maxVideoSize,
   now,
+  normalizeExpiresAt,
   publicVideo,
   readJson,
   requireAdmin,

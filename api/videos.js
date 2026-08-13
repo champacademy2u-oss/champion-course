@@ -1,4 +1,4 @@
-import { db, hashPassword, maxVideoSize, publicVideo, readJson, requireAdmin, safeName, sendJson } from './_firebase.js';
+import { db, hashPassword, maxVideoSize, normalizeExpiresAt, publicVideo, readJson, requireAdmin, safeName, sendJson } from './_firebase.js';
 import { deleteStoredObject, storedObjectExists } from './_r2.js';
 
 const supported = new Set(['.mp4', '.webm', '.mov', '.m4v']);
@@ -26,6 +26,31 @@ export default async function handler(req, res) {
   try {
     await requireAdmin(req);
 
+    if (req.method === 'PATCH') {
+      const input = await readJson(req);
+      const videoId = String(input.id || '').trim();
+      if (!videoId) return sendJson(res, 400, { error: '缺少 video id' });
+      const hasTitle = Object.prototype.hasOwnProperty.call(input, 'title');
+      const hasExpiresAt = Object.prototype.hasOwnProperty.call(input, 'expiresAt');
+      if (!hasTitle && !hasExpiresAt) return sendJson(res, 400, { error: '没有需要更新的视频资料' });
+
+      const ref = db().collection('videos').doc(videoId);
+      const snap = await ref.get();
+      if (!snap.exists) return sendJson(res, 404, { error: '找不到视频' });
+
+      const updates = { updatedAt: new Date().toISOString() };
+      if (hasTitle) {
+        const title = String(input.title ?? '').trim();
+        if (!title) return sendJson(res, 400, { error: '视频名称不可留空' });
+        if (title.length > 100) return sendJson(res, 400, { error: '视频名称不可超过 100 个字' });
+        updates.title = title;
+      }
+      if (hasExpiresAt) updates.expiresAt = normalizeExpiresAt(input.expiresAt);
+
+      await ref.update(updates);
+      return sendJson(res, 200, { video: publicVideo({ id: videoId, ...snap.data(), ...updates }) });
+    }
+
     if (req.method === 'POST') {
       const input = await readJson(req);
       const originalName = safeName(input.originalName);
@@ -43,7 +68,7 @@ export default async function handler(req, res) {
       const doc = {
         title: String(input.title).trim().slice(0, 100),
         passwordHash: hashPassword(input.password),
-        expiresAt: String(input.expiresAt || ''),
+        expiresAt: normalizeExpiresAt(input.expiresAt),
         storagePath,
         originalName,
         contentType: String(input.contentType || 'video/mp4'),

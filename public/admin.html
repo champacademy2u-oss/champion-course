@@ -91,6 +91,34 @@
   </section>
 </main>
 
+<dialog id="editVideoDialog" class="edit-dialog">
+  <form id="editVideoForm" class="edit-dialog-form">
+    <div class="dialog-heading">
+      <span class="dialog-icon">✦</span>
+      <div>
+        <span class="eyebrow">VIDEO DETAILS</span>
+        <h2>编辑视频资料与期限</h2>
+        <p>可以延长或缩短观看期限；留空后，这支视频会改为永不过期。</p>
+      </div>
+    </div>
+    <input name="id" type="hidden">
+    <label>视频名称<input required name="title" maxlength="100" autocomplete="off"></label>
+    <label>观看期限（留空为永不过期）<input name="expiresAt" type="datetime-local"></label>
+    <div class="expiry-shortcuts" aria-label="快速调整观看期限">
+      <button type="button" data-expiry-days="7">延长 7 天</button>
+      <button type="button" data-expiry-days="30">延长 30 天</button>
+      <button type="button" data-expiry-clear>设为永不过期</button>
+    </div>
+    <p class="field-hint">可选择任何较早或较晚的时间。若设为过去时间，观看链接会立即显示已过期。</p>
+    <p id="editVideoError" class="error"></p>
+    <div class="dialog-actions">
+      <button id="cancelEditVideo" class="ghost" type="button">取消</button>
+      <button type="submit">保存更改</button>
+    </div>
+  </form>
+</dialog>
+<div id="toast" class="toast" role="status" aria-live="polite"></div>
+
 <script type="module">
 let adminToken = sessionStorage.getItem('videoRoomAdminToken') || '';
 let isPublicAdmin = false;
@@ -115,6 +143,12 @@ const videosEl = document.getElementById('videos');
 const viewsEl = document.getElementById('views');
 const videoCountEl = document.getElementById('videoCount');
 const viewCountEl = document.getElementById('viewCount');
+const editVideoDialogEl = document.getElementById('editVideoDialog');
+const editVideoFormEl = document.getElementById('editVideoForm');
+const editVideoErrorEl = document.getElementById('editVideoError');
+const cancelEditVideoEl = document.getElementById('cancelEditVideo');
+const toastEl = document.getElementById('toast');
+let toastTimer;
 
 const api = async (url, options = {}) => {
   const headers = new Headers(options.headers || {});
@@ -129,6 +163,15 @@ const esc = value => String(value ?? '').replace(/[&<>"]/g, char => ({ '&': '&am
 const seconds = value => Math.floor(value / 60) + ' 分 ' + Math.floor(value % 60) + ' 秒';
 const dateText = value => value ? new Date(value).toLocaleString() : '永不过期';
 const shortDate = value => value ? new Date(value).toLocaleDateString('zh-CN', { year: 'numeric', month: 'short', day: 'numeric' }) : '永不过期';
+const shortDateTime = value => value ? new Date(value).toLocaleString('zh-CN', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '永不过期';
+const toDatetimeLocal = value => {
+  if (!value) return '';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  const pad = number => String(number).padStart(2, '0');
+  return date.getFullYear() + '-' + pad(date.getMonth() + 1) + '-' + pad(date.getDate()) + 'T' + pad(date.getHours()) + ':' + pad(date.getMinutes());
+};
+const toIsoOrEmpty = value => value ? new Date(value).toISOString() : '';
 const previewDuration = value => {
   const total = Math.max(0, Math.floor(Number(value) || 0));
   const hours = Math.floor(total / 3600);
@@ -139,6 +182,13 @@ const previewDuration = value => {
 const setProgress = (percent, text) => {
   uploadBarEl.style.width = Math.max(0, Math.min(100, percent)) + '%';
   uploadStatusEl.textContent = text;
+};
+const showToast = (message, type = 'success') => {
+  clearTimeout(toastTimer);
+  toastEl.textContent = message;
+  toastEl.dataset.type = type;
+  toastEl.classList.add('show');
+  toastTimer = setTimeout(() => toastEl.classList.remove('show'), 2600);
 };
 
 async function init() {
@@ -229,8 +279,9 @@ function render() {
         '<span class="duration-badge">' + (video.hasThumbnail ? 'Thumbnail' : '读取预览…') + '</span>' +
       '</a>' +
       '<div class="video-card-body">' +
-        '<div class="video-card-heading"><div><span class="eyebrow">COURSE VIDEO</span><h3>' + esc(video.title) + '</h3></div></div>' +
-        '<div class="video-meta"><span>◫ ' + esc(video.sizeText) + '</span><span>↑ ' + shortDate(video.createdAt) + '</span><span>⌁ ' + shortDate(video.expiresAt) + '</span></div>' +
+        '<div class="video-card-heading"><div><span class="eyebrow">COURSE VIDEO</span><h3>' + esc(video.title) + '</h3></div>' +
+          '<button class="icon-button" onclick="openEditVideo(&quot;' + esc(video.id) + '&quot;)" title="编辑资料与期限" aria-label="编辑 ' + esc(video.title) + ' 的资料与期限">✎</button></div>' +
+        '<div class="video-meta"><span>◫ ' + esc(video.sizeText) + '</span><span>↑ 上传：' + shortDate(video.createdAt) + '</span><span>⌁ 期限：' + shortDateTime(video.expiresAt) + '</span></div>' +
         '<div class="thumbnail-state ' + (video.hasThumbnail ? 'is-set' : '') + '">▧ Thumbnail：' + (video.hasThumbnail ? '已设置 · 播放前显示 3 秒' : '自动使用视频画面预览') + '</div>' +
         '<div class="video-metrics">' +
           '<div><strong>' + video.viewCount + '</strong><span>观看人数</span></div>' +
@@ -241,6 +292,7 @@ function render() {
         '<div class="video-card-actions">' +
           '<a class="video-action primary" href="/watch/' + esc(video.id) + '" target="_blank" rel="noopener"><span>▶</span> 预览观看页</a>' +
           '<button class="video-action thumbnail-action" onclick="pickThumbnail(&quot;' + esc(video.id) + '&quot;)"><span>▧</span> ' + (video.hasThumbnail ? '更换 Thumbnail' : '上传 Thumbnail') + '</button>' +
+          '<button class="video-action" onclick="openEditVideo(&quot;' + esc(video.id) + '&quot;)"><span>✎</span> 编辑资料与期限</button>' +
           '<button class="video-action delete" onclick="removeVideo(&quot;' + esc(video.id) + '&quot;)"><span>⌫</span> 删除</button>' +
         '</div>' +
       '</div>' +
@@ -279,6 +331,51 @@ window.removeVideo = async id => {
   await api('/api/videos?id=' + encodeURIComponent(id), { method: 'DELETE' });
   await boot();
 };
+
+window.openEditVideo = id => {
+  const video = state.videos.find(item => item.id === id);
+  if (!video) return;
+  editVideoErrorEl.textContent = '';
+  editVideoFormEl.elements.id.value = video.id;
+  editVideoFormEl.elements.title.value = video.title;
+  editVideoFormEl.elements.expiresAt.value = toDatetimeLocal(video.expiresAt);
+  editVideoDialogEl.showModal();
+  editVideoFormEl.elements.title.focus();
+  editVideoFormEl.elements.title.select();
+};
+
+async function saveVideoDetails(event) {
+  event.preventDefault();
+  editVideoErrorEl.textContent = '';
+  const submitButton = editVideoFormEl.querySelector('button[type="submit"]');
+  submitButton.disabled = true;
+  try {
+    await api('/api/videos', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        id: editVideoFormEl.elements.id.value,
+        title: editVideoFormEl.elements.title.value,
+        expiresAt: toIsoOrEmpty(editVideoFormEl.elements.expiresAt.value)
+      })
+    });
+    editVideoDialogEl.close();
+    await boot();
+    showToast('视频资料与期限已更新');
+  } catch (error) {
+    editVideoErrorEl.textContent = error.message;
+  } finally {
+    submitButton.disabled = false;
+  }
+}
+
+function shiftEditExpiry(days) {
+  const field = editVideoFormEl.elements.expiresAt;
+  const current = field.value ? new Date(field.value) : new Date();
+  const base = Number.isNaN(current.getTime()) || current < new Date() ? new Date() : current;
+  base.setDate(base.getDate() + days);
+  field.value = toDatetimeLocal(base);
+}
 
 function initializeVideoPreviews() {
   videosEl.querySelectorAll('.video-thumbnail').forEach(media => {
@@ -462,6 +559,14 @@ uploadFormEl.addEventListener('submit', upload);
 thumbnailPickerEl.addEventListener('change', updateExistingThumbnail);
 settingsFormEl.addEventListener('submit', saveSettings);
 refreshButtonEl.addEventListener('click', boot);
+editVideoFormEl.addEventListener('submit', saveVideoDetails);
+editVideoFormEl.querySelectorAll('[data-expiry-days]').forEach(button => {
+  button.addEventListener('click', () => shiftEditExpiry(Number(button.dataset.expiryDays)));
+});
+editVideoFormEl.querySelector('[data-expiry-clear]').addEventListener('click', () => {
+  editVideoFormEl.elements.expiresAt.value = '';
+});
+cancelEditVideoEl.addEventListener('click', () => editVideoDialogEl.close());
 init().catch(error => loginErrorEl.textContent = error.message);
 </script>
 </body>
