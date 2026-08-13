@@ -3,13 +3,13 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>视频后台</title>
+  <title>Champ Academy - Video Room</title>
   <link rel="stylesheet" href="/styles.css">
 </head>
 <body>
 <main class="shell">
   <header>
-    <a class="brand" href="/admin">▣ Secure Video Room</a>
+    <a class="brand" href="/admin"><img src="/champ-academy-logo.jpg" alt="Champ Academy"><span>Champ Academy - Video Room</span></a>
     <p>Vercel + Firestore + Cloudflare R2 视频后台</p>
   </header>
 
@@ -43,14 +43,10 @@
           <label>观看密码<input required name="password" type="text" placeholder="分享给观众的密码"></label>
           <label>期限（留空为永不过期）<input name="expiresAt" type="datetime-local"></label>
           <label>视频文件（最大 1GB）<input required name="file" type="file" accept="video/mp4,video/webm,video/quicktime,video/x-m4v"></label>
-          <label>Thumbnail（可选，最大 5MB）<input name="thumbnail" type="file" accept="image/png,image/jpeg,image/webp"></label>
-          <p class="hint">设置后，观众通过验证会先看到 Thumbnail 3 秒，再开始播放视频。</p>
           <button id="uploadButton">上传并建立观看链接</button>
           <div class="progress"><span id="uploadBar"></span></div>
           <p id="uploadStatus" class="hint"></p>
         </form>
-        <input id="thumbnailPicker" type="file" accept="image/png,image/jpeg,image/webp" hidden>
-        <p id="thumbnailStatus" class="hint"></p>
       </section>
 
       <section class="card">
@@ -91,13 +87,39 @@
   </section>
 </main>
 
+<dialog id="editVideoDialog" class="edit-dialog">
+  <form id="editVideoForm" class="edit-dialog-form">
+    <div class="dialog-heading">
+      <span class="dialog-icon">✦</span>
+      <div>
+        <span class="eyebrow">VIDEO DETAILS</span>
+        <h2>编辑视频资料与期限</h2>
+        <p>可以延长或缩短观看期限；留空后，这支视频会改为永不过期。</p>
+      </div>
+    </div>
+    <input name="id" type="hidden">
+    <label>视频名称<input required name="title" maxlength="100" autocomplete="off"></label>
+    <label>观看期限（留空为永不过期）<input name="expiresAt" type="datetime-local"></label>
+    <div class="expiry-shortcuts" aria-label="快速调整观看期限">
+      <button type="button" data-expiry-days="7">延长 7 天</button>
+      <button type="button" data-expiry-days="30">延长 30 天</button>
+      <button type="button" data-expiry-clear>设为永不过期</button>
+    </div>
+    <p class="field-hint">可选择任何较早或较晚的时间。若设为过去时间，观看链接会立即显示已过期。</p>
+    <p id="editVideoError" class="error"></p>
+    <div class="dialog-actions">
+      <button id="cancelEditVideo" class="ghost" type="button">取消</button>
+      <button type="submit">保存更改</button>
+    </div>
+  </form>
+</dialog>
+<div id="toast" class="toast" role="status" aria-live="polite"></div>
+
 <script type="module">
 let adminToken = sessionStorage.getItem('videoRoomAdminToken') || '';
 let isPublicAdmin = false;
 let state = {};
 let maxVideoSize = 1024 * 1024 * 1024;
-let thumbnailTargetId = '';
-const maxThumbnailSize = 5 * 1024 * 1024;
 const loginPanel = document.getElementById('login');
 const dashboardPanel = document.getElementById('dashboard');
 const loginFormEl = document.getElementById('loginForm');
@@ -106,8 +128,6 @@ const uploadFormEl = document.getElementById('uploadForm');
 const uploadButtonEl = document.getElementById('uploadButton');
 const uploadBarEl = document.getElementById('uploadBar');
 const uploadStatusEl = document.getElementById('uploadStatus');
-const thumbnailPickerEl = document.getElementById('thumbnailPicker');
-const thumbnailStatusEl = document.getElementById('thumbnailStatus');
 const settingsFormEl = document.getElementById('settingsForm');
 const refreshButtonEl = document.getElementById('refreshButton');
 const statsEl = document.getElementById('stats');
@@ -115,6 +135,12 @@ const videosEl = document.getElementById('videos');
 const viewsEl = document.getElementById('views');
 const videoCountEl = document.getElementById('videoCount');
 const viewCountEl = document.getElementById('viewCount');
+const editVideoDialogEl = document.getElementById('editVideoDialog');
+const editVideoFormEl = document.getElementById('editVideoForm');
+const editVideoErrorEl = document.getElementById('editVideoError');
+const cancelEditVideoEl = document.getElementById('cancelEditVideo');
+const toastEl = document.getElementById('toast');
+let toastTimer;
 
 const api = async (url, options = {}) => {
   const headers = new Headers(options.headers || {});
@@ -129,12 +155,28 @@ const esc = value => String(value ?? '').replace(/[&<>"]/g, char => ({ '&': '&am
 const seconds = value => Math.floor(value / 60) + ' 分 ' + Math.floor(value % 60) + ' 秒';
 const dateText = value => value ? new Date(value).toLocaleString() : '永不过期';
 const shortDate = value => value ? new Date(value).toLocaleDateString('zh-CN', { year: 'numeric', month: 'short', day: 'numeric' }) : '永不过期';
+const shortDateTime = value => value ? new Date(value).toLocaleString('zh-CN', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '永不过期';
+const toDatetimeLocal = value => {
+  if (!value) return '';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  const pad = number => String(number).padStart(2, '0');
+  return date.getFullYear() + '-' + pad(date.getMonth() + 1) + '-' + pad(date.getDate()) + 'T' + pad(date.getHours()) + ':' + pad(date.getMinutes());
+};
+const toIsoOrEmpty = value => value ? new Date(value).toISOString() : '';
 const previewDuration = value => {
   const total = Math.max(0, Math.floor(Number(value) || 0));
   const hours = Math.floor(total / 3600);
   const minutes = Math.floor(total % 3600 / 60);
   const secondsValue = String(total % 60).padStart(2, '0');
   return hours ? hours + ':' + String(minutes).padStart(2, '0') + ':' + secondsValue : minutes + ':' + secondsValue;
+};
+const showToast = (message, type = 'success') => {
+  clearTimeout(toastTimer);
+  toastEl.textContent = message;
+  toastEl.dataset.type = type;
+  toastEl.classList.add('show');
+  toastTimer = setTimeout(() => toastEl.classList.remove('show'), 2600);
 };
 const setProgress = (percent, text) => {
   uploadBarEl.style.width = Math.max(0, Math.min(100, percent)) + '%';
@@ -215,33 +257,31 @@ function render() {
 
   videosEl.innerHTML = state.videos.length ? state.videos.map(video => {
     const url = location.origin + '/watch/' + video.id;
-    const previewMedia = video.thumbnailPreviewUrl
-      ? '<img class="video-thumbnail preview-image" src="' + esc(video.thumbnailPreviewUrl) + '" alt="' + esc(video.title) + ' Thumbnail">'
-      : video.previewUrl
-        ? '<video class="video-thumbnail" src="' + esc(video.previewUrl) + '" muted playsinline preload="metadata"></video>'
-        : '';
+    const preview = video.previewUrl
+      ? '<video class="video-thumbnail" src="' + esc(video.previewUrl) + '" muted playsinline preload="metadata"></video>'
+      : '';
     const statusClass = video.expired ? 'expired' : 'active';
     const statusText = video.expired ? '已过期' : '可观看';
     return '<article class="video-card" data-video-id="' + esc(video.id) + '">' +
       '<a class="video-preview" href="/watch/' + esc(video.id) + '" target="_blank" rel="noopener" aria-label="预览 ' + esc(video.title) + '">' +
-        '<div class="preview-art"><span class="preview-mark">CA</span><small>CHAMP ACADEMY · VIDEO ROOM</small></div>' + previewMedia +
+        '<div class="preview-art"><img class="preview-logo" src="/champ-academy-logo.jpg" alt=""><small>CHAMP ACADEMY · VIDEO ROOM</small></div>' + preview +
         '<div class="preview-overlay"><span class="video-status ' + statusClass + '"><i></i>' + statusText + '</span><span class="play-button">▶</span></div>' +
-        '<span class="duration-badge">' + (video.hasThumbnail ? 'Thumbnail' : '读取预览…') + '</span>' +
+        '<span class="duration-badge">预览</span>' +
       '</a>' +
       '<div class="video-card-body">' +
-        '<div class="video-card-heading"><div><span class="eyebrow">COURSE VIDEO</span><h3>' + esc(video.title) + '</h3></div></div>' +
-        '<div class="video-meta"><span>◫ ' + esc(video.sizeText) + '</span><span>↑ ' + shortDate(video.createdAt) + '</span><span>⌁ ' + shortDate(video.expiresAt) + '</span></div>' +
-        '<div class="thumbnail-state ' + (video.hasThumbnail ? 'is-set' : '') + '">▧ Thumbnail：' + (video.hasThumbnail ? '已设置 · 播放前显示 3 秒' : '自动使用视频画面预览') + '</div>' +
+        '<div class="video-card-heading"><div><span class="eyebrow">COURSE VIDEO</span><h3>' + esc(video.title) + '</h3></div>' +
+          '<button class="icon-button" data-action="edit" data-id="' + esc(video.id) + '" title="编辑资料与期限" aria-label="编辑 ' + esc(video.title) + ' 的资料与期限">✎</button></div>' +
+        '<div class="video-meta"><span>◫ ' + esc(video.sizeText) + '</span><span>↑ 上传：' + shortDate(video.createdAt) + '</span><span>⌁ 期限：' + shortDateTime(video.expiresAt) + '</span></div>' +
         '<div class="video-metrics">' +
           '<div><strong>' + video.viewCount + '</strong><span>观看人数</span></div>' +
           '<div><strong>' + video.completedCount + '</strong><span>完成观看</span></div>' +
           '<div><strong>' + seconds(video.totalWatchedSeconds) + '</strong><span>总观看时长</span></div>' +
         '</div>' +
-        '<div class="share-link"><span>' + esc(url) + '</span><button onclick="copyLink(&quot;' + esc(video.id) + '&quot;)" aria-label="复制观看链接">复制</button></div>' +
+        '<div class="share-link"><span>' + esc(url) + '</span><button data-action="copy" data-id="' + esc(video.id) + '" aria-label="复制观看链接">复制</button></div>' +
         '<div class="video-card-actions">' +
           '<a class="video-action primary" href="/watch/' + esc(video.id) + '" target="_blank" rel="noopener"><span>▶</span> 预览观看页</a>' +
-          '<button class="video-action thumbnail-action" onclick="pickThumbnail(&quot;' + esc(video.id) + '&quot;)"><span>▧</span> ' + (video.hasThumbnail ? '更换 Thumbnail' : '上传 Thumbnail') + '</button>' +
-          '<button class="video-action delete" onclick="removeVideo(&quot;' + esc(video.id) + '&quot;)"><span>⌫</span> 删除</button>' +
+          '<button class="video-action" data-action="edit" data-id="' + esc(video.id) + '"><span>✎</span> 编辑资料与期限</button>' +
+          '<button class="video-action delete" data-action="delete" data-id="' + esc(video.id) + '"><span>⌫</span> 删除</button>' +
         '</div>' +
       '</div>' +
     '</article>';
@@ -269,49 +309,94 @@ function renderLoadError(error) {
   viewsEl.innerHTML = '<tr><td colspan="6" class="hint">Firebase 设置完成后会显示观看记录。</td></tr>';
 }
 
-window.copyLink = async id => {
-  await navigator.clipboard.writeText(location.origin + '/watch/' + id);
-  alert('观看链接已复制');
-};
+async function copyLink(id) {
+  try {
+    await navigator.clipboard.writeText(location.origin + '/watch/' + id);
+    showToast('观看链接已复制');
+  } catch {
+    showToast('无法复制，请手动复制链接', 'error');
+  }
+}
 
-window.removeVideo = async id => {
+async function removeVideo(id) {
   if (!confirm('确定删除这个视频和相关观看记录？')) return;
   await api('/api/videos?id=' + encodeURIComponent(id), { method: 'DELETE' });
   await boot();
-};
+  showToast('视频已删除');
+}
+
+function openEditVideo(id) {
+  const video = state.videos.find(item => item.id === id);
+  if (!video) return;
+  editVideoErrorEl.textContent = '';
+  editVideoFormEl.elements.id.value = video.id;
+  editVideoFormEl.elements.title.value = video.title;
+  editVideoFormEl.elements.expiresAt.value = toDatetimeLocal(video.expiresAt);
+  editVideoDialogEl.showModal();
+  editVideoFormEl.elements.title.focus();
+  editVideoFormEl.elements.title.select();
+}
+
+async function saveVideoDetails(event) {
+  event.preventDefault();
+  editVideoErrorEl.textContent = '';
+  const submitButton = editVideoFormEl.querySelector('button[type="submit"]');
+  submitButton.disabled = true;
+  try {
+    await api('/api/videos', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        id: editVideoFormEl.elements.id.value,
+        title: editVideoFormEl.elements.title.value,
+        expiresAt: toIsoOrEmpty(editVideoFormEl.elements.expiresAt.value)
+      })
+    });
+    editVideoDialogEl.close();
+    await boot();
+    showToast('视频资料与期限已更新');
+  } catch (error) {
+    editVideoErrorEl.textContent = error.message;
+  } finally {
+    submitButton.disabled = false;
+  }
+}
+
+function shiftEditExpiry(days) {
+  const field = editVideoFormEl.elements.expiresAt;
+  const current = field.value ? new Date(field.value) : new Date();
+  const base = Number.isNaN(current.getTime()) || current < new Date() ? new Date() : current;
+  base.setDate(base.getDate() + days);
+  field.value = toDatetimeLocal(base);
+}
 
 function initializeVideoPreviews() {
-  videosEl.querySelectorAll('.video-thumbnail').forEach(media => {
-    const preview = media.closest('.video-preview');
+  videosEl.querySelectorAll('.video-thumbnail').forEach(player => {
+    const preview = player.closest('.video-preview');
     const duration = preview.querySelector('.duration-badge');
-    if (media.tagName === 'IMG') {
-      const ready = () => preview.classList.add('preview-ready');
-      if (media.complete && media.naturalWidth) ready();
-      else media.addEventListener('load', ready, { once: true });
-      media.addEventListener('error', () => preview.classList.add('preview-error'), { once: true });
-      duration.textContent = 'Thumbnail';
-      return;
-    }
-    media.addEventListener('loadedmetadata', () => {
-      duration.textContent = previewDuration(media.duration);
+    player.addEventListener('loadedmetadata', () => {
+      duration.textContent = previewDuration(player.duration);
       try {
-        media.currentTime = Math.min(5, Math.max(.5, media.duration * .06));
+        player.currentTime = Math.min(5, Math.max(.5, player.duration * .06));
       } catch {
         preview.classList.add('preview-ready');
       }
     }, { once: true });
-    media.addEventListener('seeked', () => preview.classList.add('preview-ready'), { once: true });
-    media.addEventListener('loadeddata', () => {
-      if (!preview.classList.contains('preview-ready')) preview.classList.add('preview-ready');
-    }, { once: true });
-    media.addEventListener('error', () => {
-      preview.classList.add('preview-error');
-      duration.textContent = '预览';
-    }, { once: true });
+    player.addEventListener('seeked', () => preview.classList.add('preview-ready'), { once: true });
+    player.addEventListener('error', () => preview.classList.add('preview-error'), { once: true });
   });
 }
 
-function uploadToSignedUrl(uploadUrl, file, contentType, onProgress = setProgress) {
+videosEl.addEventListener('click', event => {
+  const action = event.target.closest('[data-action]');
+  if (!action) return;
+  const id = action.dataset.id;
+  if (action.dataset.action === 'copy') copyLink(id);
+  if (action.dataset.action === 'edit') openEditVideo(id);
+  if (action.dataset.action === 'delete') removeVideo(id).catch(error => showToast(error.message, 'error'));
+});
+
+function uploadToSignedUrl(uploadUrl, file, contentType) {
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
     xhr.open('PUT', uploadUrl);
@@ -319,89 +404,20 @@ function uploadToSignedUrl(uploadUrl, file, contentType, onProgress = setProgres
     xhr.upload.onprogress = event => {
       if (!event.lengthComputable) return;
       const percent = Math.round(event.loaded / event.total * 100);
-      onProgress(percent, '正在上传 ' + percent + '% · ' + Math.round(event.loaded / 1024 / 1024) + 'MB / ' + Math.round(event.total / 1024 / 1024) + 'MB');
+      setProgress(percent, '正在上传 ' + percent + '% · ' + Math.round(event.loaded / 1024 / 1024) + 'MB / ' + Math.round(event.total / 1024 / 1024) + 'MB');
     };
     xhr.onload = () => xhr.status >= 200 && xhr.status < 300 ? resolve() : reject(new Error('上传失败：' + xhr.status));
-    xhr.onerror = () => reject(new Error('网络中断，上传失败'));
+    xhr.onerror = () => reject(new Error('无法连接 Cloudflare R2，请检查 R2 CORS 设置后重试'));
     xhr.send(file);
   });
-}
-
-function validateThumbnail(file) {
-  if (!file) throw new Error('请选择 Thumbnail 图片');
-  if (!['image/png', 'image/jpeg', 'image/webp'].includes(file.type)) {
-    throw new Error('Thumbnail 只支持 PNG、JPG 或 WebP');
-  }
-  if (file.size > maxThumbnailSize) throw new Error('Thumbnail 不可超过 5MB');
-}
-
-async function uploadThumbnailFile(file, videoId, onProgress = setProgress) {
-  validateThumbnail(file);
-  const uploadPlan = await api('/api/upload-url', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      kind: 'thumbnail',
-      videoId,
-      originalName: file.name,
-      contentType: file.type,
-      size: file.size
-    })
-  });
-  await uploadToSignedUrl(uploadPlan.uploadUrl, file, uploadPlan.contentType, onProgress);
-  return {
-    thumbnailPath: uploadPlan.storagePath,
-    thumbnailContentType: uploadPlan.contentType
-  };
-}
-
-window.pickThumbnail = id => {
-  thumbnailTargetId = id;
-  thumbnailStatusEl.textContent = '';
-  thumbnailPickerEl.value = '';
-  thumbnailPickerEl.click();
-};
-
-async function updateExistingThumbnail() {
-  const file = thumbnailPickerEl.files[0];
-  const videoId = thumbnailTargetId;
-  if (!file || !videoId) return;
-  const progress = (percent, text) => {
-    thumbnailStatusEl.textContent = 'Thumbnail：' + text;
-  };
-  try {
-    thumbnailPickerEl.disabled = true;
-    thumbnailStatusEl.textContent = '正在准备 Thumbnail…';
-    const thumbnail = await uploadThumbnailFile(file, videoId, progress);
-    await api('/api/videos', {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id: videoId, ...thumbnail })
-    });
-    thumbnailStatusEl.textContent = 'Thumbnail 已储存，观看时会先显示 3 秒。';
-    await boot();
-  } catch (error) {
-    thumbnailStatusEl.textContent = error.message;
-  } finally {
-    thumbnailPickerEl.disabled = false;
-    thumbnailTargetId = '';
-  }
 }
 
 async function upload(event) {
   event.preventDefault();
   const form = event.target;
   const file = form.file.files[0];
-  const thumbnailFile = form.thumbnail.files[0] || null;
   if (!file) return setProgress(0, '请选择视频文件');
   if (file.size > maxVideoSize) return setProgress(0, '视频文件不可超过 1GB');
-  if (thumbnailFile) {
-    try {
-      validateThumbnail(thumbnailFile);
-    } catch (error) {
-      return setProgress(0, error.message);
-    }
-  }
   uploadButtonEl.disabled = true;
   try {
     setProgress(2, '准备上传链接…');
@@ -415,11 +431,6 @@ async function upload(event) {
       })
     });
     await uploadToSignedUrl(uploadPlan.uploadUrl, file, uploadPlan.contentType);
-    let thumbnail = {};
-    if (thumbnailFile) {
-      setProgress(96, '正在准备 Thumbnail…');
-      thumbnail = await uploadThumbnailFile(thumbnailFile, uploadPlan.id);
-    }
     setProgress(99, '确认视频资料…');
     const video = await api('/api/videos', {
       method: 'POST',
@@ -432,8 +443,7 @@ async function upload(event) {
         storagePath: uploadPlan.storagePath,
         originalName: file.name,
         contentType: uploadPlan.contentType,
-        size: file.size,
-        ...thumbnail
+        size: file.size
       })
     });
     setProgress(100, '完成！观看链接：' + location.origin + '/watch/' + video.video.id);
@@ -459,9 +469,16 @@ async function saveSettings(event) {
 
 loginFormEl.addEventListener('submit', adminLogin);
 uploadFormEl.addEventListener('submit', upload);
-thumbnailPickerEl.addEventListener('change', updateExistingThumbnail);
 settingsFormEl.addEventListener('submit', saveSettings);
 refreshButtonEl.addEventListener('click', boot);
+editVideoFormEl.addEventListener('submit', saveVideoDetails);
+editVideoFormEl.querySelectorAll('[data-expiry-days]').forEach(button => {
+  button.addEventListener('click', () => shiftEditExpiry(Number(button.dataset.expiryDays)));
+});
+editVideoFormEl.querySelector('[data-expiry-clear]').addEventListener('click', () => {
+  editVideoFormEl.elements.expiresAt.value = '';
+});
+cancelEditVideoEl.addEventListener('click', () => editVideoDialogEl.close());
 init().catch(error => loginErrorEl.textContent = error.message);
 </script>
 </body>
