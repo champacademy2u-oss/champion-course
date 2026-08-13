@@ -115,7 +115,9 @@ function verifyPassword(password, stored) {
 }
 
 function adminSecret() {
-  return process.env.ADMIN_SESSION_SECRET || process.env.ADMIN_PASSWORD || 'admin123';
+  const secret = process.env.ADMIN_SESSION_SECRET || process.env.ADMIN_PASSWORD;
+  if (!secret) throw new Error('ADMIN_SESSION_SECRET 尚未配置');
+  return secret;
 }
 
 function base64Url(value) {
@@ -163,7 +165,6 @@ function publicVideo(video) {
     title: video.title,
     expiresAt: video.expiresAt || '',
     originalName: video.originalName || '',
-    hasThumbnail: Boolean(video.thumbnailPath),
     size: Number(video.size) || 0,
     sizeText: formatBytes(Number(video.size) || 0),
     createdAt: video.createdAt || '',
@@ -172,6 +173,21 @@ function publicVideo(video) {
     totalWatchedSeconds: Number(video.totalWatchedSeconds) || 0,
     expired: isExpired(video)
   };
+}
+
+function normalizeExpiresAt(value) {
+  const raw = String(value ?? '').trim();
+  if (!raw) return '';
+
+  // datetime-local inputs do not include a timezone. Champion Course operates
+  // in Malaysia, so interpret those values as Asia/Kuala_Lumpur (+08:00)
+  // before storing one unambiguous ISO timestamp.
+  const candidate = raw.includes('T') && !/(?:z|[+-]\d{2}:\d{2})$/i.test(raw)
+    ? `${raw}+08:00`
+    : raw;
+  const timestamp = Date.parse(candidate);
+  if (Number.isNaN(timestamp)) throw new Error('观看期限格式不正确');
+  return new Date(timestamp).toISOString();
 }
 
 function isExpired(video) {
@@ -207,6 +223,7 @@ export {
   isExpired,
   maxVideoSize,
   now,
+  normalizeExpiresAt,
   publicVideo,
   readJson,
   requireAdmin,
