@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Champ Academy</title>
-    <link rel="stylesheet" href="./styles.css?v=20260811-bulk-lead-delete" />
+    <link rel="stylesheet" href="./styles.css?v=20260813-email-campaign-append" />
     <link rel="manifest" href="./manifest.json" />
   </head>
   <body>
@@ -438,7 +438,7 @@
           </div>
 
           <div class="email-campaign-card">
-            <div class="email-section-heading"><div><h4>Campaign 记录</h4><p>草稿可以继续编辑；发送中可暂停或恢复。</p></div></div>
+            <div class="email-section-heading"><div><h4>Campaign 记录</h4><p>草稿可以继续编辑；发送中可暂停或恢复；已完成后可每天追加新报名者。</p></div></div>
             <div class="table-wrap">
               <table class="email-campaign-table">
                 <thead><tr><th>Campaign</th><th>状态</th><th>有效名单</th><th>更新时间</th><th>操作</th></tr></thead>
@@ -460,6 +460,7 @@
                 <label class="template-field"><span>CTA HTTPS 链接</span><input id="emailCampaignCtaUrl" type="url" inputmode="url" maxlength="2048" placeholder="https://..." /></label>
               </div>
               <div class="email-campaign-actions">
+                <button class="text-button" id="emailAppendRecipientsBtn" type="button" hidden>追加新收件人</button>
                 <button class="text-button primary" id="emailSaveDraftBtn" type="button">保存草稿</button>
                 <button class="text-button" id="emailSendTestBtn" type="button" disabled>寄测试邮件</button>
               </div>
@@ -1003,6 +1004,6 @@
     <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-storage-compat.js"></script>
     <script src="./config.js"></script>
-    <script src="./app.js?v=20260811-bulk-lead-delete"></script>
+    <script src="./app.js?v=20260813-email-campaign-append"></script>
   </body>
 </html>

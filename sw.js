@@ -1,9 +1,9 @@
-const CACHE_NAME = "lead-center-v12";
+const CACHE_NAME = "lead-center-v13";
 const ASSETS = [
   "./",
   "./index.html",
-  "./styles.css?v=20260811-bulk-lead-delete",
-  "./app.js?v=20260811-bulk-lead-delete",
+  "./styles.css?v=20260813-email-campaign-append",
+  "./app.js?v=20260813-email-campaign-append",
   "./config.js",
   "./manifest.json",
   "./zoom.html",
