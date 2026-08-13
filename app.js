@@ -477,6 +477,7 @@ const elements = {
   emailCampaignCtaLabel: document.querySelector("#emailCampaignCtaLabel"),
   emailCampaignCtaUrl: document.querySelector("#emailCampaignCtaUrl"),
   emailDraftState: document.querySelector("#emailDraftState"),
+  emailAppendRecipientsBtn: document.querySelector("#emailAppendRecipientsBtn"),
   emailSaveDraftBtn: document.querySelector("#emailSaveDraftBtn"),
   emailSendTestBtn: document.querySelector("#emailSendTestBtn"),
   emailAudienceSourceFilter: document.querySelector("#emailAudienceSourceFilter"),
@@ -565,7 +566,8 @@ const emailCampaignState = {
   audienceAudit: null,
   report: null,
   service: null,
-  sending: false
+  sending: false,
+  appendMode: false
 };
 
 function normalizeZoomSettings(value) {
@@ -1370,8 +1372,12 @@ function renderEmailAudience() {
   }
   const selected = emailCampaignState.selectedKeys.size;
   elements.emailAudienceSummary.textContent = selected
-    ? `已选择 ${selected} 位客户；服务器会再次验证、去重并检查永久排除名单。`
-    : "尚未选择收件人。";
+    ? emailCampaignState.appendMode
+      ? `已选择 ${selected} 位客户；审核会自动排除这个 Campaign 已经寄过的人，只保留新增收件人。`
+      : `已选择 ${selected} 位客户；服务器会再次验证、去重并检查永久排除名单。`
+    : emailCampaignState.appendMode
+      ? "请选择今天新报名的人；也可选择目前全部结果，审核时会自动排除已经寄过的人。"
+      : "尚未选择收件人。";
   const filteredKeys = candidates.map(candidate => emailCandidateKey(candidate.source, candidate.sourceId));
   elements.emailAudienceSelectAll.checked = Boolean(filteredKeys.length) && filteredKeys.every(key => emailCampaignState.selectedKeys.has(key));
   elements.emailAudienceSelectAll.indeterminate = filteredKeys.some(key => emailCampaignState.selectedKeys.has(key)) && !elements.emailAudienceSelectAll.checked;
@@ -1410,19 +1416,21 @@ function emailFormData() {
   };
 }
 
-function setEmailFormDisabled(disabled) {
+function setEmailFormDisabled(contentDisabled, audienceDisabled = contentDisabled) {
   [
     elements.emailCampaignName,
     elements.emailCampaignSubject,
     elements.emailCampaignPreview,
     elements.emailCampaignBody,
     elements.emailCampaignCtaLabel,
-    elements.emailCampaignCtaUrl,
+    elements.emailCampaignCtaUrl
+  ].forEach(element => { if (element) element.disabled = contentDisabled; });
+  [
     elements.emailAudienceSourceFilter,
     elements.emailAudienceSearch,
     elements.emailAudienceSelectAll
-  ].forEach(element => { if (element) element.disabled = disabled; });
-  elements.emailAudienceBody?.querySelectorAll("input").forEach(input => { input.disabled = disabled; });
+  ].forEach(element => { if (element) element.disabled = audienceDisabled; });
+  elements.emailAudienceBody?.querySelectorAll("input").forEach(input => { input.disabled = audienceDisabled; });
 }
 
 function resetEmailAudienceAudit() {
@@ -1437,7 +1445,17 @@ function resetEmailAudienceAudit() {
 function emailCampaignStartBlocker() {
   const campaign = emailCampaignState.activeCampaign;
   if (!campaign) return "请先建立 Campaign，填写内容并保存草稿。";
-  if (campaign.status === "completed") return "这个 Campaign 已完成发送。";
+  if (campaign.status === "completed" && !emailCampaignState.appendMode) return "这个 Campaign 已完成；如需寄给新报名者，请点击「追加新收件人」。";
+  if (campaign.status === "completed" && emailCampaignState.appendMode) {
+    if (!emailCampaignState.selectedKeys.size) return "请选择今天新报名、尚未寄送的收件人。";
+    if (!emailCampaignState.audienceAudit?.stats) return "请先点击「审核新增名单」。";
+    if (!(Number(emailCampaignState.audienceAudit.stats.valid) > 0)) return "名单中没有尚未寄送的新收件人。";
+    if (!elements.emailConsentConfirmed.checked) return "请先勾选新增收件人同意确认。";
+    if (emailCampaignState.service && !emailCampaignState.service.canSendCampaign) {
+      return emailCampaignState.service.message || "Email 发送服务尚未完成配置。";
+    }
+    return "";
+  }
   if (["sending", "paused", "preparing"].includes(campaign.status)) return "";
   if (!elements.emailCampaignId.value) return "请先点击「保存草稿」。";
   if (emailCampaignState.dirty) return "内容有修改，请先重新保存草稿。";
@@ -1462,20 +1480,25 @@ function updateEmailCampaignWorkflow() {
   const campaign = emailCampaignState.activeCampaign;
   const status = campaign?.status || "draft";
   const locked = status !== "draft";
+  const appendMode = status === "completed" && emailCampaignState.appendMode;
   const hasDraft = Boolean(elements.emailCampaignId.value);
   const testCurrent = !emailCampaignState.dirty && Boolean(
     campaign?.testSentAt
     && campaign?.testSentContentVersion === campaign?.contentVersion
     && campaign?.testProvider === emailCampaignState.service?.provider
   );
-  setEmailFormDisabled(locked);
+  setEmailFormDisabled(locked, locked && !appendMode);
+  if (elements.emailAppendRecipientsBtn) elements.emailAppendRecipientsBtn.hidden = status !== "completed" || appendMode;
   elements.emailSaveDraftBtn.disabled = locked;
   elements.emailSendTestBtn.disabled = locked || !hasDraft || emailCampaignState.dirty;
-  elements.emailPreviewAudienceBtn.disabled = locked || !hasDraft || emailCampaignState.dirty || !emailCampaignState.selectedKeys.size;
+  elements.emailPreviewAudienceBtn.disabled = (!appendMode && (locked || !hasDraft || emailCampaignState.dirty)) || !emailCampaignState.selectedKeys.size;
+  elements.emailPreviewAudienceBtn.textContent = appendMode ? "审核新增名单" : "审核名单";
   elements.emailPauseCampaignBtn.hidden = status !== "sending";
-  elements.emailStartCampaignBtn.textContent = ["sending", "paused", "preparing"].includes(status) ? "继续发送" : "确认并开始发送";
+  elements.emailStartCampaignBtn.textContent = appendMode
+    ? "确认并发送新增名单"
+    : ["sending", "paused", "preparing"].includes(status) ? "继续发送" : "确认并开始发送";
   const startBlocker = emailCampaignStartBlocker();
-  elements.emailStartCampaignBtn.disabled = status === "completed";
+  elements.emailStartCampaignBtn.disabled = status === "completed" && !appendMode;
   elements.emailStartCampaignBtn.title = startBlocker;
   if (elements.emailStartRequirement) {
     elements.emailStartRequirement.textContent = startBlocker
@@ -1486,7 +1509,35 @@ function updateEmailCampaignWorkflow() {
     elements.emailProviderNote.textContent = emailCampaignState.service?.message
       || "正在读取 Email 发送服务状态。";
   }
-  elements.emailDraftState.textContent = !hasDraft ? "尚未保存" : emailCampaignState.dirty ? "有尚未保存的修改" : testCurrent ? "测试邮件已寄出" : "草稿已保存，等待测试";
+  elements.emailDraftState.textContent = appendMode
+    ? "追加模式：原邮件内容与旧报告保持不变"
+    : !hasDraft ? "尚未保存" : emailCampaignState.dirty ? "有尚未保存的修改" : testCurrent ? "测试邮件已寄出" : "草稿已保存，等待测试";
+}
+
+async function beginEmailCampaignAppend(campaignId = "") {
+  const campaign = campaignId ? emailCampaignState.campaigns.find(item => item.id === campaignId) : emailCampaignState.activeCampaign;
+  if (!campaign) {
+    toast("❌ 找不到 Campaign，请先刷新记录。");
+    return;
+  }
+  if (campaign.status !== "completed") {
+    toast("ℹ️ 只有已完成的 Campaign 可以追加新收件人。");
+    return;
+  }
+  fillEmailCampaignForm(campaign);
+  emailCampaignState.appendMode = true;
+  emailCampaignState.audienceAudit = null;
+  emailCampaignState.dirty = false;
+  emailCampaignState.selectedKeys = new Set();
+  elements.emailConsentConfirmed.checked = false;
+  elements.emailSendProgress.textContent = "";
+  resetEmailAudienceAudit();
+  renderEmailAudience();
+  updateEmailCampaignWorkflow();
+  await loadEmailCampaignReport(campaign.id, { quiet: true });
+  elements.emailAudienceSummary.scrollIntoView({ behavior: "smooth", block: "center" });
+  window.setTimeout(() => elements.emailAudienceSearch?.focus({ preventScroll: true }), 300);
+  toast("✅ 已进入追加模式；请选择今天新报名的人，旧报告会继续保留。");
 }
 
 function markEmailCampaignDirty() {
@@ -1495,11 +1546,21 @@ function markEmailCampaignDirty() {
   updateEmailCampaignWorkflow();
 }
 
+function markEmailAudienceChanged() {
+  if (emailCampaignState.appendMode) {
+    resetEmailAudienceAudit();
+    updateEmailCampaignWorkflow();
+    return;
+  }
+  markEmailCampaignDirty();
+}
+
 function newEmailCampaign({ revealEditor = false } = {}) {
   emailCampaignState.activeCampaign = null;
   emailCampaignState.audienceAudit = null;
   emailCampaignState.report = null;
   emailCampaignState.dirty = false;
+  emailCampaignState.appendMode = false;
   emailCampaignState.selectedKeys = new Set();
   elements.emailCampaignId.value = "";
   elements.emailCampaignName.value = "";
@@ -1525,6 +1586,7 @@ function newEmailCampaign({ revealEditor = false } = {}) {
 function fillEmailCampaignForm(campaign) {
   emailCampaignState.activeCampaign = campaign;
   emailCampaignState.dirty = false;
+  emailCampaignState.appendMode = false;
   elements.emailCampaignId.value = campaign.id || "";
   elements.emailCampaignName.value = campaign.internalName || "";
   elements.emailCampaignSubject.value = campaign.subject || "";
@@ -1550,7 +1612,7 @@ function renderEmailCampaignList() {
       <td><span class="email-status-badge status-${escapeHtml(campaign.status)}">${escapeHtml(emailCampaignStatusLabel(campaign.status))}</span></td>
       <td>${Number(campaign.audience?.valid) || "-"}</td>
       <td>${emailFormatDate(campaign.updatedAt)}</td>
-      <td><button class="mini-button email-campaign-open" data-campaign-id="${escapeHtml(campaign.id)}">${campaign.status === "draft" ? "编辑" : "查看"}</button></td>
+      <td><div class="email-campaign-row-actions"><button class="mini-button email-campaign-open" data-campaign-id="${escapeHtml(campaign.id)}">${campaign.status === "draft" ? "编辑" : "查看"}</button>${campaign.status === "completed" ? `<button class="mini-button email-campaign-append" data-campaign-id="${escapeHtml(campaign.id)}">追加收件人</button>` : ""}</div></td>
     </tr>`).join("");
 }
 
@@ -1629,12 +1691,14 @@ async function previewEmailAudience() {
   try {
     const data = await emailCampaignRequest("preview-audience", {
       method: "POST",
-      body: { campaignId: elements.emailCampaignId.value }
+      body: emailCampaignState.appendMode
+        ? { campaignId: elements.emailCampaignId.value, selections: emailAudienceSelections(), incremental: true }
+        : { campaignId: elements.emailCampaignId.value }
     });
     emailCampaignState.audienceAudit = data;
     const stats = data.stats || {};
     elements.emailAudienceAudit.hidden = false;
-    elements.emailAudienceAudit.textContent = `选中 ${stats.selected || 0}；有效 ${stats.valid || 0}；排除 ${stats.excluded || 0}（Email 无效 ${stats.invalid || 0}、重复 ${stats.duplicate || 0}、永久排除 ${stats.suppressed || 0}、未同意 ${stats.noConsent || 0}、记录不存在 ${stats.missing || 0}）。`;
+    elements.emailAudienceAudit.textContent = `选中 ${stats.selected || 0}；${emailCampaignState.appendMode ? "新增有效" : "有效"} ${stats.valid || 0}；排除 ${stats.excluded || 0}（已经寄过 ${stats.alreadyAdded || 0}、Email 无效 ${stats.invalid || 0}、重复 ${stats.duplicate || 0}、永久排除 ${stats.suppressed || 0}、未同意 ${stats.noConsent || 0}、记录不存在 ${stats.missing || 0}）。`;
     toast("✅ 名单审核完成");
   } catch (error) {
     toast(`❌ ${error.message}`);
@@ -1655,6 +1719,7 @@ async function openEmailCampaign(campaignId) {
 
 async function startEmailCampaign() {
   const campaign = emailCampaignState.activeCampaign;
+  const appendMode = emailCampaignState.appendMode;
   const blocker = emailCampaignStartBlocker();
   if (blocker) {
     toast(`ℹ️ ${blocker}`);
@@ -1663,16 +1728,23 @@ async function startEmailCampaign() {
   }
   const isResume = ["sending", "paused", "preparing"].includes(campaign.status);
   const valid = Number(emailCampaignState.audienceAudit?.stats?.valid) || Number(campaign.audience?.valid) || 0;
-  const message = isResume
-    ? "继续处理尚未寄出的收件人吗？"
-    : `将真实寄送给 ${valid} 位有效收件人。寄送后无法撤回，确定继续吗？`;
+  const message = appendMode
+    ? `将把相同 Email 追加寄送给 ${valid} 位尚未寄过的新收件人；旧报告会保留。确定继续吗？`
+    : isResume
+      ? "继续处理尚未寄出的收件人吗？"
+      : `将真实寄送给 ${valid} 位有效收件人。寄送后无法撤回，确定继续吗？`;
   if (!confirm(message)) return;
   elements.emailStartCampaignBtn.disabled = true;
   try {
-    const data = await emailCampaignRequest("start", {
+    const data = await emailCampaignRequest(appendMode ? "append-audience" : "start", {
       method: "POST",
-      body: { campaignId: campaign.id, consentConfirmed: elements.emailConsentConfirmed.checked }
+      body: {
+        campaignId: campaign.id,
+        consentConfirmed: elements.emailConsentConfirmed.checked,
+        ...(appendMode ? { selections: emailAudienceSelections() } : {})
+      }
     });
+    emailCampaignState.appendMode = false;
     emailCampaignState.activeCampaign = { ...campaign, ...(data.campaign || {}), status: "sending" };
     await loadEmailCampaigns();
     await processEmailCampaignBatches();
@@ -3615,6 +3687,7 @@ elements.bulkWhatsappBtn.addEventListener("click", bulkWhatsapp);
 elements.bulkEmailBtn.addEventListener("click", bulkEmail);
 if (elements.emailRefreshCampaignsBtn) elements.emailRefreshCampaignsBtn.addEventListener("click", loadEmailCampaigns);
 if (elements.emailNewCampaignBtn) elements.emailNewCampaignBtn.addEventListener("click", () => newEmailCampaign({ revealEditor: true }));
+if (elements.emailAppendRecipientsBtn) elements.emailAppendRecipientsBtn.addEventListener("click", () => beginEmailCampaignAppend());
 if (elements.emailSaveDraftBtn) elements.emailSaveDraftBtn.addEventListener("click", saveEmailCampaignDraft);
 if (elements.emailSendTestBtn) elements.emailSendTestBtn.addEventListener("click", sendEmailCampaignTest);
 if (elements.emailPreviewAudienceBtn) elements.emailPreviewAudienceBtn.addEventListener("click", previewEmailAudience);
@@ -3626,6 +3699,11 @@ if (elements.emailRefreshReportBtn) elements.emailRefreshReportBtn.addEventListe
 });
 if (elements.emailExportReportBtn) elements.emailExportReportBtn.addEventListener("click", exportEmailCampaignReport);
 if (elements.emailCampaignListBody) elements.emailCampaignListBody.addEventListener("click", event => {
+  const appendButton = event.target.closest(".email-campaign-append");
+  if (appendButton?.dataset.campaignId) {
+    beginEmailCampaignAppend(appendButton.dataset.campaignId);
+    return;
+  }
   const button = event.target.closest(".email-campaign-open");
   if (button?.dataset.campaignId) openEmailCampaign(button.dataset.campaignId);
 });
@@ -3634,7 +3712,7 @@ if (elements.emailAudienceBody) elements.emailAudienceBody.addEventListener("cha
   if (!checkbox?.dataset.key) return;
   if (checkbox.checked) emailCampaignState.selectedKeys.add(checkbox.dataset.key);
   else emailCampaignState.selectedKeys.delete(checkbox.dataset.key);
-  markEmailCampaignDirty();
+  markEmailAudienceChanged();
   renderEmailAudience();
 });
 if (elements.emailAudienceSelectAll) elements.emailAudienceSelectAll.addEventListener("change", event => {
@@ -3643,7 +3721,7 @@ if (elements.emailAudienceSelectAll) elements.emailAudienceSelectAll.addEventLis
     if (event.target.checked) emailCampaignState.selectedKeys.add(key);
     else emailCampaignState.selectedKeys.delete(key);
   });
-  markEmailCampaignDirty();
+  markEmailAudienceChanged();
   renderEmailAudience();
 });
 if (elements.emailAudienceSourceFilter) elements.emailAudienceSourceFilter.addEventListener("change", renderEmailAudience);

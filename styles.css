@@ -1627,6 +1627,12 @@ input[type="checkbox"].lead-select {
   height: 16px;
 }
 
+.email-campaign-row-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
 .email-status-badge {
   display: inline-flex;
   align-items: center;
