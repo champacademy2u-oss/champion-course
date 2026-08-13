@@ -9,6 +9,8 @@ import {
   createResendWebhookSignature,
   createUnsubscribeToken,
   isTrackedCtaClick,
+  mergeAudienceSelections,
+  mergeAudienceStats,
   normalizeEmail,
   recipientIsNotClicked,
   sanitizeCampaignInput,
@@ -63,6 +65,30 @@ test('campaign content and audience inputs are normalized and bounded', () => {
   assert.throws(() => sanitizeCampaignInput({ ...campaign, ctaUrl: 'http://example.com' }), /https/);
   assert.throws(() => validateAudienceSelections([{ source: 'unknown', ids: ['one'] }]), /来源/);
   assert.throws(() => validateAudienceSelections([{ source: 'leads', ids: Array.from({ length: 501 }, (_, index) => `id-${index}`) }]), /500/);
+});
+
+test('daily audience additions merge into one campaign without duplicating source records', () => {
+  assert.deepEqual(mergeAudienceSelections(
+    [{ source: 'leads', ids: ['lead-1'] }],
+    [{ source: 'leads', ids: ['lead-1', 'lead-2'] }, { source: 'preview_landing', ids: ['lead-3'] }]
+  ), [
+    { source: 'leads', ids: ['lead-1', 'lead-2'] },
+    { source: 'preview_landing', ids: ['lead-3'] }
+  ]);
+  assert.deepEqual(mergeAudienceStats(
+    { selected: 2, valid: 1, excluded: 1 },
+    { selected: 3, valid: 2, excluded: 1, alreadyAdded: 1 }
+  ), {
+    selected: 5,
+    valid: 3,
+    excluded: 2,
+    invalid: 0,
+    duplicate: 0,
+    suppressed: 0,
+    noConsent: 0,
+    missing: 0,
+    alreadyAdded: 1
+  });
 });
 
 test('email renderer escapes customer-controlled content and includes one tracked CTA', () => {
@@ -304,8 +330,11 @@ test('Mailbox is an in-app view and the old BCC implementation is removed', () =
   assert.match(html, /id="emailCampaignsView"/);
   assert.match(html, /id="emailStartRequirement"/);
   assert.match(html, /id="emailProviderNote"/);
+  assert.match(html, /id="emailAppendRecipientsBtn"/);
   assert.doesNotMatch(app, /mailto:\?bcc=/);
   assert.match(app, /preview-audience/);
+  assert.match(app, /append-audience/);
+  assert.match(app, /已经寄过/);
   assert.match(app, /emailCampaignStartBlocker/);
   assert.match(app, /请先点击「寄测试邮件」/);
   assert.match(app, /canSendCampaign/);
