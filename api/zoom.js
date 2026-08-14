@@ -5,10 +5,12 @@ import {
   resendZoomNotificationHandler,
   saveZoomEventHandler
 } from '../lib/zoom-api.js';
+import previewLeadHandler from './preview-lead.js';
 
 const handlers = {
   adminZoomData: adminZoomDataHandler,
   getActiveZoomEvent: getActiveZoomEventHandler,
+  registerPreviewLead: previewLeadHandler,
   registerForZoom: registerForZoomHandler,
   resendZoomNotification: resendZoomNotificationHandler,
   saveZoomEvent: saveZoomEventHandler
