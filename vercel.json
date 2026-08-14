@@ -6,7 +6,6 @@
     { "src": "api/config.js", "use": "@vercel/node" },
     { "src": "api/email-campaigns.js", "use": "@vercel/node" },
     { "src": "api/email-webhook.js", "use": "@vercel/node" },
-    { "src": "api/preview-lead.js", "use": "@vercel/node" },
     { "src": "api/public-video.js", "use": "@vercel/node" },
     { "src": "api/settings.js", "use": "@vercel/node" },
     { "src": "api/upload-url.js", "use": "@vercel/node" },
@@ -17,6 +16,7 @@
     { "src": "public/**", "use": "@vercel/static" }
   ],
   "routes": [
+    { "src": "/api/preview-lead", "dest": "/api/zoom.js?action=registerPreviewLead" },
     { "src": "/api/unsubscribe", "dest": "/api/email-campaigns.js" },
     { "src": "/api/email-track", "dest": "/api/email-campaigns.js" },
     { "src": "/api/(.*)", "dest": "/api/$1.js" },
