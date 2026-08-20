@@ -74,6 +74,7 @@ Webhook 订阅 `email.sent`、`email.delivered`、`email.opened`、`email.clicke
 Vercel 环境变量参考 `.env.vercel.example`，至少需要：
 
 - `CRM_ADMIN_UIDS`：允许使用 Email Campaign 的 Firebase UID；
+- `CRM_ADMIN_EMAILS`：允许跨设备登录的已验证 Google 管理员邮箱；服务器同时验证 `email_verified` 与 Google 登录提供者；
 - `RESEND_API_KEY` 与 `RESEND_WEBHOOK_SECRET`；
 - `EMAIL_FROM`：例如 `Champion Academy <updates@已验证域名>`；
 - `EMAIL_REPLY_TO`：客户点击回复时收到邮件的官方邮箱，可使用 Gmail；
