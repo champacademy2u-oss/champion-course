@@ -345,6 +345,7 @@ test('Mailbox is an in-app view and the old BCC implementation is removed', () =
 test('Mailbox supports a persistent Google administrator across Chrome and mobile', () => {
   const html = fs.readFileSync(new URL('../index.html', import.meta.url), 'utf8');
   const app = fs.readFileSync(new URL('../app.js', import.meta.url), 'utf8');
+  const api = fs.readFileSync(new URL('../lib/email-campaign-api.js', import.meta.url), 'utf8');
   assert.match(html, /id="emailAdminAuthPanel"/);
   assert.match(html, /id="emailAdminSignInBtn"/);
   assert.match(app, /Auth\.Persistence\.LOCAL/);
@@ -353,4 +354,7 @@ test('Mailbox supports a persistent Google administrator across Chrome and mobil
   assert.match(app, /auth\.signInWithCredential\(credential\)/);
   assert.match(app, /Google 管理员账号已登录/);
   assert.doesNotMatch(app, /Signed in anonymously:/);
+  assert.match(api, /process\.env\.CRM_ADMIN_EMAILS/);
+  assert.match(api, /decoded\.email_verified === true/);
+  assert.match(api, /sign_in_provider === 'google\.com'/);
 });
