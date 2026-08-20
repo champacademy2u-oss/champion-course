@@ -83,28 +83,54 @@ const defaultZoomSettings = {
 // ──────────────────────────────────────────
 // Firebase Firestore Cloud Storage
 // All data is synced to Google Firebase cloud.
-// SECURITY: we sign in anonymously (firebase-auth) before any read/write so the
-// locked-down firestore.rules (allow if request.auth != null) are satisfied.
-// If Anonymous Auth is NOT enabled in the Firebase console, signInAnonymously()
-// fails and the app gracefully falls back to localStorage — it never crashes.
+// SECURITY: Google sign-in is the portable administrator identity. Existing
+// browser-only administrators may continue anonymously until they link that
+// authorized UID to Google from Mailbox. New devices then sign in with the same
+// Google account and receive the same Firebase UID and allowlist permissions.
 // ──────────────────────────────────────────
 let _db = null;
 let _storage = null;
 let _authUser = null;
+
+function waitForInitialFirebaseUser(auth, timeoutMs = 5000) {
+  return new Promise(resolve => {
+    let settled = false;
+    let unsubscribe = () => {};
+    const timeout = window.setTimeout(() => finish(auth.currentUser || null), timeoutMs);
+    function finish(user) {
+      if (settled) return;
+      settled = true;
+      window.clearTimeout(timeout);
+      unsubscribe();
+      resolve(user || null);
+    }
+    unsubscribe = auth.onAuthStateChanged(finish, () => finish(null));
+  });
+}
+
+function firebaseUserUsesGoogle(user) {
+  return Boolean(user && !user.isAnonymous && (user.providerData || []).some(provider => provider?.providerId === "google.com"));
+}
 
 async function initFirebase() {
   if (!window.FIREBASE_CONFIG) return false;
   try {
     const fbApp = firebase.initializeApp(window.FIREBASE_CONFIG);
 
-    // Anonymous Auth — required so Firestore rules permit reads/writes.
+    // Preserve a Google administrator across restarts. Only create an anonymous
+    // browser identity when this device has never signed in with Google.
     if (firebase.auth) {
       try {
-        const cred = await firebase.auth(fbApp).signInAnonymously();
-        _authUser = cred.user;
-        console.log('[Firebase] Signed in anonymously:', _authUser?.uid);
+        const auth = firebase.auth(fbApp);
+        await auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL);
+        _authUser = await waitForInitialFirebaseUser(auth);
+        if (!_authUser) {
+          const cred = await auth.signInAnonymously();
+          _authUser = cred.user;
+        }
+        console.log(`[Firebase] Signed in with ${firebaseUserUsesGoogle(_authUser) ? 'Google administrator' : 'browser identity'}.`);
       } catch (authErr) {
-        console.warn('[Firebase] Anonymous sign-in failed (enable Anonymous Auth in console):', authErr.message);
+        console.warn('[Firebase] Sign-in initialization failed:', authErr.message);
         // Continue without auth: app uses localStorage fallback. If rules are
         // deployed as auth-required, Firestore calls will fail and fall back.
       }
@@ -467,6 +493,11 @@ const elements = {
   zoomRegistrationsBody: document.querySelector("#zoomRegistrationsBody"),
   refreshZoomDataBtn: document.querySelector("#refreshZoomDataBtn"),
   emailCampaignListBody: document.querySelector("#emailCampaignListBody"),
+  emailAdminAuthPanel: document.querySelector("#emailAdminAuthPanel"),
+  emailAdminAuthTitle: document.querySelector("#emailAdminAuthTitle"),
+  emailAdminAuthStatus: document.querySelector("#emailAdminAuthStatus"),
+  emailAdminSignInBtn: document.querySelector("#emailAdminSignInBtn"),
+  emailAdminSignOutBtn: document.querySelector("#emailAdminSignOutBtn"),
   emailRefreshCampaignsBtn: document.querySelector("#emailRefreshCampaignsBtn"),
   emailNewCampaignBtn: document.querySelector("#emailNewCampaignBtn"),
   emailCampaignId: document.querySelector("#emailCampaignId"),
@@ -569,6 +600,81 @@ const emailCampaignState = {
   sending: false,
   appendMode: false
 };
+
+function updateEmailAdminAuthUi(message = "") {
+  if (!elements.emailAdminAuthPanel) return;
+  const user = _authUser || window.firebase?.auth?.().currentUser || null;
+  const googleAdmin = firebaseUserUsesGoogle(user);
+  elements.emailAdminAuthPanel.classList.toggle("is-google", googleAdmin);
+  elements.emailAdminAuthTitle.textContent = googleAdmin ? "Google 管理员账号已登录" : "Email 管理员账号";
+  elements.emailAdminAuthStatus.textContent = message || (googleAdmin
+    ? "这项登录可以在电脑 Chrome 与手机沿用；其他设备请使用同一个 Google 账号。"
+    : user?.isAnonymous
+      ? "目前是只属于这个浏览器的临时身份。请绑定 Google 管理员账号，才能在手机或其他 Chrome 使用。"
+      : "请使用获授权的 Google 管理员账号登录。"
+  );
+  elements.emailAdminSignInBtn.hidden = googleAdmin;
+  elements.emailAdminSignOutBtn.hidden = !googleAdmin;
+}
+
+async function signInEmailAdminWithGoogle() {
+  const auth = window.firebase?.auth?.();
+  if (!auth || !window.firebase?.auth?.GoogleAuthProvider) {
+    toast("❌ Google 管理员登录尚未载入，请刷新页面再试");
+    return;
+  }
+  const button = elements.emailAdminSignInBtn;
+  button.disabled = true;
+  button.textContent = "正在打开 Google 登录…";
+  updateEmailAdminAuthUi("请选择 Champion Academy 的管理员 Google 账号。");
+  try {
+    await auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL);
+    const provider = new firebase.auth.GoogleAuthProvider();
+    provider.setCustomParameters({ prompt: "select_account" });
+    const current = auth.currentUser;
+    let result;
+    if (current?.isAnonymous) {
+      try {
+        result = await current.linkWithPopup(provider);
+      } catch (error) {
+        if (error?.code !== "auth/credential-already-in-use") throw error;
+        const credential = error.credential || firebase.auth.GoogleAuthProvider.credentialFromError?.(error);
+        if (!credential) throw error;
+        result = await auth.signInWithCredential(credential);
+      }
+    } else {
+      result = await auth.signInWithPopup(provider);
+    }
+    _authUser = result.user;
+    updateEmailAdminAuthUi("登录成功，正在重新读取云端资料…");
+    toast("✅ Google 管理员账号登录成功");
+    window.setTimeout(() => window.location.reload(), 500);
+  } catch (error) {
+    const cancelled = ["auth/popup-closed-by-user", "auth/cancelled-popup-request"].includes(error?.code);
+    const providerDisabled = error?.code === "auth/operation-not-allowed";
+    updateEmailAdminAuthUi(providerDisabled
+      ? "Firebase 尚未启用 Google 登录，请先完成管理员设置。"
+      : cancelled
+        ? "Google 登录已取消；需要时可以重新点击登录。"
+        : "Google 登录失败，请确认弹出窗口没有被封锁后重试。"
+    );
+    if (!cancelled) console.error("Email administrator Google sign-in failed:", error);
+  } finally {
+    button.disabled = false;
+    button.textContent = "使用 Google 管理员账号登录";
+  }
+}
+
+async function signOutEmailAdminGoogle() {
+  if (!confirm("退出后，这台设备将无法读取客户和 Email Campaign，直到再次登录。确定退出吗？")) return;
+  try {
+    await window.firebase?.auth?.().signOut();
+    _authUser = null;
+    window.location.reload();
+  } catch (error) {
+    toast("❌ 无法退出管理员账号，请稍后再试");
+  }
+}
 
 function normalizeZoomSettings(value) {
   const data = value && typeof value === "object" ? value : {};
@@ -1627,6 +1733,9 @@ async function loadEmailCampaigns() {
     updateEmailCampaignWorkflow();
   } catch (error) {
     elements.emailCampaignListBody.innerHTML = `<tr><td colspan="5" style="color:#b91c1c">${escapeHtml(error.message)}</td></tr>`;
+    if (/没有 Email 管理权限|未授权/.test(error.message)) {
+      updateEmailAdminAuthUi("当前账号没有 Email 管理权限。请使用获授权的 Google 管理员账号登录。");
+    }
   }
 }
 
@@ -3686,6 +3795,8 @@ elements.exportBtn.addEventListener("click", exportLeads);
 elements.bulkWhatsappBtn.addEventListener("click", bulkWhatsapp);
 elements.bulkEmailBtn.addEventListener("click", bulkEmail);
 if (elements.emailRefreshCampaignsBtn) elements.emailRefreshCampaignsBtn.addEventListener("click", loadEmailCampaigns);
+if (elements.emailAdminSignInBtn) elements.emailAdminSignInBtn.addEventListener("click", signInEmailAdminWithGoogle);
+if (elements.emailAdminSignOutBtn) elements.emailAdminSignOutBtn.addEventListener("click", signOutEmailAdminGoogle);
 if (elements.emailNewCampaignBtn) elements.emailNewCampaignBtn.addEventListener("click", () => newEmailCampaign({ revealEditor: true }));
 if (elements.emailAppendRecipientsBtn) elements.emailAppendRecipientsBtn.addEventListener("click", () => beginEmailCampaignAppend());
 if (elements.emailSaveDraftBtn) elements.emailSaveDraftBtn.addEventListener("click", saveEmailCampaignDraft);
@@ -4262,8 +4373,10 @@ async function autoLoadBackupFromServer() {
 
 // ─── Firebase startup: load all data from Firestore then render ───
 async function initFromFirebase() {
-  // Initialize Firebase + sign in anonymously BEFORE any DB read.
+  // Initialize Firebase and restore Google admin (or the existing browser
+  // identity) before any database read.
   const initialized = await initFirebase();
+  updateEmailAdminAuthUi();
   if (!initialized || !_db) {
     // No Firebase — fall back to localStorage + JSON backup
     initPerformanceFilters();

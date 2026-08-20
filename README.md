@@ -28,7 +28,7 @@
 
 上线前的 Firebase 设置：
 
-1. 在 Firebase Authentication 启用 Anonymous 登录，让现有主系统可以取得稳定的浏览器身份。
+1. 在 Firebase Authentication 启用 Anonymous 与 Google 登录。Anonymous 只用于首次进入；管理员应在 Mailbox 把现有已授权身份绑定到 Google 账号。
 2. 在 `functions/` 安装依赖，并依照 `functions/.env.example` 设置非敏感参数。
 3. 把管理员浏览器的 Firebase UID 设为 Functions 的 `ZOOM_ADMIN_UIDS`；页面不会显示登录或验证步骤，服务器会在后台静默确认权限。
 4. 使用 Firebase Secret Manager 设置 `WHATSAPP_ACCESS_TOKEN`、`WHATSAPP_PHONE_NUMBER_ID` 与 `RESEND_API_KEY`。
@@ -36,7 +36,14 @@
 6. 部署 Functions 与 `firestore.rules` 后，先用测试活动、测试号码及测试邮箱验证，再发布真实活动。
 7. Google Cloud 的预算只能发出告警；系统另以 `DAILY_SEND_LIMIT` 限制每日自动发送次数。
 
-如果更换浏览器或清除 Firebase 登录资料，新的 UID 需要追加到 `ZOOM_ADMIN_UIDS`，多个 UID 以逗号分隔。
+管理员身份绑定 Google 后，同一个 Google 账号在电脑 Chrome 与手机会取得同一 Firebase UID，因此不需要逐一授权浏览器。尚未绑定 Google 的旧浏览器身份，在清除资料或更换设备后仍会失效。
+
+首次启用跨设备管理员登录：
+
+1. 在 Firebase Console 的 Authentication → Sign-in method 启用 Google provider。
+2. 用原本已获授权的 Chrome 打开 Mailbox，点击“使用 Google 管理员账号登录”。系统会把现有获授权 UID 绑定到该 Google 账号，不会移动 Leads、Campaign 或报告。
+3. 手机打开同一网页，点击相同按钮并选择同一个 Google 账号。系统会取得同一 UID 与权限。
+4. 不要在共用手机或电脑保持管理员账号登录；使用完毕可从 Mailbox 退出。
 
 Meta 的两个核准模板都需要依序设置 5 个正文变量：客户姓名、活动名称、日期、时间、Zoom 链接。模板名称分别由 `WHATSAPP_TEMPLATE_CONFIRMATION` 与 `WHATSAPP_TEMPLATE_REMINDER` 指定。
 
