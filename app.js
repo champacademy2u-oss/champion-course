@@ -1457,11 +1457,12 @@ async function loadEmailAudienceCandidates() {
 
 function filteredEmailCandidates() {
   const source = elements.emailAudienceSourceFilter?.value || "all";
-  const query = (elements.emailAudienceSearch?.value || "").trim().toLowerCase();
+  const query = normalize(elements.emailAudienceSearch?.value || "");
   return emailCampaignState.candidates.filter(candidate => {
     if (source !== "all" && candidate.source !== source) return false;
     if (!query) return true;
-    return candidate.name.toLowerCase().includes(query) || candidate.email.toLowerCase().includes(query);
+    return [candidate.name, candidate.email, candidate.course]
+      .some(value => normalize(value).includes(query));
   });
 }
 
