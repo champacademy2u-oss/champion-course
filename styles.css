@@ -1511,6 +1511,35 @@ input[type="checkbox"].lead-select {
   min-width: 0;
 }
 
+.email-admin-auth {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 14px 16px;
+  border: 1px solid #f1c27d;
+  border-radius: 12px;
+  background: #fff8ed;
+}
+
+.email-admin-auth.is-google {
+  border-color: #a7dfca;
+  background: #eefaf5;
+}
+
+.email-admin-auth strong {
+  display: block;
+  color: #182538;
+  margin-bottom: 4px;
+}
+
+.email-admin-auth p {
+  margin: 0;
+  color: #5b6778;
+  font-size: 0.9rem;
+  line-height: 1.45;
+}
+
 .email-campaign-heading,
 .email-section-heading {
   display: flex;
@@ -1696,6 +1725,16 @@ input[type="checkbox"].lead-select {
 }
 
 @media (max-width: 680px) {
+  .email-admin-auth {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .email-admin-auth .email-campaign-actions,
+  .email-admin-auth .text-button {
+    width: 100%;
+  }
+
   .email-field-grid {
     grid-template-columns: 1fr;
   }

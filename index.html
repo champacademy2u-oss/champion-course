@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Champ Academy</title>
-    <link rel="stylesheet" href="./styles.css?v=20260813-email-campaign-append" />
+    <link rel="stylesheet" href="./styles.css?v=20260819-google-admin" />
     <link rel="manifest" href="./manifest.json" />
   </head>
   <body>
@@ -434,6 +434,17 @@
               <a class="text-button" href="https://mail.google.com/mail/u/4/#inbox" target="_blank" rel="noopener" style="text-decoration:none">打开 Gmail</a>
               <button class="text-button" id="emailRefreshCampaignsBtn" type="button">刷新</button>
               <button class="text-button primary" id="emailNewCampaignBtn" type="button">建立 Campaign</button>
+            </div>
+          </div>
+
+          <div class="email-admin-auth" id="emailAdminAuthPanel">
+            <div>
+              <strong id="emailAdminAuthTitle">Email 管理员账号</strong>
+              <p id="emailAdminAuthStatus">正在确认管理员登录状态…</p>
+            </div>
+            <div class="email-campaign-actions">
+              <button class="text-button primary" id="emailAdminSignInBtn" type="button">使用 Google 管理员账号登录</button>
+              <button class="text-button" id="emailAdminSignOutBtn" type="button" hidden>退出管理员账号</button>
             </div>
           </div>
 
@@ -1004,6 +1015,6 @@
     <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-storage-compat.js"></script>
     <script src="./config.js"></script>
-    <script src="./app.js?v=20260813-email-campaign-append"></script>
+    <script src="./app.js?v=20260819-google-admin"></script>
   </body>
 </html>
