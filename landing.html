@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>免费领取 | 世界级营销100招（流量密码2.0）</title>
-  <meta name="description" content="免费下载《世界级营销100招·流量密码2.0》电子书，掌握最实用的营销策略，让你的生意流量倍增！" />
+  <title>免费领取 | 世界级营销100招</title>
+  <meta name="description" content="免费下载《世界级营销100招》电子书，掌握可立即应用的营销策略，系统提升引流、内容与成交能力。" />
   <!-- config.js loaded later with Firebase SDK -->
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -89,45 +89,114 @@
       margin-bottom: 44px; max-width: 520px;
     }
 
-    /* Book mockup */
+    /* Premium book mockup */
     .book-wrap {
       margin-bottom: 44px;
-      display: flex; align-items: center; gap: 32px;
+      display: flex; align-items: center; gap: 38px;
+    }
+    .book-stage {
+      width: 202px; height: 284px; flex: 0 0 202px;
+      display: grid; place-items: center;
+      perspective: 1000px;
+      filter: drop-shadow(0 24px 26px rgba(0,0,0,0.52));
+    }
+    .book-object {
+      width: 178px; height: 256px;
+      position: relative;
+      transform: rotateY(-9deg) rotateZ(-1deg);
+      transform-style: preserve-3d;
+      transition: transform 0.45s cubic-bezier(.2,.8,.2,1);
+    }
+    .book-stage:hover .book-object {
+      transform: rotateY(-2deg) rotateZ(0deg) translateY(-4px);
+    }
+    .book-pages {
+      position: absolute; z-index: 0;
+      top: 7px; right: -8px; bottom: 6px; width: 18px;
+      border-radius: 0 9px 9px 0;
+      background:
+        repeating-linear-gradient(0deg, rgba(110,82,31,0.2) 0 1px, transparent 1px 4px),
+        linear-gradient(90deg, #9e7a31 0%, #f2d792 24%, #fff0bd 55%, #b58d3b 100%);
+      box-shadow: 5px 2px 10px rgba(0,0,0,0.38);
+      transform: translateZ(-3px);
     }
     .book-cover {
-      width: 160px; height: 220px;
-      background: linear-gradient(135deg, #1a0a3d 0%, #2d1065 50%, #4c1d95 100%);
-      border-radius: 4px 12px 12px 4px;
-      position: relative; flex-shrink: 0;
-      box-shadow: -8px 8px 24px rgba(0,0,0,0.6), 4px 4px 0 rgba(255,255,255,0.05) inset;
-      display: flex; flex-direction: column; align-items: center; justify-content: center;
-      padding: 20px 16px; text-align: center;
+      width: 178px; height: 256px;
+      background:
+        radial-gradient(circle at 76% 23%, rgba(218,174,83,0.19) 0 2%, transparent 22%),
+        linear-gradient(142deg, transparent 0 54%, rgba(201,154,64,0.12) 54.2% 54.8%, transparent 55%),
+        linear-gradient(158deg, #0b2135 0%, #071624 54%, #030a12 100%);
+      border: 1px solid rgba(236,203,128,0.58);
+      border-radius: 3px 11px 11px 3px;
+      position: relative; z-index: 1;
+      box-shadow:
+        -10px 10px 30px rgba(0,0,0,0.62),
+        0 0 0 1px rgba(255,255,255,0.04) inset,
+        8px 0 18px rgba(0,0,0,0.22) inset;
+      display: flex; flex-direction: column;
+      padding: 20px 18px 18px 26px;
       overflow: hidden;
     }
     .book-cover::before {
-      content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 14px;
-      background: linear-gradient(90deg, rgba(0,0,0,0.4), rgba(255,255,255,0.05));
+      content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 17px;
+      border-right: 1px solid rgba(227,187,101,0.32);
+      background:
+        linear-gradient(90deg, rgba(0,0,0,0.68), rgba(255,255,255,0.04) 62%, rgba(0,0,0,0.28));
     }
     .book-cover::after {
       content: ''; position: absolute; inset: 0;
-      background: linear-gradient(135deg, rgba(245,166,35,0.1) 0%, transparent 60%);
+      border-radius: inherit; pointer-events: none;
+      background:
+        linear-gradient(112deg, transparent 7%, rgba(255,255,255,0.07) 18%, transparent 29%),
+        linear-gradient(180deg, rgba(255,255,255,0.04), transparent 30%);
+      box-shadow: inset 0 0 0 5px rgba(2,9,16,0.58), inset 0 0 0 6px rgba(216,174,82,0.22);
     }
-    .book-stars {
-      font-size: 18px; letter-spacing: 2px; margin-bottom: 8px; position: relative; z-index: 1;
+    .book-brand {
+      color: #d9b56b; font-size: 7px; line-height: 1;
+      font-weight: 700; letter-spacing: 0.18em;
+      position: relative; z-index: 1;
+    }
+    .book-rule {
+      width: 28px; height: 2px; margin: 17px 0 18px;
+      background: linear-gradient(90deg, #f2d28a, #a87527);
+      position: relative; z-index: 1;
     }
     .book-title {
-      font-size: 13px; font-weight: 800; color: #fff; line-height: 1.4;
-      font-family: 'Noto Sans SC', sans-serif; position: relative; z-index: 1;
-      letter-spacing: 0.02em;
+      color: #f7f3e8; font-family: 'Noto Sans SC', sans-serif;
+      position: relative; z-index: 1;
+    }
+    .book-title .book-title-top {
+      display: block; font-size: 18px; font-weight: 700;
+      line-height: 1.25; letter-spacing: 0.05em;
+    }
+    .book-title .book-title-number {
+      display: block; margin: 1px 0 -2px;
+      color: #e8c47a; font-family: Georgia, 'Times New Roman', serif;
+      font-size: 65px; font-weight: 700; line-height: 0.96;
+      letter-spacing: -0.06em;
+      text-shadow: 0 2px 20px rgba(221,173,73,0.18);
+    }
+    .book-title .book-title-unit {
+      display: inline-block; margin-left: 5px;
+      color: #f7f3e8; font-family: 'Noto Sans SC', sans-serif;
+      font-size: 20px; font-weight: 700; letter-spacing: 0;
+      vertical-align: 8px;
     }
     .book-subtitle {
-      font-size: 10px; color: var(--gold); font-weight: 600; margin-top: 8px;
-      position: relative; z-index: 1; letter-spacing: 0.05em;
+      margin-top: auto; padding-top: 11px;
+      border-top: 1px solid rgba(229,190,105,0.36);
+      color: #c6bfae; font-size: 7px; line-height: 1.6;
+      font-weight: 500; letter-spacing: 0.08em;
+      position: relative; z-index: 1;
     }
-    .book-badge {
-      position: absolute; top: 10px; right: 10px; z-index: 2;
-      background: var(--gold); color: #000; font-size: 9px; font-weight: 900;
-      padding: 3px 7px; border-radius: 4px; text-transform: uppercase; letter-spacing: 0.08em;
+    .book-seal {
+      position: absolute; right: 14px; bottom: 43px; z-index: 2;
+      width: 34px; height: 34px; border-radius: 50%;
+      border: 1px solid rgba(231,194,112,0.8);
+      box-shadow: inset 0 0 0 3px #071420, inset 0 0 0 4px rgba(231,194,112,0.35);
+      color: #e7c270; font-size: 7px; line-height: 1.15; font-weight: 800;
+      letter-spacing: 0.02em; text-align: center;
+      display: grid; place-items: center;
     }
 
     .book-info { flex: 1; }
@@ -320,6 +389,7 @@
         text-align: center;
         gap: 16px;
       }
+      .book-stage { width: 188px; flex-basis: 188px; }
     }
 
     /* ── PARTICLES ── */
@@ -345,7 +415,7 @@
     .divider hr { flex: 1; border: none; border-top: 1px solid var(--line); }
     .divider span { font-size: 12px; color: var(--text-muted); }
 
-    /* Counter */
+    /* Trust note */
     .counter-strip {
       display: flex; align-items: center; gap: 10px;
       background: rgba(16,185,129,0.08); border: 1px solid rgba(16,185,129,0.2);
@@ -380,16 +450,25 @@
       </h1>
 
       <p class="subtitle">
-        《流量密码2.0》收录100个经过实战验证的营销策略，无论你的生意规模大小，立刻可以应用，让你的流量与销售额双双暴涨。
+        《世界级营销100招》系统整理引流、内容、社媒与成交策略，无论生意规模大小，都能从中找到可以立即开始的实战方向。
       </p>
 
       <!-- Book Visual -->
       <div class="book-wrap">
-        <div class="book-cover">
-          <div class="book-badge">FREE</div>
-          <div class="book-stars">★★★★★</div>
-          <div class="book-title">世界级营销<br />100招</div>
-          <div class="book-subtitle">流量密码 2.0</div>
+        <div class="book-stage" aria-label="《世界级营销100招》电子书封面">
+          <div class="book-object">
+            <div class="book-pages" aria-hidden="true"></div>
+            <div class="book-cover">
+              <div class="book-brand">CHAMPION ACADEMY</div>
+              <div class="book-rule"></div>
+              <div class="book-title">
+                <span class="book-title-top">世界级营销</span>
+                <span class="book-title-number">100<span class="book-title-unit">招</span></span>
+              </div>
+              <div class="book-seal">实战<br />手册</div>
+              <div class="book-subtitle">从引流 · 内容 · 社媒到成交增长</div>
+            </div>
+          </div>
         </div>
         <div class="book-info">
           <h3>你将学到什么？</h3>
@@ -441,10 +520,10 @@
           <p>只需30秒，即可免费下载这本价值连城的电子书</p>
         </div>
 
-        <!-- Download count indicator -->
+        <!-- Download note -->
         <div class="counter-strip">
           <div class="green-dot"></div>
-          <span>已有 <strong id="dlCount">1,247</strong> 人 成功下载</span>
+          <span><strong>免费电子书</strong> · 填写后即可领取</span>
         </div>
 
         <!-- Error message -->
@@ -502,7 +581,7 @@
           <div class="success-icon">🎉</div>
           <h2>恭喜！资料提交成功</h2>
           <p>感谢您的填写！<br />您的电子书已准备好，请点击下方按钮立即下载。</p>
-          <a href="/download-ebook" id="downloadLink" class="download-btn" download>
+          <a href="/download-ebook" id="downloadLink" class="download-btn" download="世界级营销100招.pdf">
             📥 立即下载电子书
           </a>
           <p class="auto-note">如下载未自动开始，请点击上方按钮</p>
@@ -548,22 +627,11 @@
       container.appendChild(p);
     }
 
-    // ── Fake counter animation ──
-    function animateCounter() {
-      const el = document.getElementById('dlCount');
-      const base = 1247;
-      const rand = Math.floor(Math.random() * 50);
-      el.textContent = (base + rand).toLocaleString();
-    }
-    animateCounter();
-    setInterval(animateCounter, 30000);
-
     // ── Set download link ──
     const dLink = document.getElementById('downloadLink');
     if (dLink) {
       dLink.href = './世界级营销100招( 流量密码2.0） .pdf';
-      dLink.removeAttribute('download');
-      dLink.target = '_blank';
+      dLink.download = '世界级营销100招.pdf';
     }
 
     // ── Form Submit ──
@@ -628,7 +696,7 @@
       setTimeout(() => {
         const link = document.createElement('a');
         link.href = './世界级营销100招( 流量密码2.0） .pdf';
-        link.target = '_blank';
+        link.download = '世界级营销100招.pdf';
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
