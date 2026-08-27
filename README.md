@@ -12,7 +12,7 @@
 6. Dashboard 会显示今天需要 follow-up 的客户。
 7. 点击 `WhatsApp` 会打开 WhatsApp 发送预设文案。
 8. 点击 `Email` 会打开你的 email app 并带入标题和内容。
-9. 在 Leads 页面点击 `Bulk WhatsApp`，会用同一段 WhatsApp 文案打开所有有电话的客户聊天。
+9. 在 Leads 页面先勾选客户，再点击 `Bulk WhatsApp (Selected)`。系统会先显示脱敏名单预览、自动把马来西亚本地 `01...` 号码转换为 `601...`、排除无效与重复号码，并在确认客户已同意接收信息后每批最多打开 10 个 WhatsApp 聊天。系统只填入文案，不会自动按发送。
 10. 在 Leads 页面点击 `Create Email Campaign`，会把目前筛选的客户带入 Mailbox；系统不会再用无法追踪个人结果的 BCC。
 11. 跟进完成后点击 `Done`，系统会进入下一次 Day 3 或 Day 7 follow-up。
 12. 左侧 `Zoom` 页面可以保存每场活动的名称、日期时间、Zoom 报名链接，以及 WhatsApp / Email 通知内容。

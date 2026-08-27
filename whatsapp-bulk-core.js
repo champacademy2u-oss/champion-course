@@ -1,0 +1,96 @@
+(function exposeWhatsappBulkCore(globalScope) {
+  const E164_PATTERN = /^[1-9]\d{7,14}$/;
+
+  function normalizeMalaysiaPhone(value) {
+    const original = String(value || "").trim();
+    if (!original) {
+      return { original, phone: "", valid: false, changed: false, reason: "缺少电话号码" };
+    }
+
+    const explicitInternational = original.startsWith("+") || original.startsWith("00");
+    let digits = original.replace(/\D/g, "");
+    if (digits.startsWith("00")) digits = digits.slice(2);
+
+    let phone = digits;
+    if (digits.startsWith("60")) {
+      phone = digits;
+    } else if (digits.startsWith("0")) {
+      phone = `60${digits.slice(1)}`;
+    } else if (!explicitInternational && /^1\d{8,9}$/.test(digits)) {
+      phone = `60${digits}`;
+    }
+
+    const valid = E164_PATTERN.test(phone);
+    return {
+      original,
+      phone: valid ? phone : "",
+      valid,
+      changed: valid && phone !== digits,
+      reason: valid ? "" : "电话号码格式无效",
+    };
+  }
+
+  function maskPhone(phone) {
+    const digits = String(phone || "").replace(/\D/g, "");
+    if (digits.length <= 7) return digits || "—";
+    return `${digits.slice(0, 4)}••••${digits.slice(-3)}`;
+  }
+
+  function whatsappUrl(phone, message) {
+    if (!E164_PATTERN.test(String(phone || ""))) return "";
+    return `https://wa.me/${phone}?text=${encodeURIComponent(String(message || ""))}`;
+  }
+
+  function prepareAudience(leads, messageForLead) {
+    const seenPhones = new Set();
+    const sendable = [];
+    const excluded = [];
+
+    (Array.isArray(leads) ? leads : []).forEach((lead) => {
+      const normalized = normalizeMalaysiaPhone(lead?.phone);
+      if (!normalized.valid) {
+        excluded.push({ lead, reason: normalized.reason });
+        return;
+      }
+      if (seenPhones.has(normalized.phone)) {
+        excluded.push({ lead, reason: "重复电话号码" });
+        return;
+      }
+
+      seenPhones.add(normalized.phone);
+      const message = typeof messageForLead === "function" ? messageForLead(lead) : "";
+      sendable.push({
+        lead,
+        phone: normalized.phone,
+        maskedPhone: maskPhone(normalized.phone),
+        normalized: normalized.changed,
+        message,
+        url: whatsappUrl(normalized.phone, message),
+      });
+    });
+
+    return { sendable, excluded };
+  }
+
+  function getBatch(audience, cursor = 0, batchSize = 10) {
+    const safeAudience = Array.isArray(audience) ? audience : [];
+    const safeCursor = Math.max(0, Number(cursor) || 0);
+    const safeSize = Math.max(1, Number(batchSize) || 10);
+    const items = safeAudience.slice(safeCursor, safeCursor + safeSize);
+    const nextCursor = safeCursor + items.length;
+    return {
+      items,
+      nextCursor,
+      remaining: Math.max(0, safeAudience.length - nextCursor),
+      batchNumber: Math.floor(safeCursor / safeSize) + 1,
+    };
+  }
+
+  globalScope.WhatsappBulkCore = Object.freeze({
+    getBatch,
+    maskPhone,
+    normalizeMalaysiaPhone,
+    prepareAudience,
+    whatsappUrl,
+  });
+})(globalThis);

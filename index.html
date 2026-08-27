@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Champ Academy</title>
-    <link rel="stylesheet" href="./styles.css?v=20260819-google-admin" />
+    <link rel="stylesheet" href="./styles.css?v=20260828-safe-batches" />
     <link rel="manifest" href="./manifest.json" />
   </head>
   <body>
@@ -223,7 +223,7 @@
           <select id="courseFilter">
             <option value="all">All Preview Courses</option>
           </select>
-          <button class="text-button primary" id="bulkWhatsappBtn">Bulk WhatsApp</button>
+          <button class="text-button primary" id="bulkWhatsappBtn" title="只处理已勾选的 Leads" disabled>Bulk WhatsApp (Selected)</button>
           <button class="text-button" id="bulkEmailBtn">Create Email Campaign</button>
           <div class="view-toggle">
             <button class="active" id="tableViewBtn">Table</button>
@@ -794,6 +794,60 @@
 
     </main>
 
+    <div id="bulkWhatsappModal" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="bulkWhatsappModalTitle">
+      <div class="modal-content bulk-whatsapp-modal-content">
+        <div class="modal-header">
+          <div>
+            <h3 id="bulkWhatsappModalTitle">WhatsApp 群发名单预览</h3>
+            <p class="muted bulk-wa-modal-intro">只会打开已勾选且电话号码有效的客户，每批最多 10 人。</p>
+          </div>
+          <button class="icon-button" id="closeBulkWhatsappModal" type="button" aria-label="关闭群发预览">✕</button>
+        </div>
+        <div class="modal-body">
+          <div class="bulk-wa-summary-grid">
+            <div><span>已勾选</span><strong id="bulkWhatsappSelectedCount">0</strong></div>
+            <div><span>可打开</span><strong id="bulkWhatsappValidCount">0</strong></div>
+            <div><span>已排除</span><strong id="bulkWhatsappExcludedCount">0</strong></div>
+            <div><span>剩余批次</span><strong id="bulkWhatsappBatchCount">0</strong></div>
+          </div>
+
+          <div class="bulk-wa-section-heading">
+            <div>
+              <h4 id="bulkWhatsappBatchTitle">第 1 批</h4>
+              <p id="bulkWhatsappBatchSummary" class="muted">等待选择名单。</p>
+            </div>
+            <span class="bulk-wa-batch-badge">每批最多 10 人</span>
+          </div>
+
+          <div class="bulk-wa-table-wrap">
+            <table class="bulk-wa-preview-table">
+              <thead><tr><th>客户</th><th>课程</th><th>WhatsApp</th><th>处理</th></tr></thead>
+              <tbody id="bulkWhatsappPreviewBody"><tr><td colspan="4" class="muted">暂无名单</td></tr></tbody>
+            </table>
+          </div>
+
+          <details id="bulkWhatsappExcludedDetails" class="bulk-wa-excluded" hidden>
+            <summary id="bulkWhatsappExcludedSummary">查看已排除名单</summary>
+            <ul id="bulkWhatsappExcludedList"></ul>
+          </details>
+
+          <div class="bulk-wa-message-card">
+            <span>本批第一位客户的消息预览</span>
+            <pre id="bulkWhatsappMessagePreview">—</pre>
+          </div>
+
+          <label class="bulk-wa-consent-confirm">
+            <input id="bulkWhatsappConsent" type="checkbox" />
+            <span>我已确认本批客户同意接收 WhatsApp 信息，并会在每个聊天窗口再次检查后才按发送。</span>
+          </label>
+        </div>
+        <div class="modal-footer">
+          <button class="text-button" id="cancelBulkWhatsapp" type="button">取消</button>
+          <button class="text-button primary" id="openBulkWhatsappBatch" type="button" disabled>打开本批 0 个聊天</button>
+        </div>
+      </div>
+    </div>
+
     <div id="notesModal" class="modal-overlay">
       <div class="modal-content">
         <div class="modal-header">
@@ -1015,6 +1069,7 @@
     <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-storage-compat.js"></script>
     <script src="./config.js"></script>
-    <script src="./app.js?v=20260819-google-admin"></script>
+    <script src="./whatsapp-bulk-core.js?v=20260828-safe-batches"></script>
+    <script src="./app.js?v=20260828-safe-batches"></script>
   </body>
 </html>

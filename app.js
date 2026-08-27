@@ -375,6 +375,19 @@ const state = {
   zoomSettings: normalizeZoomSettings(loadJson(storageKeys.zoomSettings, defaultZoomSettings)),
 };
 
+const BULK_WHATSAPP_BATCH_SIZE = 10;
+const whatsappBulkCore = globalThis.WhatsappBulkCore;
+let bulkWhatsappPreviewState = {
+  selectedCount: 0,
+  sendable: [],
+  excluded: [],
+  cursor: 0,
+};
+
+if (!whatsappBulkCore) {
+  throw new Error("WhatsApp bulk safety module failed to load.");
+}
+
 state.leads = mergeDuplicateLeads(state.leads.map(sanitizeLead));
 saveJson(storageKeys.leads, state.leads);
 
@@ -399,6 +412,22 @@ const elements = {
   statusFilter: document.querySelector("#statusFilter"),
   saveTemplatesBtn: document.querySelector("#saveTemplatesBtn"),
   bulkWhatsappBtn: document.querySelector("#bulkWhatsappBtn"),
+  bulkWhatsappModal: document.querySelector("#bulkWhatsappModal"),
+  closeBulkWhatsappModal: document.querySelector("#closeBulkWhatsappModal"),
+  cancelBulkWhatsapp: document.querySelector("#cancelBulkWhatsapp"),
+  openBulkWhatsappBatch: document.querySelector("#openBulkWhatsappBatch"),
+  bulkWhatsappConsent: document.querySelector("#bulkWhatsappConsent"),
+  bulkWhatsappSelectedCount: document.querySelector("#bulkWhatsappSelectedCount"),
+  bulkWhatsappValidCount: document.querySelector("#bulkWhatsappValidCount"),
+  bulkWhatsappExcludedCount: document.querySelector("#bulkWhatsappExcludedCount"),
+  bulkWhatsappBatchCount: document.querySelector("#bulkWhatsappBatchCount"),
+  bulkWhatsappBatchTitle: document.querySelector("#bulkWhatsappBatchTitle"),
+  bulkWhatsappBatchSummary: document.querySelector("#bulkWhatsappBatchSummary"),
+  bulkWhatsappPreviewBody: document.querySelector("#bulkWhatsappPreviewBody"),
+  bulkWhatsappExcludedDetails: document.querySelector("#bulkWhatsappExcludedDetails"),
+  bulkWhatsappExcludedSummary: document.querySelector("#bulkWhatsappExcludedSummary"),
+  bulkWhatsappExcludedList: document.querySelector("#bulkWhatsappExcludedList"),
+  bulkWhatsappMessagePreview: document.querySelector("#bulkWhatsappMessagePreview"),
   bulkEmailBtn: document.querySelector("#bulkEmailBtn"),
   toast: document.querySelector("#toast"),
   intakeChart: document.querySelector("#intakeChart"),
@@ -1291,9 +1320,12 @@ function triggerWhatsapp(leadId, templateNum) {
   if (!lead) return;
   const template = state.templates[`waTemplate${templateNum}`] || state.templates.waTemplate1;
   const text = applyTemplate(template, lead);
-  const phone = lead.phone.replace(/[^\d]/g, "");
-  if (phone) window.open(`https://wa.me/${phone}?text=${encodeURIComponent(text)}`, "_blank");
-  else toast("No phone number.");
+  const phone = whatsappBulkCore.normalizeMalaysiaPhone(lead.phone);
+  if (!phone.valid) {
+    toast("电话号码格式无效，请先更新客户资料。");
+    return;
+  }
+  window.open(whatsappBulkCore.whatsappUrl(phone.phone, text), "_blank");
   addHistory(leadId, "whatsapp", `Sent Template ${templateNum}`);
 }
 
@@ -1301,14 +1333,8 @@ function whatsappUrl(lead, step) {
   const templateKey = step ? `waTemplate${step}` : 'waTemplate1';
   const template = state.templates[templateKey] || state.templates.waTemplate1;
   const text = applyTemplate(template, lead);
-  const phone = lead.phone.replace(/[^\d]/g, "");
-  return phone ? `https://wa.me/${phone}?text=${encodeURIComponent(text)}` : "";
-}
-
-function bulkWhatsappUrl(lead) {
-  const text = state.templates.bulkWhatsapp || defaultTemplates.bulkWhatsapp;
-  const phone = lead.phone.replace(/[^\d]/g, "");
-  return phone ? `https://wa.me/${phone}?text=${encodeURIComponent(text)}` : "";
+  const phone = whatsappBulkCore.normalizeMalaysiaPhone(lead.phone);
+  return phone.valid ? whatsappBulkCore.whatsappUrl(phone.phone, text) : "";
 }
 
 function emailUrl(lead) {
@@ -1318,16 +1344,111 @@ function emailUrl(lead) {
 }
 
 function bulkWhatsapp() {
-  const leads = filteredLeads().filter((lead) => lead.phone);
-  if (!leads.length) {
-    toast("No phone numbers found.");
+  const selectedLeads = state.leads.filter((lead) => state.selectedIds.has(lead.id));
+  if (!selectedLeads.length) {
+    toast("请先勾选至少一位客户。");
     return;
   }
-  leads.slice(0, 25).forEach((lead) => {
-    window.open(bulkWhatsappUrl(lead), "_blank", "noopener,noreferrer");
+
+  const template = state.templates.bulkWhatsapp || defaultTemplates.bulkWhatsapp;
+  const audience = whatsappBulkCore.prepareAudience(
+    selectedLeads,
+    (lead) => applyTemplate(template, lead),
+  );
+
+  bulkWhatsappPreviewState = {
+    selectedCount: selectedLeads.length,
+    sendable: audience.sendable,
+    excluded: audience.excluded,
+    cursor: 0,
+  };
+
+  elements.bulkWhatsappConsent.checked = false;
+  renderBulkWhatsappPreview();
+  elements.bulkWhatsappModal.classList.add("show");
+}
+
+function currentBulkWhatsappBatch() {
+  return whatsappBulkCore.getBatch(
+    bulkWhatsappPreviewState.sendable,
+    bulkWhatsappPreviewState.cursor,
+    BULK_WHATSAPP_BATCH_SIZE,
+  );
+}
+
+function renderBulkWhatsappPreview() {
+  const batch = currentBulkWhatsappBatch();
+  const totalBatches = Math.ceil(bulkWhatsappPreviewState.sendable.length / BULK_WHATSAPP_BATCH_SIZE);
+  const remainingBatches = batch.items.length
+    ? Math.ceil((bulkWhatsappPreviewState.sendable.length - bulkWhatsappPreviewState.cursor) / BULK_WHATSAPP_BATCH_SIZE)
+    : 0;
+
+  elements.bulkWhatsappSelectedCount.textContent = String(bulkWhatsappPreviewState.selectedCount);
+  elements.bulkWhatsappValidCount.textContent = String(bulkWhatsappPreviewState.sendable.length);
+  elements.bulkWhatsappExcludedCount.textContent = String(bulkWhatsappPreviewState.excluded.length);
+  elements.bulkWhatsappBatchCount.textContent = String(remainingBatches);
+  elements.bulkWhatsappBatchTitle.textContent = batch.items.length
+    ? `第 ${batch.batchNumber} 批／共 ${totalBatches} 批`
+    : "没有可打开的号码";
+  elements.bulkWhatsappBatchSummary.textContent = batch.items.length
+    ? `本批 ${batch.items.length} 人；完成后还有 ${batch.remaining} 人。电话号码只显示脱敏版本。`
+    : "请修正已排除客户的电话号码后再试。";
+
+  elements.bulkWhatsappPreviewBody.innerHTML = batch.items.length
+    ? batch.items.map((entry) => `
+        <tr>
+          <td><strong>${escapeHtml(entry.lead.name || "未命名客户")}</strong></td>
+          <td>${escapeHtml(entry.lead.course || "General Preview")}</td>
+          <td>${escapeHtml(entry.maskedPhone)}</td>
+          <td>${entry.normalized
+            ? '<span class="bulk-wa-normalized">已自动补 60</span>'
+            : '<span class="bulk-wa-unchanged">号码无需修改</span>'}</td>
+        </tr>
+      `).join("")
+    : '<tr><td colspan="4" class="muted">本批没有有效电话号码。</td></tr>';
+
+  const hasExcluded = bulkWhatsappPreviewState.excluded.length > 0;
+  elements.bulkWhatsappExcludedDetails.hidden = !hasExcluded;
+  elements.bulkWhatsappExcludedSummary.textContent = `查看 ${bulkWhatsappPreviewState.excluded.length} 位已排除客户`;
+  elements.bulkWhatsappExcludedList.innerHTML = hasExcluded
+    ? bulkWhatsappPreviewState.excluded.map((entry) =>
+        `<li>${escapeHtml(entry.lead?.name || "未命名客户")}：${escapeHtml(entry.reason)}</li>`,
+      ).join("")
+    : "";
+
+  elements.bulkWhatsappMessagePreview.textContent = batch.items[0]?.message || "—";
+  elements.openBulkWhatsappBatch.textContent = `打开本批 ${batch.items.length} 个聊天`;
+  updateBulkWhatsappOpenButton();
+}
+
+function updateBulkWhatsappOpenButton() {
+  const batch = currentBulkWhatsappBatch();
+  elements.openBulkWhatsappBatch.disabled = !batch.items.length || !elements.bulkWhatsappConsent.checked;
+}
+
+function closeBulkWhatsappPreview() {
+  elements.bulkWhatsappModal.classList.remove("show");
+  elements.bulkWhatsappConsent.checked = false;
+}
+
+function openBulkWhatsappBatch() {
+  const batch = currentBulkWhatsappBatch();
+  if (!elements.bulkWhatsappConsent.checked || !batch.items.length) return;
+
+  batch.items.forEach((entry) => {
+    window.open(entry.url, "_blank", "noopener,noreferrer");
   });
-  const extra = leads.length > 25 ? ` ${leads.length - 25} skipped to avoid popup blocking.` : "";
-  toast(`${Math.min(leads.length, 25)} WhatsApp chats opened.${extra}`);
+
+  bulkWhatsappPreviewState.cursor = batch.nextCursor;
+  if (batch.remaining > 0) {
+    elements.bulkWhatsappConsent.checked = false;
+    renderBulkWhatsappPreview();
+    toast(`已打开第 ${batch.batchNumber} 批 ${batch.items.length} 个聊天；请检查弹窗后再继续下一批。`);
+    return;
+  }
+
+  closeBulkWhatsappPreview();
+  toast(`已打开最后一批 ${batch.items.length} 个聊天。系统不会自动按发送。`);
 }
 
 async function bulkEmail() {
@@ -2868,6 +2989,8 @@ function updateBulkToolbar() {
   elements.bulkToolbar.classList.toggle("show", count > 0);
   elements.bulkCount.textContent = `${count} leads selected`;
   elements.selectAll.checked = count > 0 && count === filteredLeads().length;
+  elements.bulkWhatsappBtn.disabled = count === 0;
+  elements.bulkWhatsappBtn.textContent = count > 0 ? `WhatsApp Preview (${count})` : "Bulk WhatsApp (Selected)";
 }
 
 function initPerformanceFilters() {
@@ -3794,6 +3917,13 @@ elements.csvInput.addEventListener("change", async (event) => {
 
 elements.exportBtn.addEventListener("click", exportLeads);
 elements.bulkWhatsappBtn.addEventListener("click", bulkWhatsapp);
+elements.closeBulkWhatsappModal.addEventListener("click", closeBulkWhatsappPreview);
+elements.cancelBulkWhatsapp.addEventListener("click", closeBulkWhatsappPreview);
+elements.bulkWhatsappConsent.addEventListener("change", updateBulkWhatsappOpenButton);
+elements.openBulkWhatsappBatch.addEventListener("click", openBulkWhatsappBatch);
+elements.bulkWhatsappModal.addEventListener("click", (event) => {
+  if (event.target === elements.bulkWhatsappModal) closeBulkWhatsappPreview();
+});
 elements.bulkEmailBtn.addEventListener("click", bulkEmail);
 if (elements.emailRefreshCampaignsBtn) elements.emailRefreshCampaignsBtn.addEventListener("click", loadEmailCampaigns);
 if (elements.emailAdminSignInBtn) elements.emailAdminSignInBtn.addEventListener("click", signInEmailAdminWithGoogle);
