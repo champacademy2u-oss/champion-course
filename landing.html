@@ -581,7 +581,7 @@
           <div class="success-icon">🎉</div>
           <h2>恭喜！资料提交成功</h2>
           <p>感谢您的填写！<br />您的电子书已准备好，请点击下方按钮立即下载。</p>
-          <a href="/download-ebook" id="downloadLink" class="download-btn" download="世界级营销100招.pdf">
+          <a href="./世界级营销100招.pdf" id="downloadLink" class="download-btn" download="世界级营销100招.pdf">
             📥 立即下载电子书
           </a>
           <p class="auto-note">如下载未自动开始，请点击上方按钮</p>
@@ -630,7 +630,7 @@
     // ── Set download link ──
     const dLink = document.getElementById('downloadLink');
     if (dLink) {
-      dLink.href = './世界级营销100招( 流量密码2.0） .pdf';
+      dLink.href = './世界级营销100招.pdf';
       dLink.download = '世界级营销100招.pdf';
     }
 
@@ -695,7 +695,7 @@
 
       setTimeout(() => {
         const link = document.createElement('a');
-        link.href = './世界级营销100招( 流量密码2.0） .pdf';
+        link.href = './世界级营销100招.pdf';
         link.download = '世界级营销100招.pdf';
         document.body.appendChild(link);
         link.click();

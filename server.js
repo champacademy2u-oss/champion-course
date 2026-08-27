@@ -110,7 +110,7 @@ const server = http.createServer(async (req, res) => {
 
     // ── Download ebook ──
     if (req.method === "GET" && pathname === "/download-ebook") {
-      const ebookName = "世界级营销100招( 流量密码2.0） .pdf";
+      const ebookName = "世界级营销100招.pdf";
       const ebookPath = path.join(__dirname, ebookName);
       if (!fs.existsSync(ebookPath)) {
         return sendJson(res, 404, { error: "Ebook not found" });
