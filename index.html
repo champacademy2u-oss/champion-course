@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Champ Academy</title>
-    <link rel="stylesheet" href="./styles.css?v=20260828-safe-batches" />
+    <link rel="stylesheet" href="./styles.css?v=20260828-wa-media" />
     <link rel="manifest" href="./manifest.json" />
   </head>
   <body>
@@ -811,6 +811,40 @@
             <div><span>剩余批次</span><strong id="bulkWhatsappBatchCount">0</strong></div>
           </div>
 
+          <div class="bulk-wa-composer">
+            <div class="bulk-wa-copy-editor">
+              <label for="bulkWhatsappMessageInput">自定义发送文案</label>
+              <textarea id="bulkWhatsappMessageInput" rows="6" maxlength="4000" placeholder="输入本次群发文案"></textarea>
+              <div class="bulk-wa-copy-actions">
+                <small>可用变量：{{name}}、{{course}}、{{phone}}、{{email}}、{{job}}、{{greeting}}、{{today}}</small>
+                <button class="text-button" id="saveBulkWhatsappMessage" type="button">保存为默认文案</button>
+              </div>
+            </div>
+
+            <div class="bulk-wa-image-editor">
+              <div>
+                <strong>自定义图片（可选）</strong>
+                <p>JPG、PNG 或 WebP，最大 10 MB。图片只在本机预览，不会上传或保存。</p>
+              </div>
+              <label class="bulk-wa-image-picker">
+                选择图片
+                <input id="bulkWhatsappImageInput" type="file" accept="image/jpeg,image/png,image/webp" />
+              </label>
+              <div id="bulkWhatsappImagePreview" class="bulk-wa-image-preview" hidden>
+                <img id="bulkWhatsappImageThumb" alt="群发图片预览" />
+                <div class="bulk-wa-image-meta">
+                  <span id="bulkWhatsappImageSummary">已选择图片</span>
+                  <span id="bulkWhatsappImageStatus" class="muted">打开聊天前请先复制图片。</span>
+                  <div class="bulk-wa-image-actions">
+                    <button class="text-button primary" id="copyBulkWhatsappImage" type="button">复制图片</button>
+                    <button class="text-button" id="removeBulkWhatsappImage" type="button">移除</button>
+                  </div>
+                </div>
+              </div>
+              <p class="bulk-wa-image-help">WhatsApp 链接不能自动附图。复制后，请在每个聊天输入框按 Command/Control + V 粘贴图片，再检查文案并发送。</p>
+            </div>
+          </div>
+
           <div class="bulk-wa-section-heading">
             <div>
               <h4 id="bulkWhatsappBatchTitle">第 1 批</h4>
@@ -1069,7 +1103,7 @@
     <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-storage-compat.js"></script>
     <script src="./config.js"></script>
-    <script src="./whatsapp-bulk-core.js?v=20260828-safe-batches"></script>
-    <script src="./app.js?v=20260828-safe-batches"></script>
+    <script src="./whatsapp-bulk-core.js?v=20260828-wa-media"></script>
+    <script src="./app.js?v=20260828-wa-media"></script>
   </body>
 </html>

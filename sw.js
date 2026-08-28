@@ -1,10 +1,10 @@
-const CACHE_NAME = "lead-center-v15-whatsapp-safe-batches";
+const CACHE_NAME = "lead-center-v16-whatsapp-custom-media";
 const ASSETS = [
   "./",
   "./index.html",
-  "./styles.css?v=20260828-safe-batches",
-  "./whatsapp-bulk-core.js?v=20260828-safe-batches",
-  "./app.js?v=20260828-safe-batches",
+  "./styles.css?v=20260828-wa-media",
+  "./whatsapp-bulk-core.js?v=20260828-wa-media",
+  "./app.js?v=20260828-wa-media",
   "./config.js",
   "./manifest.json",
   "./zoom.html",

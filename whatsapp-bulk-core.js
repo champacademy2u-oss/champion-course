@@ -1,5 +1,7 @@
 (function exposeWhatsappBulkCore(globalScope) {
   const E164_PATTERN = /^[1-9]\d{7,14}$/;
+  const WHATSAPP_IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
+  const DEFAULT_IMAGE_MAX_BYTES = 10 * 1024 * 1024;
 
   function normalizeMalaysiaPhone(value) {
     const original = String(value || "").trim();
@@ -39,6 +41,18 @@
   function whatsappUrl(phone, message) {
     if (!E164_PATTERN.test(String(phone || ""))) return "";
     return `https://wa.me/${phone}?text=${encodeURIComponent(String(message || ""))}`;
+  }
+
+  function validateImageFile(file, maxBytes = DEFAULT_IMAGE_MAX_BYTES) {
+    if (!file) return { valid: false, reason: "请先选择图片" };
+    if (!WHATSAPP_IMAGE_TYPES.has(String(file.type || "").toLowerCase())) {
+      return { valid: false, reason: "只支持 JPG、PNG 或 WebP 图片" };
+    }
+
+    const size = Number(file.size) || 0;
+    if (!size) return { valid: false, reason: "图片文件为空" };
+    if (size > maxBytes) return { valid: false, reason: "图片请勿超过 10 MB" };
+    return { valid: true, reason: "" };
   }
 
   function prepareAudience(leads, messageForLead) {
@@ -91,6 +105,7 @@
     maskPhone,
     normalizeMalaysiaPhone,
     prepareAudience,
+    validateImageFile,
     whatsappUrl,
   });
 })(globalThis);

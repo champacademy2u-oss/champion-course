@@ -379,9 +379,15 @@ const BULK_WHATSAPP_BATCH_SIZE = 10;
 const whatsappBulkCore = globalThis.WhatsappBulkCore;
 let bulkWhatsappPreviewState = {
   selectedCount: 0,
+  selectedLeads: [],
   sendable: [],
   excluded: [],
   cursor: 0,
+  template: "",
+  imageFile: null,
+  imagePreviewUrl: "",
+  imageCopied: false,
+  started: false,
 };
 
 if (!whatsappBulkCore) {
@@ -428,6 +434,15 @@ const elements = {
   bulkWhatsappExcludedSummary: document.querySelector("#bulkWhatsappExcludedSummary"),
   bulkWhatsappExcludedList: document.querySelector("#bulkWhatsappExcludedList"),
   bulkWhatsappMessagePreview: document.querySelector("#bulkWhatsappMessagePreview"),
+  bulkWhatsappMessageInput: document.querySelector("#bulkWhatsappMessageInput"),
+  saveBulkWhatsappMessage: document.querySelector("#saveBulkWhatsappMessage"),
+  bulkWhatsappImageInput: document.querySelector("#bulkWhatsappImageInput"),
+  bulkWhatsappImagePreview: document.querySelector("#bulkWhatsappImagePreview"),
+  bulkWhatsappImageThumb: document.querySelector("#bulkWhatsappImageThumb"),
+  bulkWhatsappImageSummary: document.querySelector("#bulkWhatsappImageSummary"),
+  bulkWhatsappImageStatus: document.querySelector("#bulkWhatsappImageStatus"),
+  copyBulkWhatsappImage: document.querySelector("#copyBulkWhatsappImage"),
+  removeBulkWhatsappImage: document.querySelector("#removeBulkWhatsappImage"),
   bulkEmailBtn: document.querySelector("#bulkEmailBtn"),
   toast: document.querySelector("#toast"),
   intakeChart: document.querySelector("#intakeChart"),
@@ -1351,21 +1366,36 @@ function bulkWhatsapp() {
   }
 
   const template = state.templates.bulkWhatsapp || defaultTemplates.bulkWhatsapp;
-  const audience = whatsappBulkCore.prepareAudience(
-    selectedLeads,
-    (lead) => applyTemplate(template, lead),
-  );
+  cleanupBulkWhatsappImage();
 
   bulkWhatsappPreviewState = {
     selectedCount: selectedLeads.length,
-    sendable: audience.sendable,
-    excluded: audience.excluded,
+    selectedLeads,
+    sendable: [],
+    excluded: [],
     cursor: 0,
+    template,
+    imageFile: null,
+    imagePreviewUrl: "",
+    imageCopied: false,
+    started: false,
   };
 
+  elements.bulkWhatsappMessageInput.value = template;
+  elements.bulkWhatsappImageInput.value = "";
   elements.bulkWhatsappConsent.checked = false;
+  rebuildBulkWhatsappAudience();
   renderBulkWhatsappPreview();
   elements.bulkWhatsappModal.classList.add("show");
+}
+
+function rebuildBulkWhatsappAudience() {
+  const audience = whatsappBulkCore.prepareAudience(
+    bulkWhatsappPreviewState.selectedLeads,
+    (lead) => applyTemplate(bulkWhatsappPreviewState.template, lead),
+  );
+  bulkWhatsappPreviewState.sendable = audience.sendable;
+  bulkWhatsappPreviewState.excluded = audience.excluded;
 }
 
 function currentBulkWhatsappBatch() {
@@ -1417,18 +1447,144 @@ function renderBulkWhatsappPreview() {
     : "";
 
   elements.bulkWhatsappMessagePreview.textContent = batch.items[0]?.message || "—";
+  renderBulkWhatsappComposer();
   elements.openBulkWhatsappBatch.textContent = `打开本批 ${batch.items.length} 个聊天`;
   updateBulkWhatsappOpenButton();
 }
 
+function formatBulkWhatsappImageSize(bytes) {
+  const size = Number(bytes) || 0;
+  if (size < 1024 * 1024) return `${Math.max(1, Math.round(size / 1024))} KB`;
+  return `${(size / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function renderBulkWhatsappComposer() {
+  const hasImage = Boolean(bulkWhatsappPreviewState.imageFile);
+  const locked = bulkWhatsappPreviewState.started;
+  elements.bulkWhatsappMessageInput.disabled = locked;
+  elements.saveBulkWhatsappMessage.disabled = locked;
+  elements.bulkWhatsappImageInput.disabled = locked;
+  elements.removeBulkWhatsappImage.disabled = locked;
+  elements.bulkWhatsappImagePreview.hidden = !hasImage;
+
+  if (!hasImage) return;
+  const file = bulkWhatsappPreviewState.imageFile;
+  elements.bulkWhatsappImageThumb.src = bulkWhatsappPreviewState.imagePreviewUrl;
+  elements.bulkWhatsappImageSummary.textContent = `${file.type.replace("image/", "").toUpperCase()} · ${formatBulkWhatsappImageSize(file.size)}`;
+  elements.bulkWhatsappImageStatus.textContent = bulkWhatsappPreviewState.imageCopied
+    ? "图片已复制。本批每个聊天都需要粘贴一次。"
+    : "打开本批聊天前，请先复制图片。";
+  elements.copyBulkWhatsappImage.textContent = bulkWhatsappPreviewState.imageCopied ? "重新复制图片" : "复制图片";
+}
+
+function handleBulkWhatsappMessageInput() {
+  if (bulkWhatsappPreviewState.started) return;
+  bulkWhatsappPreviewState.template = elements.bulkWhatsappMessageInput.value;
+  rebuildBulkWhatsappAudience();
+  renderBulkWhatsappPreview();
+}
+
+function saveBulkWhatsappMessageTemplate() {
+  if (bulkWhatsappPreviewState.started) return;
+  state.templates.bulkWhatsapp = elements.bulkWhatsappMessageInput.value;
+  const settingsField = document.querySelector("#bulkWhatsapp");
+  if (settingsField) settingsField.value = state.templates.bulkWhatsapp;
+  saveJson(storageKeys.templates, state.templates);
+  toast("已保存为默认 WhatsApp 群发文案。");
+}
+
+function cleanupBulkWhatsappImage() {
+  if (bulkWhatsappPreviewState.imagePreviewUrl) {
+    URL.revokeObjectURL(bulkWhatsappPreviewState.imagePreviewUrl);
+  }
+  if (elements.bulkWhatsappImageThumb) elements.bulkWhatsappImageThumb.removeAttribute("src");
+}
+
+function removeBulkWhatsappImage() {
+  if (bulkWhatsappPreviewState.started) return;
+  cleanupBulkWhatsappImage();
+  bulkWhatsappPreviewState.imageFile = null;
+  bulkWhatsappPreviewState.imagePreviewUrl = "";
+  bulkWhatsappPreviewState.imageCopied = false;
+  elements.bulkWhatsappImageInput.value = "";
+  renderBulkWhatsappPreview();
+}
+
+function handleBulkWhatsappImageSelection(event) {
+  if (bulkWhatsappPreviewState.started) return;
+  const [file] = event.target.files;
+  if (!file) return;
+
+  const validation = whatsappBulkCore.validateImageFile(file);
+  if (!validation.valid) {
+    event.target.value = "";
+    toast(validation.reason);
+    return;
+  }
+
+  cleanupBulkWhatsappImage();
+  bulkWhatsappPreviewState.imageFile = file;
+  bulkWhatsappPreviewState.imagePreviewUrl = URL.createObjectURL(file);
+  bulkWhatsappPreviewState.imageCopied = false;
+  renderBulkWhatsappPreview();
+}
+
+async function imageFileToPngBlob(file) {
+  const bitmap = await createImageBitmap(file);
+  const canvas = document.createElement("canvas");
+  canvas.width = bitmap.width;
+  canvas.height = bitmap.height;
+  const context = canvas.getContext("2d");
+  context.drawImage(bitmap, 0, 0);
+  bitmap.close();
+  return new Promise((resolve, reject) => {
+    canvas.toBlob((blob) => {
+      if (blob) resolve(blob);
+      else reject(new Error("图片转换失败"));
+    }, "image/png");
+  });
+}
+
+async function copyBulkWhatsappImage() {
+  const file = bulkWhatsappPreviewState.imageFile;
+  if (!file) return;
+  if (!navigator.clipboard?.write || typeof ClipboardItem === "undefined") {
+    toast("此浏览器无法复制图片，请使用 Chrome 并允许剪贴板权限。");
+    return;
+  }
+
+  elements.copyBulkWhatsappImage.disabled = true;
+  elements.copyBulkWhatsappImage.textContent = "正在复制…";
+  try {
+    const pngBlob = await imageFileToPngBlob(file);
+    await navigator.clipboard.write([new ClipboardItem({ "image/png": pngBlob })]);
+    bulkWhatsappPreviewState.imageCopied = true;
+    toast("图片已复制；请在每个 WhatsApp 聊天粘贴一次。");
+  } catch (error) {
+    console.error("Copy WhatsApp image failed:", error);
+    bulkWhatsappPreviewState.imageCopied = false;
+    toast("图片复制失败，请允许剪贴板权限后重试。");
+  } finally {
+    elements.copyBulkWhatsappImage.disabled = false;
+    renderBulkWhatsappComposer();
+    updateBulkWhatsappOpenButton();
+  }
+}
+
 function updateBulkWhatsappOpenButton() {
   const batch = currentBulkWhatsappBatch();
-  elements.openBulkWhatsappBatch.disabled = !batch.items.length || !elements.bulkWhatsappConsent.checked;
+  const imageReady = !bulkWhatsappPreviewState.imageFile || bulkWhatsappPreviewState.imageCopied;
+  elements.openBulkWhatsappBatch.disabled = !batch.items.length || !elements.bulkWhatsappConsent.checked || !imageReady;
+  elements.openBulkWhatsappBatch.title = imageReady ? "" : "请先复制所选图片";
 }
 
 function closeBulkWhatsappPreview() {
   elements.bulkWhatsappModal.classList.remove("show");
   elements.bulkWhatsappConsent.checked = false;
+  cleanupBulkWhatsappImage();
+  bulkWhatsappPreviewState.imageFile = null;
+  bulkWhatsappPreviewState.imagePreviewUrl = "";
+  bulkWhatsappPreviewState.imageCopied = false;
 }
 
 function openBulkWhatsappBatch() {
@@ -1439,6 +1595,8 @@ function openBulkWhatsappBatch() {
     window.open(entry.url, "_blank", "noopener,noreferrer");
   });
 
+  bulkWhatsappPreviewState.started = true;
+  bulkWhatsappPreviewState.imageCopied = false;
   bulkWhatsappPreviewState.cursor = batch.nextCursor;
   if (batch.remaining > 0) {
     elements.bulkWhatsappConsent.checked = false;
@@ -3920,6 +4078,11 @@ elements.bulkWhatsappBtn.addEventListener("click", bulkWhatsapp);
 elements.closeBulkWhatsappModal.addEventListener("click", closeBulkWhatsappPreview);
 elements.cancelBulkWhatsapp.addEventListener("click", closeBulkWhatsappPreview);
 elements.bulkWhatsappConsent.addEventListener("change", updateBulkWhatsappOpenButton);
+elements.bulkWhatsappMessageInput.addEventListener("input", handleBulkWhatsappMessageInput);
+elements.saveBulkWhatsappMessage.addEventListener("click", saveBulkWhatsappMessageTemplate);
+elements.bulkWhatsappImageInput.addEventListener("change", handleBulkWhatsappImageSelection);
+elements.copyBulkWhatsappImage.addEventListener("click", copyBulkWhatsappImage);
+elements.removeBulkWhatsappImage.addEventListener("click", removeBulkWhatsappImage);
 elements.openBulkWhatsappBatch.addEventListener("click", openBulkWhatsappBatch);
 elements.bulkWhatsappModal.addEventListener("click", (event) => {
   if (event.target === elements.bulkWhatsappModal) closeBulkWhatsappPreview();
