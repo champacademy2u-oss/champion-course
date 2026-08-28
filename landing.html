@@ -534,7 +534,7 @@
           <form id="leadForm" novalidate>
             <div class="field">
               <label>姓名 <span class="req">*</span></label>
-              <input type="text" id="fieldName" name="name" placeholder="请输入您的全名" required autocomplete="name" />
+              <input type="text" id="fieldName" name="name" placeholder="请输入您的全名" required maxlength="100" autocomplete="name" />
             </div>
 
             <div class="field">
@@ -548,18 +548,18 @@
                   <option value="+66">🇹🇭 +66</option>
                   <option value="+84">🇻🇳 +84</option>
                 </select>
-                <input type="tel" id="fieldPhone" name="phone" class="phone-input" placeholder="123456789" required autocomplete="tel" />
+                <input type="tel" id="fieldPhone" name="phone" class="phone-input" placeholder="123456789" required maxlength="20" inputmode="tel" autocomplete="tel" />
               </div>
             </div>
 
             <div class="field">
               <label>工作领域 / 行业 <span class="req">*</span></label>
-              <input type="text" id="fieldIndustry" name="industry" placeholder="例如：保险、餐饮、电商、培训..." required />
+              <input type="text" id="fieldIndustry" name="industry" placeholder="例如：保险、餐饮、电商、培训..." required maxlength="120" />
             </div>
 
             <div class="field">
               <label>目前生意面临的最大挑战 <span class="req">*</span></label>
-              <textarea id="fieldChallenge" name="challenge" placeholder="请描述您目前生意面临的挑战或问题，例如：流量少、客户不回复、不知道如何推广..." required></textarea>
+              <textarea id="fieldChallenge" name="challenge" placeholder="请描述您目前生意面临的挑战或问题，例如：流量少、客户不回复、不知道如何推广..." required maxlength="2000"></textarea>
             </div>
 
             <button type="submit" class="submit-btn" id="submitBtn">
@@ -592,20 +592,33 @@
 
   <!-- Firebase SDK -->
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
   <script src="./config.js"></script>
   <script>
     // ── Init Firebase ──
     let _db = null;
+    let _firebaseReady = Promise.resolve(false);
     try {
       if (window.FIREBASE_CONFIG) {
-        // Reuse existing app if already initialized (prevent 'duplicate app' error)
-        const fbApp = firebase.apps.length
-          ? firebase.app()
-          : firebase.initializeApp(window.FIREBASE_CONFIG);
-        _db = firebase.firestore(fbApp);
-        _db.enablePersistence().catch(() => {});
-        console.log('[Landing] Firebase connected.');
+        _firebaseReady = (async () => {
+          // Reuse an existing app if one was already initialized.
+          const fbApp = firebase.apps.length
+            ? firebase.app()
+            : firebase.initializeApp(window.FIREBASE_CONFIG);
+          const auth = firebase.auth(fbApp);
+          await auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL);
+          if (!auth.currentUser) await auth.signInAnonymously();
+
+          _db = firebase.firestore(fbApp);
+          _db.enablePersistence().catch(() => {});
+          console.log('[Landing] Firebase connected and authenticated.');
+          return true;
+        })().catch((error) => {
+          _db = null;
+          console.warn('[Landing] Firebase connection failed:', error);
+          return false;
+        });
       }
     } catch (e) {
       console.warn('[Landing] Firebase init failed:', e);
@@ -655,7 +668,14 @@
         return;
       }
 
-      const fullPhone = prefix + phone.replace(/^0/, '');
+      const localPhone = phone.replace(/\D/g, '').replace(/^0/, '');
+      const fullPhone = prefix + localPhone;
+      if (!/^\+[0-9]{7,15}$/.test(fullPhone)) {
+        errorMsg.textContent = '请输入正确的联络电话';
+        errorMsg.classList.add('show');
+        return;
+      }
+
       const leadData = {
         id: crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36),
         name,
@@ -668,25 +688,20 @@
       submitBtn.classList.add('loading');
       submitBtn.querySelector('.btn-text').textContent = '提交中...';
 
-      // ── Save to Firebase Firestore (primary) ──
-      let saved = false;
-      if (_db) {
-        try {
-          await _db.collection('landing_leads').doc(leadData.id).set(leadData);
-          saved = true;
-          console.log('[Landing] Lead saved to Firebase.');
-        } catch (err) {
-          console.warn('[Landing] Firebase save failed, falling back to localStorage:', err);
-        }
-      }
-
-      // ── Fallback: save to localStorage if Firebase unavailable ──
-      if (!saved) {
-        try {
-          const leads = JSON.parse(localStorage.getItem('landing_leads_static') || '[]');
-          leads.unshift(leadData);
-          localStorage.setItem('landing_leads_static', JSON.stringify(leads));
-        } catch (_) {}
+      // Save to Firestore before showing success. A browser-only fallback would
+      // strand the lead on the visitor's device and hide it from Ebook Leads.
+      try {
+        const connected = await _firebaseReady;
+        if (!connected || !_db) throw new Error('Firebase unavailable');
+        await _db.collection('landing_leads').doc(leadData.id).set(leadData);
+        console.log('[Landing] Lead saved to Firebase.');
+      } catch (err) {
+        console.warn('[Landing] Firebase save failed:', err);
+        errorMsg.textContent = '资料暂时无法提交，请检查网络后再试一次。';
+        errorMsg.classList.add('show');
+        submitBtn.classList.remove('loading');
+        submitBtn.querySelector('.btn-text').textContent = '🎁 立即免费领取电子书';
+        return;
       }
 
       // ── Show success + trigger download ──
