@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 
 await import("../whatsapp-bulk-core.js");
 
@@ -8,6 +9,7 @@ const {
   maskPhone,
   normalizeMalaysiaPhone,
   prepareAudience,
+  validateImageFile,
   whatsappUrl,
 } = globalThis.WhatsappBulkCore;
 
@@ -71,4 +73,27 @@ test("masks preview numbers and builds an encoded WhatsApp URL", () => {
     whatsappUrl("60123456789", "Hi 你好"),
     "https://wa.me/60123456789?text=Hi%20%E4%BD%A0%E5%A5%BD",
   );
+});
+
+test("accepts supported WhatsApp images and rejects unsafe selections", () => {
+  assert.deepEqual(validateImageFile({ type: "image/jpeg", size: 1024 }), {
+    valid: true,
+    reason: "",
+  });
+  assert.equal(validateImageFile({ type: "image/gif", size: 1024 }).valid, false);
+  assert.equal(validateImageFile({ type: "image/png", size: 0 }).valid, false);
+  assert.equal(validateImageFile({ type: "image/webp", size: 11 * 1024 * 1024 }).valid, false);
+});
+
+test("bulk preview exposes custom copy and local-image safety controls", async () => {
+  const [html, app] = await Promise.all([
+    readFile(new URL("../index.html", import.meta.url), "utf8"),
+    readFile(new URL("../app.js", import.meta.url), "utf8"),
+  ]);
+
+  assert.match(html, /id="bulkWhatsappMessageInput"/);
+  assert.match(html, /id="bulkWhatsappImageInput"/);
+  assert.match(html, /图片只在本机预览，不会上传或保存/);
+  assert.match(app, /applyTemplate\(bulkWhatsappPreviewState\.template, lead\)/);
+  assert.match(app, /!bulkWhatsappPreviewState\.imageFile \|\| bulkWhatsappPreviewState\.imageCopied/);
 });
