@@ -72,7 +72,7 @@ test("masks preview numbers and builds an encoded WhatsApp URL", () => {
   assert.equal(maskPhone("60123456789"), "6012••••789");
   assert.equal(
     whatsappUrl("60123456789", "Hi 你好"),
-    "https://wa.me/60123456789?text=Hi%20%E4%BD%A0%E5%A5%BD",
+    "https://api.whatsapp.com/send?phone=60123456789&text=Hi%20%E4%BD%A0%E5%A5%BD",
   );
 });
 
@@ -81,6 +81,9 @@ test("preserves complete emoji sequences through the WhatsApp URL", () => {
   const url = whatsappUrl("60123456789", message);
 
   assert.equal(new URL(url).searchParams.get("text"), message);
+  assert.equal(new URL(url).hostname, "api.whatsapp.com");
+  assert.equal(new URL(url).searchParams.get("phone"), "60123456789");
+  assert.equal(url.includes("wa.me"), false);
   assert.deepEqual(inspectMessageEncoding(message), {
     message,
     valid: true,
