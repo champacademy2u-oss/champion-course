@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Champ Academy</title>
-    <link rel="stylesheet" href="./styles.css?v=20260828-wa-media" />
+    <link rel="stylesheet" href="./styles.css?v=20260828-emoji-safe" />
     <link rel="manifest" href="./manifest.json" />
   </head>
   <body>
@@ -815,6 +815,22 @@
             <div class="bulk-wa-copy-editor">
               <label for="bulkWhatsappMessageInput">自定义发送文案</label>
               <textarea id="bulkWhatsappMessageInput" rows="6" maxlength="4000" placeholder="输入本次群发文案"></textarea>
+              <div class="bulk-wa-emoji-toolbar" aria-label="插入 Emoji">
+                <span>插入 Emoji</span>
+                <button type="button" data-wa-emoji="📣" aria-label="插入扩音器 Emoji">📣</button>
+                <button type="button" data-wa-emoji="✅" aria-label="插入完成 Emoji">✅</button>
+                <button type="button" data-wa-emoji="🔥" aria-label="插入火焰 Emoji">🔥</button>
+                <button type="button" data-wa-emoji="🚀" aria-label="插入火箭 Emoji">🚀</button>
+                <button type="button" data-wa-emoji="🎯" aria-label="插入目标 Emoji">🎯</button>
+                <button type="button" data-wa-emoji="💡" aria-label="插入灯泡 Emoji">💡</button>
+                <button type="button" data-wa-emoji="📌" aria-label="插入图钉 Emoji">📌</button>
+                <button type="button" data-wa-emoji="👉" aria-label="插入指向 Emoji">👉</button>
+                <button type="button" data-wa-emoji="😊" aria-label="插入笑脸 Emoji">😊</button>
+              </div>
+              <div id="bulkWhatsappEncodingWarning" class="bulk-wa-encoding-warning" role="alert" hidden>
+                <span id="bulkWhatsappEncodingWarningText">发现损坏符号。这些字符无法传送为 Emoji。</span>
+                <button class="text-button" id="removeBulkWhatsappBrokenChars" type="button">清除 �</button>
+              </div>
               <div class="bulk-wa-copy-actions">
                 <small>可用变量：{{name}}、{{course}}、{{phone}}、{{email}}、{{job}}、{{greeting}}、{{today}}</small>
                 <button class="text-button" id="saveBulkWhatsappMessage" type="button">保存为默认文案</button>
@@ -1103,7 +1119,7 @@
     <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-storage-compat.js"></script>
     <script src="./config.js"></script>
-    <script src="./whatsapp-bulk-core.js?v=20260828-wa-media"></script>
-    <script src="./app.js?v=20260828-wa-media"></script>
+    <script src="./whatsapp-bulk-core.js?v=20260828-emoji-safe"></script>
+    <script src="./app.js?v=20260828-emoji-safe"></script>
   </body>
 </html>

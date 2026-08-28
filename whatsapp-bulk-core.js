@@ -38,9 +38,20 @@
     return `${digits.slice(0, 4)}••••${digits.slice(-3)}`;
   }
 
+  function inspectMessageEncoding(value) {
+    const message = String(value ?? "").replace(/\r\n?/g, "\n").normalize("NFC");
+    const replacementCount = (message.match(/\uFFFD/g) || []).length;
+    return {
+      message,
+      valid: replacementCount === 0,
+      replacementCount,
+    };
+  }
+
   function whatsappUrl(phone, message) {
     if (!E164_PATTERN.test(String(phone || ""))) return "";
-    return `https://wa.me/${phone}?text=${encodeURIComponent(String(message || ""))}`;
+    const normalizedMessage = inspectMessageEncoding(message).message;
+    return `https://wa.me/${phone}?text=${encodeURIComponent(normalizedMessage)}`;
   }
 
   function validateImageFile(file, maxBytes = DEFAULT_IMAGE_MAX_BYTES) {
@@ -72,7 +83,9 @@
       }
 
       seenPhones.add(normalized.phone);
-      const message = typeof messageForLead === "function" ? messageForLead(lead) : "";
+      const message = inspectMessageEncoding(
+        typeof messageForLead === "function" ? messageForLead(lead) : "",
+      ).message;
       sendable.push({
         lead,
         phone: normalized.phone,
@@ -102,6 +115,7 @@
 
   globalScope.WhatsappBulkCore = Object.freeze({
     getBatch,
+    inspectMessageEncoding,
     maskPhone,
     normalizeMalaysiaPhone,
     prepareAudience,

@@ -435,6 +435,10 @@ const elements = {
   bulkWhatsappExcludedList: document.querySelector("#bulkWhatsappExcludedList"),
   bulkWhatsappMessagePreview: document.querySelector("#bulkWhatsappMessagePreview"),
   bulkWhatsappMessageInput: document.querySelector("#bulkWhatsappMessageInput"),
+  bulkWhatsappEmojiButtons: document.querySelectorAll("[data-wa-emoji]"),
+  bulkWhatsappEncodingWarning: document.querySelector("#bulkWhatsappEncodingWarning"),
+  bulkWhatsappEncodingWarningText: document.querySelector("#bulkWhatsappEncodingWarningText"),
+  removeBulkWhatsappBrokenChars: document.querySelector("#removeBulkWhatsappBrokenChars"),
   saveBulkWhatsappMessage: document.querySelector("#saveBulkWhatsappMessage"),
   bulkWhatsappImageInput: document.querySelector("#bulkWhatsappImageInput"),
   bulkWhatsappImagePreview: document.querySelector("#bulkWhatsappImagePreview"),
@@ -1461,8 +1465,14 @@ function formatBulkWhatsappImageSize(bytes) {
 function renderBulkWhatsappComposer() {
   const hasImage = Boolean(bulkWhatsappPreviewState.imageFile);
   const locked = bulkWhatsappPreviewState.started;
+  const encoding = whatsappBulkCore.inspectMessageEncoding(bulkWhatsappPreviewState.template);
   elements.bulkWhatsappMessageInput.disabled = locked;
-  elements.saveBulkWhatsappMessage.disabled = locked;
+  elements.saveBulkWhatsappMessage.disabled = locked || !encoding.valid;
+  elements.bulkWhatsappEmojiButtons.forEach((button) => { button.disabled = locked; });
+  elements.bulkWhatsappEncodingWarning.hidden = encoding.valid;
+  elements.bulkWhatsappEncodingWarningText.textContent = encoding.valid
+    ? ""
+    : `发现 ${encoding.replacementCount} 个损坏符号（�）。无法判断原来的 Emoji，请先清除并重新插入。`;
   elements.bulkWhatsappImageInput.disabled = locked;
   elements.removeBulkWhatsappImage.disabled = locked;
   elements.bulkWhatsappImagePreview.hidden = !hasImage;
@@ -1484,8 +1494,33 @@ function handleBulkWhatsappMessageInput() {
   renderBulkWhatsappPreview();
 }
 
+function insertBulkWhatsappEmoji(emoji) {
+  if (bulkWhatsappPreviewState.started || !emoji) return;
+  const input = elements.bulkWhatsappMessageInput;
+  const start = input.selectionStart ?? input.value.length;
+  const end = input.selectionEnd ?? start;
+  input.setRangeText(emoji, start, end, "end");
+  handleBulkWhatsappMessageInput();
+  input.focus();
+}
+
+function removeBulkWhatsappBrokenCharacters() {
+  if (bulkWhatsappPreviewState.started) return;
+  const input = elements.bulkWhatsappMessageInput;
+  const encoding = whatsappBulkCore.inspectMessageEncoding(input.value);
+  if (encoding.valid) return;
+  input.value = encoding.message.replace(/\uFFFD/g, "");
+  handleBulkWhatsappMessageInput();
+  input.focus();
+  toast(`已清除 ${encoding.replacementCount} 个损坏符号，请用 Emoji 按钮重新插入。`);
+}
+
 function saveBulkWhatsappMessageTemplate() {
   if (bulkWhatsappPreviewState.started) return;
+  if (!whatsappBulkCore.inspectMessageEncoding(elements.bulkWhatsappMessageInput.value).valid) {
+    toast("文案仍有损坏符号，请先清除并重新插入 Emoji。");
+    return;
+  }
   state.templates.bulkWhatsapp = elements.bulkWhatsappMessageInput.value;
   const settingsField = document.querySelector("#bulkWhatsapp");
   if (settingsField) settingsField.value = state.templates.bulkWhatsapp;
@@ -1574,8 +1609,11 @@ async function copyBulkWhatsappImage() {
 function updateBulkWhatsappOpenButton() {
   const batch = currentBulkWhatsappBatch();
   const imageReady = !bulkWhatsappPreviewState.imageFile || bulkWhatsappPreviewState.imageCopied;
-  elements.openBulkWhatsappBatch.disabled = !batch.items.length || !elements.bulkWhatsappConsent.checked || !imageReady;
-  elements.openBulkWhatsappBatch.title = imageReady ? "" : "请先复制所选图片";
+  const messageReady = whatsappBulkCore.inspectMessageEncoding(bulkWhatsappPreviewState.template).valid;
+  elements.openBulkWhatsappBatch.disabled = !batch.items.length || !elements.bulkWhatsappConsent.checked || !imageReady || !messageReady;
+  elements.openBulkWhatsappBatch.title = !messageReady
+    ? "文案包含损坏符号，请先清除并重新插入 Emoji"
+    : imageReady ? "" : "请先复制所选图片";
 }
 
 function closeBulkWhatsappPreview() {
@@ -1589,6 +1627,10 @@ function closeBulkWhatsappPreview() {
 
 function openBulkWhatsappBatch() {
   const batch = currentBulkWhatsappBatch();
+  if (!whatsappBulkCore.inspectMessageEncoding(bulkWhatsappPreviewState.template).valid) {
+    toast("文案包含损坏符号，请先清除并重新插入 Emoji。");
+    return;
+  }
   if (!elements.bulkWhatsappConsent.checked || !batch.items.length) return;
 
   batch.items.forEach((entry) => {
@@ -4079,6 +4121,10 @@ elements.closeBulkWhatsappModal.addEventListener("click", closeBulkWhatsappPrevi
 elements.cancelBulkWhatsapp.addEventListener("click", closeBulkWhatsappPreview);
 elements.bulkWhatsappConsent.addEventListener("change", updateBulkWhatsappOpenButton);
 elements.bulkWhatsappMessageInput.addEventListener("input", handleBulkWhatsappMessageInput);
+elements.bulkWhatsappEmojiButtons.forEach((button) => button.addEventListener("click", () => {
+  insertBulkWhatsappEmoji(button.dataset.waEmoji);
+}));
+elements.removeBulkWhatsappBrokenChars.addEventListener("click", removeBulkWhatsappBrokenCharacters);
 elements.saveBulkWhatsappMessage.addEventListener("click", saveBulkWhatsappMessageTemplate);
 elements.bulkWhatsappImageInput.addEventListener("change", handleBulkWhatsappImageSelection);
 elements.copyBulkWhatsappImage.addEventListener("click", copyBulkWhatsappImage);

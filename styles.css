@@ -1409,6 +1409,70 @@ tr:last-child td {
   width: 100%;
 }
 
+.bulk-wa-emoji-toolbar {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.bulk-wa-emoji-toolbar > span {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+  margin-right: 2px;
+}
+
+.bulk-wa-emoji-toolbar button {
+  align-items: center;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  cursor: pointer;
+  display: inline-flex;
+  font-family: "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif;
+  font-size: 18px;
+  height: 34px;
+  justify-content: center;
+  line-height: 1;
+  padding: 0;
+  width: 36px;
+}
+
+.bulk-wa-emoji-toolbar button:hover {
+  background: #ecfdf5;
+  border-color: #86efac;
+}
+
+.bulk-wa-emoji-toolbar button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.bulk-wa-encoding-warning {
+  align-items: center;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 9px;
+  color: #991b1b;
+  display: flex;
+  font-size: 12px;
+  gap: 10px;
+  justify-content: space-between;
+  line-height: 1.5;
+  padding: 9px 10px;
+}
+
+.bulk-wa-encoding-warning[hidden] {
+  display: none;
+}
+
+.bulk-wa-encoding-warning .text-button {
+  color: #991b1b;
+  flex: 0 0 auto;
+  min-height: 32px;
+}
+
 .bulk-wa-copy-actions {
   align-items: center;
   display: flex;
