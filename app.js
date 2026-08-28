@@ -398,7 +398,15 @@ state.leads = mergeDuplicateLeads(state.leads.map(sanitizeLead));
 saveJson(storageKeys.leads, state.leads);
 
 if ("serviceWorker" in navigator) {
-  navigator.serviceWorker.register("./sw.js").catch(() => {});
+  let refreshingForServiceWorker = false;
+  navigator.serviceWorker.addEventListener("controllerchange", () => {
+    if (refreshingForServiceWorker) return;
+    refreshingForServiceWorker = true;
+    window.location.reload();
+  });
+  navigator.serviceWorker.register("./sw.js")
+    .then((registration) => registration.update())
+    .catch(() => {});
 }
 
 const elements = {

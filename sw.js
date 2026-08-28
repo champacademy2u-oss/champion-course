@@ -1,10 +1,10 @@
-const CACHE_NAME = "lead-center-v17-whatsapp-emoji-safe";
+const CACHE_NAME = "lead-center-v18-whatsapp-emoji-direct";
 const ASSETS = [
   "./",
   "./index.html",
-  "./styles.css?v=20260828-emoji-safe",
-  "./whatsapp-bulk-core.js?v=20260828-emoji-safe",
-  "./app.js?v=20260828-emoji-safe",
+  "./styles.css?v=20260828-emoji-direct",
+  "./whatsapp-bulk-core.js?v=20260828-emoji-direct",
+  "./app.js?v=20260828-emoji-direct",
   "./config.js",
   "./manifest.json",
   "./zoom.html",

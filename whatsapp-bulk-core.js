@@ -51,7 +51,7 @@
   function whatsappUrl(phone, message) {
     if (!E164_PATTERN.test(String(phone || ""))) return "";
     const normalizedMessage = inspectMessageEncoding(message).message;
-    return `https://wa.me/${phone}?text=${encodeURIComponent(normalizedMessage)}`;
+    return `https://api.whatsapp.com/send?phone=${phone}&text=${encodeURIComponent(normalizedMessage)}`;
   }
 
   function validateImageFile(file, maxBytes = DEFAULT_IMAGE_MAX_BYTES) {
