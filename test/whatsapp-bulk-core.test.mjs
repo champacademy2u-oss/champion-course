@@ -6,6 +6,7 @@ await import("../whatsapp-bulk-core.js");
 
 const {
   getBatch,
+  inspectMessageEncoding,
   maskPhone,
   normalizeMalaysiaPhone,
   prepareAudience,
@@ -75,6 +76,24 @@ test("masks preview numbers and builds an encoded WhatsApp URL", () => {
   );
 });
 
+test("preserves complete emoji sequences through the WhatsApp URL", () => {
+  const message = "📣 今晚见 🔥\n✅ 系统化执行\n👨‍💼 加油 🚀";
+  const url = whatsappUrl("60123456789", message);
+
+  assert.equal(new URL(url).searchParams.get("text"), message);
+  assert.deepEqual(inspectMessageEncoding(message), {
+    message,
+    valid: true,
+    replacementCount: 0,
+  });
+});
+
+test("detects replacement characters before they reach WhatsApp", () => {
+  const status = inspectMessageEncoding("📣 标题�\n� 内容");
+  assert.equal(status.valid, false);
+  assert.equal(status.replacementCount, 2);
+});
+
 test("accepts supported WhatsApp images and rejects unsafe selections", () => {
   assert.deepEqual(validateImageFile({ type: "image/jpeg", size: 1024 }), {
     valid: true,
@@ -94,6 +113,9 @@ test("bulk preview exposes custom copy and local-image safety controls", async (
   assert.match(html, /id="bulkWhatsappMessageInput"/);
   assert.match(html, /id="bulkWhatsappImageInput"/);
   assert.match(html, /图片只在本机预览，不会上传或保存/);
+  assert.match(html, /data-wa-emoji="📣"/);
+  assert.match(html, /id="bulkWhatsappEncodingWarning"/);
   assert.match(app, /applyTemplate\(bulkWhatsappPreviewState\.template, lead\)/);
   assert.match(app, /!bulkWhatsappPreviewState\.imageFile \|\| bulkWhatsappPreviewState\.imageCopied/);
+  assert.match(app, /inspectMessageEncoding\(bulkWhatsappPreviewState\.template\)/);
 });
