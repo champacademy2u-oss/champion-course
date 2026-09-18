@@ -2036,25 +2036,43 @@ async function uploadEmailCampaignImage() {
   const file = elements.emailCampaignImageFile.files?.[0];
   elements.emailCampaignImageFile.value = "";
   if (!file) return;
-  if (!["image/jpeg", "image/png", "image/webp"].includes(file.type) || file.size > 2 * 1024 * 1024 || !file.size) {
-    toast("❌ 图片只支持 JPG、PNG、WebP，且不可超过 2 MB");
+  if (!["image/jpeg", "image/png", "image/webp"].includes(file.type) || file.size > 50 * 1024 * 1024 || !file.size) {
+    toast("❌ 图片只支持 JPG、PNG、WebP，且不可超过 50 MB");
     return;
   }
   emailCampaignState.imageUploading = true;
   elements.emailCampaignImageStatus.textContent = "正在上传图片…";
   updateEmailCampaignWorkflow();
   try {
-    const dataUrl = await new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(String(reader.result || ""));
-      reader.onerror = () => reject(new Error("无法读取图片文件"));
-      reader.readAsDataURL(file);
-    });
-    const data = await emailCampaignRequest("upload-image", {
+    const prepared = await emailCampaignRequest("prepare-image-upload", {
       method: "POST",
-      body: { contentType: file.type, data: dataUrl.split(",")[1] || "" }
+      body: { contentType: file.type, size: file.size }
     });
-    elements.emailCampaignImageUrl.value = data.imageUrl;
+    const chunkBytes = Number(prepared.chunkBytes);
+    if (!Number.isSafeInteger(chunkBytes) || chunkBytes < 1 || chunkBytes > 2 * 1024 * 1024) {
+      throw new Error("服务器返回的图片分块大小不正确");
+    }
+    const count = Math.ceil(file.size / chunkBytes);
+    for (let index = 0; index < count; index += 1) {
+      const chunk = file.slice(index * chunkBytes, Math.min((index + 1) * chunkBytes, file.size));
+      const dataUrl = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result || ""));
+        reader.onerror = () => reject(new Error("无法读取图片文件"));
+        reader.readAsDataURL(chunk);
+      });
+      await emailCampaignRequest("upload-image-chunk", {
+        method: "POST",
+        body: { imageId: prepared.imageId, index, data: dataUrl.split(",")[1] || "" }
+      });
+      elements.emailCampaignImageStatus.textContent = `正在上传图片… ${index + 1}/${count}`;
+    }
+    elements.emailCampaignImageStatus.textContent = "正在检查图片…";
+    const finished = await emailCampaignRequest("finish-image-upload", {
+      method: "POST",
+      body: { imageId: prepared.imageId, contentType: file.type, size: file.size }
+    });
+    elements.emailCampaignImageUrl.value = finished.imageUrl;
     if (!elements.emailCampaignImageAlt.value.trim()) elements.emailCampaignImageAlt.value = "Champion Academy 课程图片";
     markEmailCampaignDirty();
     renderEmailCampaignImagePreview();

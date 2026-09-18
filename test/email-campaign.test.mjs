@@ -21,9 +21,10 @@ import {
   verifyUnsubscribeToken
 } from '../lib/email-campaign-core.js';
 import { emailCampaignInternals, handleEmailCampaignRequest } from '../lib/email-campaign-api.js';
-import { decodeCampaignImage, MAX_EMAIL_IMAGE_BYTES, validEmailImageId } from '../lib/email-campaign-image.js';
+import { campaignImageMatchesType, decodeCampaignImage, decodeCampaignImageChunk, EMAIL_IMAGE_CHUNK_BYTES, expectedCampaignImageChunks, MAX_EMAIL_IMAGE_BYTES, validEmailImageId, validateCampaignImageUpload } from '../lib/email-campaign-image.js';
 import { webhookRecipientMutation } from '../lib/email-webhook-api.js';
 import emailCampaignsHandler from '../api/email-campaigns.js';
+import { sendCampaignImageObject } from '../api/email-image.js';
 
 const campaign = sanitizeCampaignInput({
   internalName: 'August Notice',
@@ -71,15 +72,43 @@ test('campaign content and audience inputs are normalized and bounded', () => {
   assert.throws(() => validateAudienceSelections([{ source: 'leads', ids: Array.from({ length: 501 }, (_, index) => `id-${index}`) }]), /500/);
 });
 
-test('campaign image upload accepts only small images with matching file signatures', () => {
+test('campaign image upload accepts large signed uploads with matching file signatures', () => {
   const png = Buffer.from('89504e470d0a1a0a00000000', 'hex');
   const image = decodeCampaignImage({ contentType: 'image/png', data: png.toString('base64') });
   assert.deepEqual(image.bytes, png);
   assert.throws(() => decodeCampaignImage({ contentType: 'image/svg+xml', data: png.toString('base64') }), /JPG/);
   assert.throws(() => decodeCampaignImage({ contentType: 'image/jpeg', data: png.toString('base64') }), /格式不符/);
-  assert.throws(() => decodeCampaignImage({ contentType: 'image/png', data: Buffer.alloc(MAX_EMAIL_IMAGE_BYTES + 1).toString('base64') }), /2 MB/);
+  assert.throws(() => decodeCampaignImage({ contentType: 'image/png', data: Buffer.alloc(2 * 1024 * 1024 + 1).toString('base64') }), /2 MB/);
+  assert.deepEqual(validateCampaignImageUpload({ contentType: 'image/png', size: 8 * 1024 * 1024 }), { contentType: 'image/png', size: 8 * 1024 * 1024 });
+  assert.throws(() => validateCampaignImageUpload({ contentType: 'image/png', size: MAX_EMAIL_IMAGE_BYTES + 1 }), /50 MB/);
+  assert.throws(() => validateCampaignImageUpload({ contentType: 'image/svg+xml', size: 1024 }), /JPG/);
+  assert.equal(campaignImageMatchesType('image/png', png), true);
+  assert.equal(campaignImageMatchesType('image/jpeg', png), false);
+  assert.equal(expectedCampaignImageChunks(EMAIL_IMAGE_CHUNK_BYTES + 1), 2);
+  assert.equal(decodeCampaignImageChunk(png.toString('base64')).length, png.length);
+  assert.throws(() => decodeCampaignImageChunk(Buffer.alloc(EMAIL_IMAGE_CHUNK_BYTES + 1).toString('base64')), /分块/);
   assert.equal(validEmailImageId('123e4567-e89b-42d3-a456-426614174000'), true);
   assert.equal(validEmailImageId('../videos/secret'), false);
+});
+
+test('public email image endpoint streams images larger than the function response limit', async () => {
+  const chunk = Buffer.alloc(1024 * 1024);
+  const response = {
+    headers: {},
+    bytes: 0,
+    setHeader(name, value) { this.headers[name] = value; },
+    write(bytes) { this.bytes += bytes.length; return true; },
+    end() { this.ended = true; }
+  };
+  await sendCampaignImageObject({
+    ContentType: 'image/png',
+    ContentLength: 6 * chunk.length,
+    Body: (async function* () { for (let index = 0; index < 6; index++) yield chunk; })()
+  }, response);
+  assert.equal(response.statusCode, 200);
+  assert.equal(response.headers['Content-Length'], String(6 * chunk.length));
+  assert.equal(response.bytes, 6 * chunk.length);
+  assert.equal(response.ended, true);
 });
 
 test('public email image endpoint rejects invalid IDs and write methods', async () => {

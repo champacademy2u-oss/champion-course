@@ -66,6 +66,11 @@ async function getStoredObject(objectKey) {
   return r2().send(new GetObjectCommand({ Bucket: values.bucketName, Key: objectKey }));
 }
 
+async function headStoredObject(objectKey) {
+  const values = config();
+  return r2().send(new HeadObjectCommand({ Bucket: values.bucketName, Key: objectKey }));
+}
+
 async function createReadUrl(objectKey) {
   const values = config();
   return getSignedUrl(r2(), new GetObjectCommand({
@@ -96,6 +101,7 @@ export {
   createUploadUrl,
   deleteStoredObject,
   getStoredObject,
+  headStoredObject,
   putStoredObject,
   storedObjectExists
 };
