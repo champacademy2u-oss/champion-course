@@ -91,7 +91,7 @@ export default async function handler(req, res) {
       state: lead.state,
       source: lead.source,
       campaign: lead.campaign,
-      courseDate: '2026-08-28',
+      courseDate: lead.courseDate,
       submittedAt,
       updatedAt: timestamp,
       ...(existing.exists ? {} : { createdAt: timestamp })
