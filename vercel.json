@@ -19,6 +19,7 @@
     { "src": "/api/preview-registration", "dest": "/api/zoom.js?action=registerPreviewLead" },
     { "src": "/api/unsubscribe", "dest": "/api/email-campaigns.js" },
     { "src": "/api/email-track", "dest": "/api/email-campaigns.js" },
+    { "src": "/api/email-image", "dest": "/api/email-campaigns.js" },
     { "src": "/api/(.*)", "dest": "/api/$1.js" },
     { "src": "/admin", "dest": "/public/admin.html" },
     { "src": "/watch/([^/]+)", "dest": "/public/watch.html" },

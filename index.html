@@ -467,6 +467,18 @@
                 <label class="template-field email-field-full"><span>Email 标题</span><input id="emailCampaignSubject" type="text" maxlength="200" placeholder="{{name}}，Champion Academy 有一项通知" /></label>
                 <label class="template-field email-field-full"><span>预览文字</span><input id="emailCampaignPreview" type="text" maxlength="240" placeholder="收件箱标题旁显示的简短说明" /></label>
                 <label class="template-field email-field-full"><span>正文（支持 {{name}}）</span><textarea id="emailCampaignBody" rows="9" maxlength="12000" placeholder="Hi {{name}}，&#10;&#10;这里填写需要通知客户的内容。"></textarea></label>
+                <div class="email-field-full email-image-editor">
+                  <label class="template-field"><span>邮件图片（选填）</span><input id="emailCampaignImageUrl" type="url" inputmode="url" maxlength="2048" placeholder="上传图片，或粘贴公开的 HTTPS 图片链接" /></label>
+                  <label class="template-field"><span>图片说明（图片无法显示时使用）</span><input id="emailCampaignImageAlt" type="text" maxlength="160" placeholder="例如：打造赚钱机器课程海报" /></label>
+                  <div class="email-campaign-actions">
+                    <input id="emailCampaignImageFile" type="file" accept="image/jpeg,image/png,image/webp" hidden />
+                    <button class="text-button" id="emailUploadImageBtn" type="button">选择并上传图片</button>
+                    <button class="text-button" id="emailRemoveImageBtn" type="button" hidden>移除图片</button>
+                  </div>
+                  <p class="muted email-image-note">支持 JPG、PNG、WebP，最多 2 MB。图片会放在正文下方、按钮上方；部分收件箱可能默认隐藏图片。</p>
+                  <div id="emailCampaignImagePreview" class="email-image-preview" hidden><img id="emailCampaignImageThumb" alt="邮件图片预览" /></div>
+                  <p id="emailCampaignImageStatus" class="muted email-image-note" role="status" aria-live="polite"></p>
+                </div>
                 <label class="template-field"><span>CTA 按钮文字</span><input id="emailCampaignCtaLabel" type="text" maxlength="80" placeholder="查看详情" /></label>
                 <label class="template-field"><span>CTA HTTPS 链接</span><input id="emailCampaignCtaUrl" type="url" inputmode="url" maxlength="2048" placeholder="https://..." /></label>
               </div>

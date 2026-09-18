@@ -58,12 +58,14 @@ Facebook 留言关键词使用 `ZOOM`。人工私讯链接范例：
 安全寄送流程固定为：
 
 1. 从 Leads、Preview Leads 或 Landing Leads 勾选客户；Ebook Leads 目前没有 Email，因此不会出现。
-2. 填写 Campaign 名称、标题、预览文字、正文、CTA 按钮和 HTTPS 链接并保存草稿。
+2. 填写 Campaign 名称、标题、预览文字、正文、CTA 按钮和 HTTPS 链接；可上传一张不超过 2 MB 的 JPG/PNG/WebP 图片，或填写公开的 HTTPS 图片链接，再保存草稿。图片会显示在正文与 CTA 按钮之间；部分收件箱可能阻挡远端图片，因此正文不能只靠图片传达重要信息。
 3. 先寄到固定的管理员测试邮箱。
 4. 审核有效、重复、无效、未同意及永久排除人数。
 5. 确认客户已同意接收 Email，再由管理员点击最终发送。
 6. 系统每批处理 25 人；关闭页面不会遗失进度，重新打开 Campaign 可继续。
 7. 已完成的 Campaign 会保持邮件内容只读以保护历史记录；每天有新报名者时，点击记录旁或查看页内的「追加新收件人」。系统会保留原报告，只把相同 Email 排入尚未寄过的新收件人，并自动排除已经寄过的人。
+
+更换或移除图片会改变 Campaign 内容版本，必须重新保存并寄管理员测试邮件。上传图片由管理员认证的 API 保存到私有 R2，邮件通过公开只读图片地址载入；请勿上传包含客户资料或机密内容的图片。图片 URL 不计入 CTA 点击报告。
 
 没有自有域名时，可暂时把 `EMAIL_FROM` 设为 `Champion Academy <onboarding@resend.dev>`，但系统只允许寄到管理员测试邮箱的测试邮件；不会允许开始真实名单寄送。正式上线前必须先在 Resend 完成自有寄件域名的 SPF/DKIM 验证，把 `EMAIL_FROM` 改为 `Champion Academy <updates@已验证域名>`，并在域名设置启用 Open Tracking 与 Click Tracking。Webhook URL 是：
 

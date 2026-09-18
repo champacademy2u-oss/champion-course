@@ -21,7 +21,9 @@ import {
   verifyUnsubscribeToken
 } from '../lib/email-campaign-core.js';
 import { emailCampaignInternals, handleEmailCampaignRequest } from '../lib/email-campaign-api.js';
+import { decodeCampaignImage, MAX_EMAIL_IMAGE_BYTES, validEmailImageId } from '../lib/email-campaign-image.js';
 import { webhookRecipientMutation } from '../lib/email-webhook-api.js';
+import emailCampaignsHandler from '../api/email-campaigns.js';
 
 const campaign = sanitizeCampaignInput({
   internalName: 'August Notice',
@@ -63,8 +65,31 @@ test('campaign content and audience inputs are normalized and bounded', () => {
     { source: 'leads', ids: ['one', 'one', 'two'] }
   ]), [{ source: 'leads', ids: ['one', 'two'] }]);
   assert.throws(() => sanitizeCampaignInput({ ...campaign, ctaUrl: 'http://example.com' }), /https/);
+  assert.throws(() => sanitizeCampaignInput({ ...campaign, imageUrl: 'http://example.com/poster.png' }), /https/);
+  assert.notEqual(contentFingerprint(campaign), contentFingerprint({ ...campaign, imageUrl: 'https://example.com/poster.png' }));
   assert.throws(() => validateAudienceSelections([{ source: 'unknown', ids: ['one'] }]), /来源/);
   assert.throws(() => validateAudienceSelections([{ source: 'leads', ids: Array.from({ length: 501 }, (_, index) => `id-${index}`) }]), /500/);
+});
+
+test('campaign image upload accepts only small images with matching file signatures', () => {
+  const png = Buffer.from('89504e470d0a1a0a00000000', 'hex');
+  const image = decodeCampaignImage({ contentType: 'image/png', data: png.toString('base64') });
+  assert.deepEqual(image.bytes, png);
+  assert.throws(() => decodeCampaignImage({ contentType: 'image/svg+xml', data: png.toString('base64') }), /JPG/);
+  assert.throws(() => decodeCampaignImage({ contentType: 'image/jpeg', data: png.toString('base64') }), /格式不符/);
+  assert.throws(() => decodeCampaignImage({ contentType: 'image/png', data: Buffer.alloc(MAX_EMAIL_IMAGE_BYTES + 1).toString('base64') }), /2 MB/);
+  assert.equal(validEmailImageId('123e4567-e89b-42d3-a456-426614174000'), true);
+  assert.equal(validEmailImageId('../videos/secret'), false);
+});
+
+test('public email image endpoint rejects invalid IDs and write methods', async () => {
+  const response = () => ({ statusCode: 200, headers: {}, setHeader(name, value) { this.headers[name] = value; }, end() {} });
+  const invalid = response();
+  await emailCampaignsHandler({ method: 'GET', url: '/api/email-image?id=../videos/private' }, invalid);
+  assert.equal(invalid.statusCode, 404);
+  const write = response();
+  await emailCampaignsHandler({ method: 'POST', url: '/api/email-image' }, write);
+  assert.equal(write.statusCode, 405);
 });
 
 test('daily audience additions merge into one campaign without duplicating source records', () => {
@@ -105,6 +130,24 @@ test('email renderer escapes customer-controlled content and includes one tracke
   assert.match(content.html, /action=open/);
   assert.match(content.html, /取消订阅未来 Email/);
   assert.match(content.text, /api\.example\.com/);
+});
+
+test('email image is displayed above the CTA without becoming a tracked click', () => {
+  const imageCampaign = sanitizeCampaignInput({
+    ...campaign,
+    imageUrl: 'https://example.com/poster.png?x=1&y=2',
+    imageAlt: '<课程海报> {{name}}'
+  });
+  const content = buildEmailContent({
+    campaign: imageCampaign,
+    recipient: { name: 'Alex' },
+    unsubscribeUrl: 'https://api.example.com/unsubscribe'
+  });
+  assert.match(content.html, /src="https:\/\/example\.com\/poster\.png\?x=1&amp;y=2"/);
+  assert.match(content.html, /alt="&lt;课程海报&gt; Alex"/);
+  assert.ok(content.html.indexOf('poster.png') < content.html.indexOf('查看详情'));
+  assert.equal((content.html.match(/<a href=/g) || []).length, 2);
+  assert.doesNotMatch(content.html, /<课程海报>/);
 });
 
 test('unsubscribe token round-trips without exposing an email address', () => {

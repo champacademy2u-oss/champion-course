@@ -50,6 +50,22 @@ async function createUploadUrl(objectKey, contentType) {
   }), { expiresIn: 30 * 60 });
 }
 
+async function putStoredObject(objectKey, bytes, contentType) {
+  const values = config();
+  await r2().send(new PutObjectCommand({
+    Bucket: values.bucketName,
+    Key: objectKey,
+    Body: bytes,
+    ContentType: contentType,
+    ContentLength: bytes.length
+  }));
+}
+
+async function getStoredObject(objectKey) {
+  const values = config();
+  return r2().send(new GetObjectCommand({ Bucket: values.bucketName, Key: objectKey }));
+}
+
 async function createReadUrl(objectKey) {
   const values = config();
   return getSignedUrl(r2(), new GetObjectCommand({
@@ -79,5 +95,7 @@ export {
   createReadUrl,
   createUploadUrl,
   deleteStoredObject,
+  getStoredObject,
+  putStoredObject,
   storedObjectExists
 };
