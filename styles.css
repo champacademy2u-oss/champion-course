@@ -1979,6 +1979,38 @@ input[type="checkbox"].lead-select {
   grid-column: 1 / -1;
 }
 
+.email-image-editor {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #f8fafb;
+}
+
+.email-image-note {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.email-image-preview {
+  max-width: 320px;
+  padding: 8px;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+
+.email-image-preview img {
+  display: block;
+  max-width: 100%;
+  max-height: 220px;
+  height: auto;
+  margin: auto;
+  border-radius: 6px;
+}
+
 .email-audience-toolbar {
   display: flex;
   align-items: center;

@@ -561,6 +561,14 @@ const elements = {
   emailCampaignSubject: document.querySelector("#emailCampaignSubject"),
   emailCampaignPreview: document.querySelector("#emailCampaignPreview"),
   emailCampaignBody: document.querySelector("#emailCampaignBody"),
+  emailCampaignImageUrl: document.querySelector("#emailCampaignImageUrl"),
+  emailCampaignImageAlt: document.querySelector("#emailCampaignImageAlt"),
+  emailCampaignImageFile: document.querySelector("#emailCampaignImageFile"),
+  emailUploadImageBtn: document.querySelector("#emailUploadImageBtn"),
+  emailRemoveImageBtn: document.querySelector("#emailRemoveImageBtn"),
+  emailCampaignImagePreview: document.querySelector("#emailCampaignImagePreview"),
+  emailCampaignImageThumb: document.querySelector("#emailCampaignImageThumb"),
+  emailCampaignImageStatus: document.querySelector("#emailCampaignImageStatus"),
   emailCampaignCtaLabel: document.querySelector("#emailCampaignCtaLabel"),
   emailCampaignCtaUrl: document.querySelector("#emailCampaignCtaUrl"),
   emailDraftState: document.querySelector("#emailDraftState"),
@@ -654,7 +662,8 @@ const emailCampaignState = {
   report: null,
   service: null,
   sending: false,
-  appendMode: false
+  appendMode: false,
+  imageUploading: false
 };
 
 function updateEmailAdminAuthUi(message = "") {
@@ -1846,6 +1855,8 @@ function emailFormData() {
     subject: elements.emailCampaignSubject.value,
     previewText: elements.emailCampaignPreview.value,
     bodyText: elements.emailCampaignBody.value,
+    imageUrl: elements.emailCampaignImageUrl.value,
+    imageAlt: elements.emailCampaignImageAlt.value,
     ctaLabel: elements.emailCampaignCtaLabel.value,
     ctaUrl: elements.emailCampaignCtaUrl.value,
     selections: emailAudienceSelections()
@@ -1858,6 +1869,11 @@ function setEmailFormDisabled(contentDisabled, audienceDisabled = contentDisable
     elements.emailCampaignSubject,
     elements.emailCampaignPreview,
     elements.emailCampaignBody,
+    elements.emailCampaignImageUrl,
+    elements.emailCampaignImageAlt,
+    elements.emailCampaignImageFile,
+    elements.emailUploadImageBtn,
+    elements.emailRemoveImageBtn,
     elements.emailCampaignCtaLabel,
     elements.emailCampaignCtaUrl
   ].forEach(element => { if (element) element.disabled = contentDisabled; });
@@ -1879,6 +1895,7 @@ function resetEmailAudienceAudit() {
 }
 
 function emailCampaignStartBlocker() {
+  if (emailCampaignState.imageUploading) return "请等待图片上传完成。";
   const campaign = emailCampaignState.activeCampaign;
   if (!campaign) return "请先建立 Campaign，填写内容并保存草稿。";
   if (campaign.status === "completed" && !emailCampaignState.appendMode) return "这个 Campaign 已完成；如需寄给新报名者，请点击「追加新收件人」。";
@@ -1923,18 +1940,22 @@ function updateEmailCampaignWorkflow() {
     && campaign?.testSentContentVersion === campaign?.contentVersion
     && campaign?.testProvider === emailCampaignState.service?.provider
   );
-  setEmailFormDisabled(locked, locked && !appendMode);
+  setEmailFormDisabled(locked || emailCampaignState.imageUploading, locked && !appendMode);
+  elements.emailNewCampaignBtn.disabled = emailCampaignState.imageUploading;
+  elements.emailCampaignListBody?.querySelectorAll(".email-campaign-open, .email-campaign-append").forEach(button => {
+    button.disabled = emailCampaignState.imageUploading;
+  });
   if (elements.emailAppendRecipientsBtn) elements.emailAppendRecipientsBtn.hidden = status !== "completed" || appendMode;
-  elements.emailSaveDraftBtn.disabled = locked;
-  elements.emailSendTestBtn.disabled = locked || !hasDraft || emailCampaignState.dirty;
-  elements.emailPreviewAudienceBtn.disabled = (!appendMode && (locked || !hasDraft || emailCampaignState.dirty)) || !emailCampaignState.selectedKeys.size;
+  elements.emailSaveDraftBtn.disabled = locked || emailCampaignState.imageUploading;
+  elements.emailSendTestBtn.disabled = locked || !hasDraft || emailCampaignState.dirty || emailCampaignState.imageUploading;
+  elements.emailPreviewAudienceBtn.disabled = (!appendMode && (locked || !hasDraft || emailCampaignState.dirty)) || !emailCampaignState.selectedKeys.size || emailCampaignState.imageUploading;
   elements.emailPreviewAudienceBtn.textContent = appendMode ? "审核新增名单" : "审核名单";
   elements.emailPauseCampaignBtn.hidden = status !== "sending";
   elements.emailStartCampaignBtn.textContent = appendMode
     ? "确认并发送新增名单"
     : ["sending", "paused", "preparing"].includes(status) ? "继续发送" : "确认并开始发送";
   const startBlocker = emailCampaignStartBlocker();
-  elements.emailStartCampaignBtn.disabled = status === "completed" && !appendMode;
+  elements.emailStartCampaignBtn.disabled = (status === "completed" && !appendMode) || emailCampaignState.imageUploading;
   elements.emailStartCampaignBtn.title = startBlocker;
   if (elements.emailStartRequirement) {
     elements.emailStartRequirement.textContent = startBlocker
@@ -1991,6 +2012,62 @@ function markEmailAudienceChanged() {
   markEmailCampaignDirty();
 }
 
+function renderEmailCampaignImagePreview() {
+  const value = elements.emailCampaignImageUrl.value.trim();
+  elements.emailRemoveImageBtn.hidden = !value;
+  elements.emailCampaignImagePreview.hidden = true;
+  elements.emailCampaignImageThumb.removeAttribute("src");
+  if (!value) {
+    elements.emailCampaignImageStatus.textContent = "";
+    return;
+  }
+  try {
+    const url = new URL(value);
+    if (url.protocol !== "https:") throw new Error();
+    elements.emailCampaignImageThumb.src = url.toString();
+    elements.emailCampaignImagePreview.hidden = false;
+    elements.emailCampaignImageStatus.textContent = "正在载入图片预览…";
+  } catch {
+    elements.emailCampaignImageStatus.textContent = "请输入完整的公开 HTTPS 图片链接。";
+  }
+}
+
+async function uploadEmailCampaignImage() {
+  const file = elements.emailCampaignImageFile.files?.[0];
+  elements.emailCampaignImageFile.value = "";
+  if (!file) return;
+  if (!["image/jpeg", "image/png", "image/webp"].includes(file.type) || file.size > 2 * 1024 * 1024 || !file.size) {
+    toast("❌ 图片只支持 JPG、PNG、WebP，且不可超过 2 MB");
+    return;
+  }
+  emailCampaignState.imageUploading = true;
+  elements.emailCampaignImageStatus.textContent = "正在上传图片…";
+  updateEmailCampaignWorkflow();
+  try {
+    const dataUrl = await new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result || ""));
+      reader.onerror = () => reject(new Error("无法读取图片文件"));
+      reader.readAsDataURL(file);
+    });
+    const data = await emailCampaignRequest("upload-image", {
+      method: "POST",
+      body: { contentType: file.type, data: dataUrl.split(",")[1] || "" }
+    });
+    elements.emailCampaignImageUrl.value = data.imageUrl;
+    if (!elements.emailCampaignImageAlt.value.trim()) elements.emailCampaignImageAlt.value = "Champion Academy 课程图片";
+    markEmailCampaignDirty();
+    renderEmailCampaignImagePreview();
+    toast("✅ 图片已上传，请保存草稿并重新寄测试邮件确认效果");
+  } catch (error) {
+    elements.emailCampaignImageStatus.textContent = error.message;
+    toast(`❌ 图片上传失败：${error.message}`);
+  } finally {
+    emailCampaignState.imageUploading = false;
+    updateEmailCampaignWorkflow();
+  }
+}
+
 function newEmailCampaign({ revealEditor = false } = {}) {
   emailCampaignState.activeCampaign = null;
   emailCampaignState.audienceAudit = null;
@@ -2003,6 +2080,10 @@ function newEmailCampaign({ revealEditor = false } = {}) {
   elements.emailCampaignSubject.value = "{{name}}，Champion Academy 有一项通知";
   elements.emailCampaignPreview.value = "请查看这项最新通知";
   elements.emailCampaignBody.value = "Hi {{name}}，\n\n这里填写需要通知客户的内容。\n\nChampion Academy";
+  elements.emailCampaignImageUrl.value = "";
+  elements.emailCampaignImageAlt.value = "";
+  elements.emailCampaignImageFile.value = "";
+  renderEmailCampaignImagePreview();
   elements.emailCampaignCtaLabel.value = "查看详情";
   elements.emailCampaignCtaUrl.value = "";
   elements.emailConsentConfirmed.checked = false;
@@ -2028,6 +2109,10 @@ function fillEmailCampaignForm(campaign) {
   elements.emailCampaignSubject.value = campaign.subject || "";
   elements.emailCampaignPreview.value = campaign.previewText || "";
   elements.emailCampaignBody.value = campaign.bodyText || "";
+  elements.emailCampaignImageUrl.value = campaign.imageUrl || "";
+  elements.emailCampaignImageAlt.value = campaign.imageAlt || "";
+  elements.emailCampaignImageFile.value = "";
+  renderEmailCampaignImagePreview();
   elements.emailCampaignCtaLabel.value = campaign.ctaLabel || "";
   elements.emailCampaignCtaUrl.value = campaign.ctaUrl || "";
   elements.emailConsentConfirmed.checked = Boolean(campaign.startedAt);
@@ -4146,6 +4231,25 @@ if (elements.emailRefreshCampaignsBtn) elements.emailRefreshCampaignsBtn.addEven
 if (elements.emailAdminSignInBtn) elements.emailAdminSignInBtn.addEventListener("click", signInEmailAdminWithGoogle);
 if (elements.emailAdminSignOutBtn) elements.emailAdminSignOutBtn.addEventListener("click", signOutEmailAdminGoogle);
 if (elements.emailNewCampaignBtn) elements.emailNewCampaignBtn.addEventListener("click", () => newEmailCampaign({ revealEditor: true }));
+if (elements.emailUploadImageBtn) elements.emailUploadImageBtn.addEventListener("click", () => elements.emailCampaignImageFile.click());
+if (elements.emailCampaignImageFile) elements.emailCampaignImageFile.addEventListener("change", uploadEmailCampaignImage);
+if (elements.emailCampaignImageUrl) elements.emailCampaignImageUrl.addEventListener("change", renderEmailCampaignImagePreview);
+if (elements.emailCampaignImageThumb) {
+  elements.emailCampaignImageThumb.addEventListener("load", () => {
+    if (elements.emailCampaignImageUrl.value.trim()) elements.emailCampaignImageStatus.textContent = "图片预览已载入。";
+  });
+  elements.emailCampaignImageThumb.addEventListener("error", () => {
+    if (!elements.emailCampaignImageUrl.value.trim()) return;
+    elements.emailCampaignImagePreview.hidden = true;
+    elements.emailCampaignImageStatus.textContent = "图片无法载入，请确认链接公开可访问。";
+  });
+}
+if (elements.emailRemoveImageBtn) elements.emailRemoveImageBtn.addEventListener("click", () => {
+  elements.emailCampaignImageUrl.value = "";
+  elements.emailCampaignImageAlt.value = "";
+  renderEmailCampaignImagePreview();
+  markEmailCampaignDirty();
+});
 if (elements.emailAppendRecipientsBtn) elements.emailAppendRecipientsBtn.addEventListener("click", () => beginEmailCampaignAppend());
 if (elements.emailSaveDraftBtn) elements.emailSaveDraftBtn.addEventListener("click", saveEmailCampaignDraft);
 if (elements.emailSendTestBtn) elements.emailSendTestBtn.addEventListener("click", sendEmailCampaignTest);
@@ -4191,6 +4295,8 @@ if (elements.emailConsentConfirmed) elements.emailConsentConfirmed.addEventListe
   elements.emailCampaignSubject,
   elements.emailCampaignPreview,
   elements.emailCampaignBody,
+  elements.emailCampaignImageUrl,
+  elements.emailCampaignImageAlt,
   elements.emailCampaignCtaLabel,
   elements.emailCampaignCtaUrl
 ].filter(Boolean).forEach(input => input.addEventListener("input", markEmailCampaignDirty));
