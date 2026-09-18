@@ -1,6 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
+  CHAMP_PREVIEW_CAMPAIGN,
+  CHAMP_PREVIEW_LEAD_SOURCE,
   PREVIEW_LEAD_SOURCE,
   allowedPreviewLeadOrigins,
   normalizePreviewLead,
@@ -20,6 +22,22 @@ test('normalizes a valid Preview lead for the existing CRM source', () => {
   assert.equal(lead.phoneDigits, '601167459987');
   assert.equal(lead.state, 'johor');
   assert.equal(lead.source, PREVIEW_LEAD_SOURCE);
+  assert.equal(lead.courseDate, '2026-08-28');
+});
+
+test('routes the Unlimited Leverage form to Landing Leads', () => {
+  const lead = normalizePreviewLead({
+    course: 'champ-preview',
+    name: 'Test User',
+    email: 'test@example.com',
+    phone: '60123456789',
+    state: 'johor'
+  });
+
+  assert.equal(lead.source, CHAMP_PREVIEW_LEAD_SOURCE);
+  assert.equal(lead.campaign, CHAMP_PREVIEW_CAMPAIGN);
+  assert.equal(lead.courseDate, '2026-10');
+  assert.throws(() => normalizePreviewLead({ ...lead, course: 'other' }), /课程资料/);
 });
 
 test('rejects malformed public registration data', () => {
