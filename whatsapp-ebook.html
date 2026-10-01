@@ -600,6 +600,7 @@
   <script>
     // ── Init Firebase ──
     let _db = null;
+    let _firebaseInitError = null;
     let _firebaseReady = Promise.resolve(false);
     try {
       if (window.FIREBASE_CONFIG) {
@@ -609,7 +610,16 @@
             ? firebase.app()
             : firebase.initializeApp(window.FIREBASE_CONFIG);
           const auth = firebase.auth(fbApp);
-          await auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL);
+          // Private / in-app browsers may not support permanent auth storage.
+          // Storage must not be a requirement for this one-time lead submission.
+          if (!auth.currentUser) {
+            try {
+              await auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL);
+            } catch (storageError) {
+              console.warn('[Landing] Auth storage unavailable; using memory mode.', storageError.code);
+              await auth.setPersistence(firebase.auth.Auth.Persistence.NONE);
+            }
+          }
           if (!auth.currentUser) await auth.signInAnonymously();
 
           _db = firebase.firestore(fbApp);
@@ -618,11 +628,13 @@
           return true;
         })().catch((error) => {
           _db = null;
+          _firebaseInitError = error;
           console.warn('[Landing] Firebase connection failed:', error);
           return false;
         });
       }
     } catch (e) {
+      _firebaseInitError = e;
       console.warn('[Landing] Firebase init failed:', e);
     }
 
@@ -697,12 +709,19 @@
       // strand the lead on the visitor's device and hide it from Ebook Leads.
       try {
         const connected = await _firebaseReady;
-        if (!connected || !_db) throw new Error('Firebase unavailable');
+        if (!connected || !_db) {
+          throw _firebaseInitError || Object.assign(new Error('Firebase unavailable'), { code: 'firebase-unavailable' });
+        }
         await _db.collection('landing_leads').doc(leadData.id).set(leadData);
         console.log('[Landing] Lead saved to Firebase.');
       } catch (err) {
         console.warn('[Landing] Firebase save failed:', err);
-        errorMsg.textContent = '资料暂时无法提交，请检查网络后再试一次。';
+        // Show only the diagnostic code, never raw request or customer data.
+        const code = String(err.code || 'submit-unavailable').replace(/[^a-z0-9_/-]/gi, '').slice(0,80);
+        const hint = code === 'permission-denied'
+          ? '资料保存权限暂时异常，请联系 Champ Academy。'
+          : '资料暂时无法提交，请重试；若仍失败，请把下方代码发给 Champ Academy。';
+        errorMsg.textContent = `${hint}（代码：${code}）`;
         errorMsg.classList.add('show');
         submitBtn.classList.remove('loading');
         submitBtn.querySelector('.btn-text').textContent = '🎁 立即免费领取电子书';
