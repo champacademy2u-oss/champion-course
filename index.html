@@ -666,7 +666,8 @@
               </div>
               <button class="text-button" id="refreshLandingLeadsBtn" onclick="loadLandingLeads()" style="font-weight:700;">🔄 刷新</button>
               <button class="text-button" id="exportLandingLeadsBtn" onclick="exportLandingLeadsCSV()" style="font-weight:700;">⬇ Export CSV</button>
-              <a href="landing.html" target="_blank" class="text-button primary" style="text-decoration:none; font-weight:700; display:inline-flex; align-items:center; gap:6px;">🔗 打开 Ebook 页</a>
+              <a href="landing.html" target="_blank" class="text-button primary" style="text-decoration:none; font-weight:700; display:inline-flex; align-items:center; gap:6px;">🔗 世界级营销100招</a>
+              <a href="whatsapp-ebook.html" target="_blank" class="text-button primary" style="text-decoration:none; font-weight:700; display:inline-flex; align-items:center; gap:6px;">🔗 WhatsApp 防封指南</a>
             </div>
           </div>
 
@@ -681,6 +682,7 @@
                   <th style="width:36px"><input type="checkbox" id="landingSelectAll" onchange="toggleSelectAllLandingLeads(this)" title="全选"></th>
                   <th style="width:40px">#</th>
                   <th>姓名</th>
+                  <th>电子书</th>
                   <th>电话</th>
                   <th>工作领域</th>
                   <th>面对的挑战</th>
@@ -689,7 +691,7 @@
                 </tr>
               </thead>
               <tbody id="landingLeadsBody">
-                <tr><td colspan="7" style="text-align:center; color:var(--muted); padding:40px;">正在加载...</td></tr>
+                <tr><td colspan="9" style="text-align:center; color:var(--muted); padding:40px;">正在加载...</td></tr>
               </tbody>
             </table>
           </div>
@@ -1132,6 +1134,6 @@
     <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-storage-compat.js"></script>
     <script src="./config.js"></script>
     <script src="./whatsapp-bulk-core.js?v=20260828-emoji-direct"></script>
-    <script src="./app.js?v=20260828-emoji-direct"></script>
+    <script src="./app.js?v=20261001-ebook-sources"></script>
   </body>
 </html>

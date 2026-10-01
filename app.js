@@ -5028,12 +5028,19 @@ initFromFirebase();
 // Landing Page Leads Admin — reads from Firebase Firestore
 // ──────────────────────────────────────────────────────
 
+function ebookLeadTitle(lead) {
+  if (lead.ebookTitle) return lead.ebookTitle;
+  if (lead.ebookId === 'whatsapp-account-safety') return 'WhatsApp 预防封禁与被封处理';
+  if (lead.ebookId === 'world-class-marketing-100') return '世界级营销100招';
+  return '未标记（旧记录）';
+}
+
 window.loadLandingLeads = async function() {
   const tbody = document.getElementById('landingLeadsBody');
   const statsBar = document.getElementById('landingLeadsStats');
   if (!tbody) return;
 
-  tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:40px;color:var(--muted)">⏳ 加载中...</td></tr>`;
+  tbody.innerHTML = `<tr><td colspan="9" style="text-align:center;padding:40px;color:var(--muted)">⏳ 加载中...</td></tr>`;
 
   try {
     let leads = [];
@@ -5077,7 +5084,7 @@ window.loadLandingLeads = async function() {
     }
 
     if (!leads.length) {
-      tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:60px;color:var(--muted)">📋 暂时没有记录<br/><small style="opacity:0.6">当有客户填写Ebook Page表单后，记录将在这里显示。</small></td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="9" style="text-align:center;padding:60px;color:var(--muted)">📋 暂时没有记录<br/><small style="opacity:0.6">当有客户填写Ebook Page表单后，记录将在这里显示。</small></td></tr>`;
       return;
     }
 
@@ -5098,6 +5105,7 @@ window.loadLandingLeads = async function() {
           <td><input type="checkbox" class="landing-lead-select" data-id="${escapeHtml(l.id || '')}" onchange="updateLandingBulkBar()"></td>
           <td style="color:var(--muted);font-size:13px;">${total - i}</td>
           <td><strong>${escapeHtml(l.name)}</strong></td>
+          <td><span class="badge" style="font-size:12px;">${escapeHtml(ebookLeadTitle(l))}</span></td>
           <td><span class="muted">${escapeHtml(l.phone || '-')}</span></td>
           <td><span class="badge" style="background:rgba(124,58,237,0.1);color:#7C3AED;border:1px solid rgba(124,58,237,0.2);font-size:12px;">${escapeHtml(l.industry || '')}</span></td>
           <td style="max-width:260px;font-size:13px;color:var(--muted);" title="${escapeHtml(l.challenge || '')}">${escapeHtml((l.challenge || '').length > 80 ? l.challenge.slice(0,80)+'...' : (l.challenge || ''))}</td>
@@ -5112,7 +5120,7 @@ window.loadLandingLeads = async function() {
 
   } catch (err) {
     console.error('loadLandingLeads error:', err);
-    tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:40px;color:#ef4444;">⚠️ 加载失败，请刷新重试</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="9" style="text-align:center;padding:40px;color:#ef4444;">⚠️ 加载失败，请刷新重试</td></tr>`;
     if (statsBar) statsBar.innerHTML = '';
   }
 };
@@ -5128,10 +5136,11 @@ window.exportLandingLeadsCSV = async function() {
     }
     if (!leads.length) { toast('暂时没有数据可以导出'); return; }
 
-    const headers = ['编号','姓名','电话','工作领域','面对的挑战','提交时间'];
+    const headers = ['编号','姓名','电子书','电话','工作领域','面对的挑战','提交时间'];
     const rows = leads.map((l, i) => [
       i + 1,
       l.name,
+      ebookLeadTitle(l),
       l.phone,
       l.industry,
       (l.challenge || '').replace(/\n/g, ' '),

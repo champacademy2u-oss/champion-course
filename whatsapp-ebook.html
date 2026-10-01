@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>免费领取 | 世界级营销100招</title>
-  <meta name="description" content="免费下载《世界级营销100招》电子书，掌握可立即应用的营销策略，系统提升引流、内容与成交能力。" />
+  <title>免费领取 | WhatsApp 预防封禁与被封处理</title>
+  <meta name="description" content="免费下载《WhatsApp 预防封禁与被封处理》电子书，了解不同 WhatsApp 平台的风控预防、限制处理与官方申诉流程。" />
   <!-- config.js loaded later with Firebase SDK -->
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -431,6 +431,18 @@
     }
     .counter-strip span { font-size: 13px; color: var(--text-muted); }
     .counter-strip strong { color: var(--success); }
+
+    /* WhatsApp Ebook uses the approved book artwork from the supplied PDF. */
+    .book-object {
+      width: 178px; height: auto;
+      transform: rotateY(-7deg) rotateZ(-1deg);
+    }
+    .book-cover-image {
+      display: block; width: 178px; height: auto;
+      border-radius: 3px 10px 10px 3px;
+      border: 1px solid rgba(245,166,35,0.58);
+      box-shadow: -10px 12px 30px rgba(0,0,0,0.62);
+    }
   </style>
 </head>
 <body>
@@ -445,34 +457,24 @@
       <div class="badge">免费电子书 · 限时领取</div>
 
       <h1 class="headline">
-        解锁<span class="gradient-text">世界级营销</span><br />
-        让生意流量倍增
+        守住你的<span class="gradient-text">WhatsApp 账号</span><br />
+        封禁前预防，受限后会处理
       </h1>
 
       <p class="subtitle">
-        《世界级营销100招》系统整理引流、内容、社媒与成交策略，无论生意规模大小，都能从中找到可以立即开始的实战方向。
+        《WhatsApp 预防封禁与被封处理》以图文方式整理个人 Messenger、Business App 与 Platform/API 的风控重点、限制处理和官方申诉路径。
       </p>
 
       <!-- Book Visual -->
       <div class="book-wrap">
-        <div class="book-stage" aria-label="《世界级营销100招》电子书封面">
+        <div class="book-stage" aria-label="《WhatsApp 预防封禁与被封处理》电子书封面">
           <div class="book-object">
-            <div class="book-pages" aria-hidden="true"></div>
-            <div class="book-cover">
-              <div class="book-brand">CHAMPION ACADEMY</div>
-              <div class="book-rule"></div>
-              <div class="book-title">
-                <span class="book-title-top">世界级营销</span>
-                <span class="book-title-number">100<span class="book-title-unit">招</span></span>
-              </div>
-              <div class="book-seal">实战<br />手册</div>
-              <div class="book-subtitle">从引流 · 内容 · 社媒到成交增长</div>
-            </div>
+            <img class="book-cover-image" src="./whatsapp-ebook-cover.jpg" alt="WhatsApp 预防封禁与被封处理电子书封面" />
           </div>
         </div>
         <div class="book-info">
           <h3>你将学到什么？</h3>
-          <p>一本涵盖数字营销、内容策略、社媒引流与成交系统的实战手册。</p>
+          <p>一本涵盖日常预防、异常处理、申诉证据与团队操作规范的 WhatsApp 实用手册。</p>
         </div>
       </div>
 
@@ -481,25 +483,25 @@
         <li>
           <div class="icon">🎯</div>
           <div>
-            <strong>精准引流策略</strong> — 掌握如何让目标客户主动找上门
+            <strong>先辨认使用平台</strong> — 个人、Business App 与 API 的处理方式各不相同
           </div>
         </li>
         <li>
           <div class="icon">📱</div>
           <div>
-            <strong>社媒内容公式</strong> — 创作高互动贴文，提升品牌曝光
+            <strong>预防风控四件事</strong> — 官方工具、真实同意、合规内容与可追溯记录
           </div>
         </li>
         <li>
           <div class="icon">💰</div>
           <div>
-            <strong>高效成交系统</strong> — 从陌生人到付费客户的完整流程
+            <strong>不同限制的处理流程</strong> — App 提示、账号限制与 API 限制分别应对
           </div>
         </li>
         <li>
           <div class="icon">🚀</div>
           <div>
-            <strong>立竿见影技巧</strong> — 100招全部可以今天开始实行
+            <strong>申诉与证据清单</strong> — 用事实、截图和政策核查提高处理效率
           </div>
         </li>
       </ul>
@@ -507,7 +509,7 @@
       <div class="trust-row">
         <div class="trust-item"><div class="dot"></div> 完全免费，无隐藏费用</div>
         <div class="trust-item"><div class="dot"></div> 填写后即可下载</div>
-        <div class="trust-item"><div class="dot"></div> 100% 实战内容</div>
+        <div class="trust-item"><div class="dot"></div> 26页图文操作指南</div>
       </div>
     </div>
 
@@ -581,7 +583,7 @@
           <div class="success-icon">🎉</div>
           <h2>恭喜！资料提交成功</h2>
           <p>感谢您的填写！<br />您的电子书已准备好，请点击下方按钮立即下载。</p>
-          <a href="./世界级营销100招.pdf" id="downloadLink" class="download-btn" download="世界级营销100招.pdf">
+          <a href="./Champ_Academy_WhatsApp_Ebook.pdf" id="downloadLink" class="download-btn" download="Champ_Academy_WhatsApp_Ebook.pdf">
             📥 立即下载电子书
           </a>
           <p class="auto-note">如下载未自动开始，请点击上方按钮</p>
@@ -643,8 +645,8 @@
     // ── Set download link ──
     const dLink = document.getElementById('downloadLink');
     if (dLink) {
-      dLink.href = './世界级营销100招.pdf';
-      dLink.download = '世界级营销100招.pdf';
+      dLink.href = './Champ_Academy_WhatsApp_Ebook.pdf';
+      dLink.download = 'Champ_Academy_WhatsApp_Ebook.pdf';
     }
 
     // ── Form Submit ──
@@ -678,9 +680,9 @@
 
       const leadData = {
         id: crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36),
-        ebookId: 'world-class-marketing-100',
-        ebookTitle: '世界级营销100招',
-        source: 'World-Class Marketing Ebook Landing Page',
+        ebookId: 'whatsapp-account-safety',
+        ebookTitle: 'WhatsApp 预防封禁与被封处理',
+        source: 'WhatsApp Ebook Landing Page',
         name,
         phone: fullPhone,
         industry,
@@ -713,8 +715,8 @@
 
       setTimeout(() => {
         const link = document.createElement('a');
-        link.href = './世界级营销100招.pdf';
-        link.download = '世界级营销100招.pdf';
+        link.href = './Champ_Academy_WhatsApp_Ebook.pdf';
+        link.download = 'Champ_Academy_WhatsApp_Ebook.pdf';
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
