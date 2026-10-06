@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Champ Academy</title>
     <link rel="stylesheet" href="./styles.css?v=20260828-emoji-direct" />
+    <link rel="stylesheet" href="./ebook-reply.css?v=20261006-reply-sop" />
     <link rel="manifest" href="./manifest.json" />
   </head>
   <body>
@@ -673,6 +674,7 @@
 
           <!-- Stats bar -->
           <div id="landingLeadsStats" style="display:flex; gap:20px; padding: 16px 0; border-bottom: 1px solid var(--line); margin-bottom: 16px; flex-wrap:wrap;"></div>
+          <div id="ebookReplySummary" class="ebook-reply-summary" role="status" aria-live="polite"></div>
 
           <!-- Table -->
           <div class="table-wrap">
@@ -687,7 +689,7 @@
                   <th>工作领域</th>
                   <th>面对的挑战</th>
                   <th>提交时间</th>
-                  <th style="width:120px">操作</th>
+                  <th style="width:190px">操作／跟进</th>
                 </tr>
               </thead>
               <tbody id="landingLeadsBody">
@@ -1134,6 +1136,8 @@
     <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-storage-compat.js"></script>
     <script src="./config.js"></script>
     <script src="./whatsapp-bulk-core.js?v=20260828-emoji-direct"></script>
-    <script src="./app.js?v=20261001-ebook-sources"></script>
+    <script src="./ebook-reply-core.js?v=20261006-reply-sop"></script>
+    <script src="./ebook-reply.js?v=20261006-reply-sop"></script>
+    <script src="./app.js?v=20261006-ebook-reply-sop"></script>
   </body>
 </html>

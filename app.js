@@ -5048,13 +5048,14 @@ window.loadLandingLeads = async function() {
     if (_db) {
       // Firebase mode: read from Firestore
       const snap = await _db.collection('landing_leads').orderBy('createdAt', 'desc').get();
-      leads = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      leads = snap.docs.map(doc => ({ ...doc.data(), id: doc.id }));
     } else {
       // Fallback: local storage
       leads = JSON.parse(localStorage.getItem('landing_leads_static') || '[]');
     }
 
     const total = leads.length;
+    window.EbookReplyUI?.setLeads(leads);
 
     if (statsBar) {
       const today = leads.filter(l => {
@@ -5099,7 +5100,9 @@ window.loadLandingLeads = async function() {
         year:'numeric',month:'short',day:'2-digit',
         hour:'2-digit',minute:'2-digit'
       }).format(date);
-      const wa = l.phone ? `<a href="https://wa.me/${l.phone.replace(/[^\d]/g,'')}" target="_blank" class="mini-button" style="background:#25D366;color:#fff;border-color:#25D366;text-decoration:none;">WA</a>` : '-';
+      const wa = window.EbookReplyUI
+        ? window.EbookReplyUI.renderAction(l)
+        : '<span class="muted">Reply 工具未加载，请刷新</span>';
       return `
         <tr data-lead-id="${escapeHtml(l.id || '')}">
           <td><input type="checkbox" class="landing-lead-select" data-id="${escapeHtml(l.id || '')}" onchange="updateLandingBulkBar()"></td>
@@ -5110,7 +5113,7 @@ window.loadLandingLeads = async function() {
           <td><span class="badge" style="background:rgba(124,58,237,0.1);color:#7C3AED;border:1px solid rgba(124,58,237,0.2);font-size:12px;">${escapeHtml(l.industry || '')}</span></td>
           <td style="max-width:260px;font-size:13px;color:var(--muted);" title="${escapeHtml(l.challenge || '')}">${escapeHtml((l.challenge || '').length > 80 ? l.challenge.slice(0,80)+'...' : (l.challenge || ''))}</td>
           <td style="font-size:12px;color:var(--muted);">${dateStr}</td>
-          <td style="display:flex;gap:6px;align-items:center;">
+          <td style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
             ${wa}
             <button class="mini-button" style="background:rgba(239,68,68,0.12);color:#ef4444;border-color:rgba(239,68,68,0.3);" onclick="deleteLandingLead('${escapeHtml(l.id || '')}', this)" title="删除这条记录">🗑</button>
           </td>

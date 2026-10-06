@@ -1,10 +1,13 @@
-const CACHE_NAME = "lead-center-v18-whatsapp-emoji-direct";
+const CACHE_NAME = "lead-center-v19-ebook-reply-sop";
 const ASSETS = [
   "./",
   "./index.html",
   "./styles.css?v=20260828-emoji-direct",
   "./whatsapp-bulk-core.js?v=20260828-emoji-direct",
-  "./app.js?v=20260828-emoji-direct",
+  "./ebook-reply-core.js?v=20261006-reply-sop",
+  "./ebook-reply.js?v=20261006-reply-sop",
+  "./ebook-reply.css?v=20261006-reply-sop",
+  "./app.js?v=20261006-ebook-reply-sop",
   "./config.js",
   "./manifest.json",
   "./zoom.html",
