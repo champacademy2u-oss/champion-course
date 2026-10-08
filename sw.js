@@ -1,12 +1,12 @@
-const CACHE_NAME = "lead-center-v19-ebook-reply-sop";
+const CACHE_NAME = "lead-center-v20-ebook-five-step";
 const ASSETS = [
   "./",
   "./index.html",
   "./styles.css?v=20260828-emoji-direct",
   "./whatsapp-bulk-core.js?v=20260828-emoji-direct",
-  "./ebook-reply-core.js?v=20261006-reply-sop",
-  "./ebook-reply.js?v=20261006-reply-sop",
-  "./ebook-reply.css?v=20261006-reply-sop",
+  "./ebook-reply-core.js?v=20261007-five-step",
+  "./ebook-reply.js?v=20261007-five-step",
+  "./ebook-reply.css?v=20261007-five-step",
   "./app.js?v=20261006-ebook-reply-sop",
   "./config.js",
   "./manifest.json",

@@ -18,6 +18,20 @@
 .er-context p { color: #273750; }
 .er-context small { color: #657186; }
 .er-grid { display: grid; grid-template-columns: minmax(0, .9fr) minmax(0, 1.1fr); gap: 16px; }
+.er-steps { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; }
+.er-step { padding: 12px 8px; min-height: 68px; border: 1px solid #ccd5e2; border-radius: 10px; background: #fff; color: #536179; font-family: inherit; cursor: pointer; overflow-wrap: anywhere; }
+.er-step b, .er-step span { display: block; }
+.er-step b { font-size: 14px; margin-bottom: 4px; }
+.er-step span { font-size: 11px; line-height: 1.5; }
+.er-step.is-active { background: #563aa4; border-color: #563aa4; color: white; }
+.er-step:disabled { opacity: .52; cursor: not-allowed; }
+.er-progress { font-size: 13px; font-weight: 700; margin: 18px 0 12px; color: #563aa4; }
+.er-guide { font-size: 13px; color: #56657b; line-height: 1.8; margin: 0 0 14px; }
+.er-focus { font-size: 13px; font-weight: 700; color: #563aa4; }
+.er-preview { white-space: pre-line; overflow-wrap: anywhere; padding: 18px; background: #f4f1fb; border-left: 3px solid #7756bb; border-radius: 8px; line-height: 1.9; font-size: 15px; }
+.er-cta { padding: 12px 16px; background: #eaf6ef; border-radius: 8px; font-size: 14px; line-height: 1.8; color: #215c43; }
+.er-navigation { display: flex; justify-content: space-between; gap: 10px; margin-top: 18px; }
+.er-navigation #er-next { margin-left: auto; }
 .er-card { min-width: 0; padding: 18px; border: 1px solid #dce2ec; border-radius: 14px; background: #fff; }
 .er-card h3, .er-confirm h3 { font-size: 16px; margin: 0 0 14px; }
 .er-card label:not(.er-check) { display: block; margin: 13px 0 6px; font-size: 12px; font-weight: 700; }
@@ -30,7 +44,7 @@
 .er-primary { background: #563aa4; color: #fff; border-color: #563aa4; }
 .er-whatsapp { background: #15803d; color: #fff; border-color: #15803d; }
 .er-header .er-button { background: transparent; color: white; border-color: #637088; }
-#er-save { margin-top: 16px; }
+#er-save { margin: 0 0 8px; }
 .er-check { display: flex; align-items: flex-start; gap: 10px; min-height: 44px; font-size: 12px; line-height: 1.65; margin-top: 16px; cursor: pointer; }
 .er-check input { width: 17px; height: 17px; min-height: 17px; padding: 0; flex: 0 0 17px; margin: 2px 0 0; accent-color: #563aa4; }
 .er-help { font-size: 11px; line-height: 1.6; color: #657186; }
@@ -48,5 +62,10 @@
   .er-body { padding: 14px; }
   .er-grid { grid-template-columns: minmax(0, 1fr); }
   .er-card { padding: 14px; }
+  .er-steps { gap: 4px; }
+  .er-step { padding: 8px 3px; min-height: 78px; }
+  .er-step b { font-size: 11px; }
+  .er-step span { font-size: 10px; }
+  .er-preview { padding: 12px; font-size: 14px; }
   .er-actions .er-button { flex: 1 1 140px; }
 }
