@@ -700,6 +700,29 @@ tr:last-child td {
 
 .course-header {
   user-select: none;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.course-header-actions {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.mini-tag.course-contact-export {
+  color: #1d4ed8;
+  background: #eff6ff;
+  border-color: #bfdbfe;
+}
+
+.mini-tag.course-contact-export:hover:not(:disabled) {
+  color: #fff;
+  background: #1d4ed8;
+  border-color: #1d4ed8;
+}
+
+.mini-tag.course-contact-export:disabled {
+  cursor: not-allowed;
 }
 
 .course-leads {
@@ -2173,3 +2196,4 @@ input[type="checkbox"].lead-select {
     min-width: 0;
   }
 }
+

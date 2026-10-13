@@ -18,6 +18,14 @@
 12. 左侧 `Zoom` 页面可以保存每场活动的名称、日期时间、Zoom 报名链接，以及 WhatsApp / Email 通知内容。
 13. `Preview Courses` 的自动课程组展开后，可单笔 `DELETE`，也可勾选多位 Lead、使用 `Select all` 和 `DELETE SELECTED` 批量删除；确认后会同步删除 Firestore 记录，云端失败时不会从页面移除。
 
+14. 每个自动课程组有「📇 生成通讯录」按钮，按该组当前全部名单生成 iPhone 可导入的 `.vcf` 文件；空组禁用。下载前显示有效、重复、无效及需核对号码的人数。
+
+## 课程组 iPhone 通讯录
+
+在 `Preview Courses → Automatic Course Groups` 找到课程，点击「生成通讯录」并确认下载。姓名加上 `课程名称｜原姓名`，例如 `引流失败｜原姓名`；备注只记录课程及号码核对提醒。号码按国际格式标准化，同一课程内按手机号去重；缺少或格式无效的号码跳过并显示数量，不猜测更正可疑号码。邮箱、原始跟进备注及其他报名资料不会放入文件。
+
+文件由浏览器在本机生成，不上传到服务器、不写入 Firestore，也不会自动打开聊天或发送消息。将文件 AirDrop 到 iPhone，打开并按提示添加联系人；重复导入可能产生重复联系人。课程标记依靠姓名前缀，不能保证自动建立 iCloud 通讯录列表。文件包含客户姓名和电话，请勿放到公开网站、Git 或共享链接；Git 已忽略 `.vcf`。
+
 ## Zoom 报名与双渠道通知
 
 - 公开报名页：`zoom.html`。客户只填写姓名、国际区号手机号码和 Email。
@@ -152,3 +160,4 @@ Ali Tan,+60123456789,ali@example.com,Business Owner
 - Cloudflare R2：保存实际视频文件，并通过短期签名链接上传与播放。
 
 部署需要在 Vercel 设置环境变量，参考 `.env.vercel.example`。R2 Bucket 必须允许 `https://champion-course-video-room.vercel.app` 使用 `PUT`、`GET` 和 `HEAD`，并允许 `Content-Type` 请求头。如果 `ADMIN_LOGIN_DISABLED=true`，后台会公开访问；正式对客户开放前建议改回 `false` 并设置强管理员密码。视频文件通过 Vercel API 产生的短期 signed URL 由浏览器直传 Cloudflare R2，避免触碰 Vercel Function request body 限制；Vercel API 只负责验证、签名和记录。
+

@@ -2620,7 +2620,7 @@ function renderCourseView() {
     <div style="margin-bottom: 25px; display: flex; justify-content: space-between; align-items: center; background: #fff; padding: 15px 20px; border-radius: 12px; border: 1px solid #e2e8f0; box-shadow: 0 4px 6px rgba(0,0,0,0.02);">
       <div>
         <h2 style="margin:0; font-size: 18px; color: #1e293b;">Automatic Course Groups</h2>
-        <p style="margin:4px 0 0; font-size:12px; color:#64748b;">Manage and organize your leads. Drag cards to reorder.</p>
+        <p style="margin:4px 0 0; font-size:12px; color:#64748b;">Manage and organize your leads. Drag cards to reorder. 点击「生成通讯录」下载带课程标记的 iPhone 联系人。</p>
       </div>
       <button class="text-button primary" onclick="createManualCourseGroup()" style="background:#0f766e; font-weight:700; border-radius:10px;">➕ Create New Course Group</button>
     </div>
@@ -2648,9 +2648,17 @@ function renderCourseView() {
               ${isEmpty ? 'EMPTY FOLDER' : `COUNT: ${leads.length} LEADS`}
             </span>
           </div>
-          <div style="display: flex; gap: 8px; align-items: center;">
+          <div class="course-header-actions" style="display: flex; gap: 8px; align-items: center;">
             <button class="mini-tag" onclick="renameCourseGroup('${course.replace(/'/g, "\\'")}')" title="Rename Group">✎ Rename</button>
             <button class="mini-tag" onclick="triggerGroupImport('${course.replace(/'/g, "\\'")}')" title="Import" style="background:#e6fffa; color:#2c7a7b;">📥 Import</button>
+            <button
+              class="mini-tag course-contact-export"
+              type="button"
+              data-contact-course="${escapeHtml(course)}"
+              aria-label="生成 iPhone 通讯录：${escapeHtml(course)}"
+              title="生成带课程标记的 iPhone 通讯录（VCF）"
+              ${isEmpty ? "disabled" : ""}
+            >📇 生成通讯录</button>
             <span id="arrow-${sanitizedId}" onclick="toggleCourseLeads('${sanitizedId}')" style="color: #a0aec0; cursor:pointer; width: 24px; text-align:center;">▼</span>
           </div>
         </div>
@@ -2936,6 +2944,53 @@ window.renameCourseGroup = function(oldName) {
   render();
   toast(`Renamed Group to "${newName}"`);
 };
+
+function exportCourseContacts(targetCourse) {
+  try {
+    const result = window.ContactExportCore.buildCourseVcard(state.leads, targetCourse);
+    const stats = result.stats;
+    if (!stats.contactCount) {
+      alert(`「${stats.course}」没有可导出的有效电话号码。请先补充或核对号码。`);
+      return;
+    }
+    const details = [
+      `生成「${stats.course}」iPhone 通讯录`,
+      `本组 ${stats.groupCount} 条名单，可生成 ${stats.contactCount} 个联系人。`,
+      `姓名格式：${stats.course}｜原姓名`,
+    ];
+    if (stats.duplicateCount) details.push(`已排除 ${stats.duplicateCount} 条重复号码。`);
+    if (stats.invalidCount) details.push(`已跳过 ${stats.invalidCount} 条缺少或格式无效的号码。`);
+    if (stats.reviewCount) details.push(`${stats.reviewCount} 个号码长度需核对，已在联系人备注标记。`);
+    if (stats.unnamedCount) details.push(`${stats.unnamedCount} 位未填写姓名，将标记为「未命名联系人」。`);
+    details.push("", "只在本机生成姓名和电话，不上传、不改动名单。文件含客户资料，请勿公开。", "下载后 AirDrop 到 iPhone，打开并按提示添加联系人。重复导入可能产生重复联系人。", "", "现在下载？");
+    if (!confirm(details.join("\n"))) return;
+
+    const blob = new Blob([result.content], { type: "text/vcard;charset=utf-8" });
+    const downloadUrl = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = downloadUrl;
+    link.download = result.fileName;
+    link.style.display = "none";
+    document.body.appendChild(link);
+    try {
+      link.click();
+    } finally {
+      link.remove();
+      window.setTimeout(() => URL.revokeObjectURL(downloadUrl), 30000);
+    }
+    toast(`已生成 ${stats.contactCount} 个联系人，请打开下载的 VCF 文件导入 iPhone。`);
+  } catch {
+    toast("通讯录生成失败，请刷新页面后重试。不会改动现有名单。");
+  }
+}
+
+elements.courseList.addEventListener("click", event => {
+  const button = event.target.closest(".course-contact-export");
+  if (!button || button.disabled) return;
+  event.preventDefault();
+  event.stopPropagation();
+  exportCourseContacts(button.dataset.contactCourse);
+});
 
 window.triggerGroupImport = function(targetCourse) {
   state.pendingCourseImport = targetCourse;
@@ -5724,3 +5779,4 @@ window.deleteSelectedChampPreviewLeads = async function() {
     toast('❌ 删除失败，请重试');
   }
 };
+

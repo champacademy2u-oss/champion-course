@@ -3,7 +3,9 @@ google-service-account.json
 node_modules/
 .DS_Store
 recovered-leads.json
+*.vcf
 landing-leads.json
 lead-center-full-backup-*.json
 assets/
 .vercel
+
