@@ -1087,6 +1087,7 @@ function sanitizeLead(lead) {
     memberLevel: lead.memberLevel || "",
     manual: lead.manual === true,  // preserve manual flag
     nextFollowUpDate: lead.nextFollowUpDate || "",
+    previewFollowup: lead.previewFollowup && typeof lead.previewFollowup === 'object' && !Array.isArray(lead.previewFollowup) ? lead.previewFollowup : {},
   };
 }
 
@@ -1153,6 +1154,7 @@ function mergeLeadData(base, incoming) {
     followupStage: base.followupStage || incoming.followupStage || "",
     followupAction: base.followupAction || incoming.followupAction || "",
     memberLevel: base.memberLevel || incoming.memberLevel || "",
+    previewFollowup: PreviewFollowupCore.mergeMaps(base.previewFollowup, incoming.previewFollowup),
   };
 }
 
@@ -1327,6 +1329,8 @@ function nextStep(lead) {
 
 function dueLeads() {
   return state.leads
+    // Managed Preview attendees use the calendar workbench, avoiding duplicate legacy reminders.
+    .filter(l => !Object.keys(l.previewFollowup || {}).length)
     .filter(l => l.status !== "converted" && l.status !== "lost" && l.status !== "not_interested")
     .map((lead) => ({ ...lead, step: nextStep(lead) }))
     .filter((lead) => {
@@ -2498,6 +2502,7 @@ function render() {
   renderPreviewSessionList();
   updateBulkToolbar();
   updateCourseFilterOptions();
+  window.PreviewFollowup?.render();
 }
 
 function renderFunnel() {
@@ -4080,6 +4085,7 @@ function renderPreviewSessionList() {
             <span style="font-size: 12px; color: var(--muted);">${p.date || "No Date"}</span>
           </div>
           <div style="display:flex; gap: 4px;">
+            <button class="mini-button" data-preview-workbench="${escapeHtml(p.id)}">跟进工作台</button>
             <button class="mini-button" onclick="editPreviewSession('${p.id}')">Edit</button>
             <button class="mini-button danger" onclick="deletePreviewSession('${p.id}')">Del</button>
           </div>
@@ -4163,6 +4169,7 @@ function savePreviewSession() {
   const getVal = (id) => document.getElementById(id)?.value || "";
   
   const session = {
+    ...(editId ? state.previews.find(x => x.id === editId) || {} : {}),
     id: editId || crypto.randomUUID(),
     title: getVal("prevTitle").trim(),
     date: getVal("prevDate"),
@@ -5074,6 +5081,96 @@ function setupRealTimeSync() {
   console.log('[Firebase] Real-time sync listeners active.');
 }
 
+// Preview notification writes are acknowledged before changing the UI. They patch
+// only the workflow field, leaving imported customer data and other sessions intact.
+function previewCache(key, records) {
+  try { localStorage.setItem(key, JSON.stringify(records)); }
+  catch (error) { toast('云端已保存，但本机缓存失败；请刷新后确认。'); }
+  if (_dataFileHandle) saveToFile().catch(() => {});
+}
+
+function assertPreviewSnapshot(current, expected) {
+  if (!current || current.date !== expected.date || (current.workflowSettings?.revision || 0) !== (expected.workflowSettings?.revision || 0)) {
+    throw new Error('活动已删除或设置已改变，请关闭窗口刷新后重试。');
+  }
+}
+
+async function updatePreviewFollowupRecord(leadId, previewId, revision, mutate, expectedSession) {
+  let next;
+  if (_db) {
+    const ref = _db.collection('leads').doc(leadId), eventRef = _db.collection('previews').doc(previewId);
+    next = await _db.runTransaction(async tx => {
+      const leadSnap = await tx.get(ref), eventSnap = await tx.get(eventRef);
+      if (!leadSnap.exists) throw new Error('客户记录已不存在，请刷新；不会重建已删除客户。');
+      const event = eventSnap.exists ? eventSnap.data() : null;
+      assertPreviewSnapshot(event, expectedSession);
+      const lead = leadSnap.data(), current = lead.previewFollowup?.[previewId];
+      if (PreviewFollowupCore.read(current).revision !== revision) throw new Error('另一设备已更新这位客户，请关闭窗口刷新后重试。');
+      const updated = mutate(current, lead, event);
+      tx.update(ref, { previewFollowup: { ...(lead.previewFollowup || {}), [previewId]: updated } });
+      return updated;
+    });
+  } else {
+    const lead = state.leads.find(l => l.id === leadId);
+    if (!lead) throw new Error('客户记录已不存在');
+    const event = state.previews.find(s => s.id === previewId);
+    assertPreviewSnapshot(event, expectedSession);
+    if (PreviewFollowupCore.read(lead.previewFollowup?.[previewId]).revision !== revision) throw new Error('记录已改变，请刷新后重试');
+    next = mutate(lead.previewFollowup?.[previewId], lead, event);
+    const nextLeads = state.leads.map(l => l.id === leadId ? { ...l, previewFollowup: { ...(l.previewFollowup || {}), [previewId]: next } } : l);
+    localStorage.setItem(storageKeys.leads, JSON.stringify(nextLeads));
+  }
+  const lead = state.leads.find(l => l.id === leadId);
+  if (lead) lead.previewFollowup = { ...(lead.previewFollowup || {}), [previewId]: next };
+  previewCache(storageKeys.leads, state.leads);
+  render();
+}
+
+async function updatePreviewWorkflowSettings(previewId, revision, patch, expectedDate) {
+  function build(event) {
+    if (!event || event.date !== expectedDate || (event.workflowSettings?.revision || 0) !== revision) throw new Error('活动已改变，请关闭窗口刷新后重试');
+    const settings = { ...(event.workflowSettings || {}) };
+    if (patch.broadcastTask) {
+      const offsets = { before7: -7, before3: -3, today: 0 }, task = patch.broadcastTask;
+      if (!(task in offsets) || PreviewFollowupCore.addDays(event.date, offsets[task]) !== PreviewFollowupCore.day()) throw new Error('今天不是该公告节点');
+      const broadcasts = settings.broadcasts || [];
+      if (broadcasts.some(b => b.task === task && b.eventDate === event.date)) throw new Error('这条群公告已经记录，不重复保存');
+      settings.broadcasts = [...broadcasts, { task, eventDate: event.date, channel: 'group', at: new Date().toISOString() }];
+    } else Object.assign(settings, PreviewFollowupCore.validateSettings(patch));
+    return { ...settings, revision: revision + 1, updatedAt: new Date().toISOString() };
+  }
+  let next;
+  if (_db) {
+    const ref = _db.collection('previews').doc(previewId);
+    next = await _db.runTransaction(async tx => {
+      const snap = await tx.get(ref);
+      const value = build(snap.exists ? snap.data() : null);
+      tx.update(ref, { workflowSettings: value });
+      return value;
+    });
+  } else {
+    const current = state.previews.find(s => s.id === previewId); next = build(current);
+    localStorage.setItem(storageKeys.previews, JSON.stringify(state.previews.map(s => s.id === previewId ? { ...s, workflowSettings: next } : s)));
+  }
+  const current = state.previews.find(s => s.id === previewId); if (current) current.workflowSettings = next;
+  previewCache(storageKeys.previews, state.previews);
+  render();
+}
+
+window.PreviewFollowup?.init({
+  leads: () => state.leads,
+  sessions: () => state.previews,
+  cloud: () => Boolean(_db),
+  updateRecord: updatePreviewFollowupRecord,
+  updateSession: updatePreviewWorkflowSettings,
+  newSession: () => { switchView('courses'); openPreviewModal(); },
+  notify: toast
+});
+document.addEventListener('click', event => {
+  const button = event.target.closest('[data-preview-workbench]');
+  if (button) { switchView('followup'); window.PreviewFollowup?.selectSession(button.dataset.previewWorkbench); }
+});
+
 initFromFirebase();
 
 
@@ -5779,4 +5876,3 @@ window.deleteSelectedChampPreviewLeads = async function() {
     toast('❌ 删除失败，请重试');
   }
 };
-
