@@ -1,4 +1,4 @@
-const CACHE_NAME = "lead-center-v22-preview-followup";
+const CACHE_NAME = "lead-center-v24-preview-wa-business";
 const ASSETS = [
   "./",
   "./index.html",
@@ -8,7 +8,7 @@ const ASSETS = [
   "./ebook-reply-core.js?v=20261007-five-step",
   "./ebook-reply.js?v=20261007-five-step",
   "./ebook-reply.css?v=20261007-five-step",
-  "./app.js?v=20261018-preview-followup",
+  "./app.js?v=20261027-preview-wa-business",
   "./preview-followup-core.js?v=20261018-preview-followup",
   "./preview-followup.js?v=20261018-preview-followup",
   "./preview-followup.css?v=20261018-preview-followup",

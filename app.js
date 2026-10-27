@@ -5493,6 +5493,29 @@ window.filterPreviewLeadsTable = function() {
   renderPreviewLeadsRows(filtered, leads.length);
 };
 
+function renderPreviewLeadWhatsappAction(rawPhone) {
+  const recipient = whatsappBulkCore.normalizeMalaysiaPhone(rawPhone);
+  if (!recipient.valid) {
+    return '<span class="muted" title="请先核对客户电话号码">号码待核对</span>';
+  }
+
+  const fallbackUrl = whatsappBulkCore.whatsappUrl(recipient.phone, '');
+  const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent) ||
+    (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  const style = 'background:#25D366;color:#fff;border-color:#25D366;text-decoration:none;white-space:nowrap;';
+  if (!isIOS) {
+    return `<a href="${escapeHtml(fallbackUrl)}" target="_blank" rel="noopener noreferrer" class="mini-button" style="${style}" title="打开客户聊天；请确认使用的是 Business 账号，不会自动发送">WA</a>`;
+  }
+
+  // The Business-specific iOS scheme needs an installed, compatible app.
+  // Keep a user-operated HTTPS fallback: no timed redirects or auto-sends.
+  const businessUrl = `whatsapp-smb://send?phone=${recipient.phone}`;
+  return `<span style="display:inline-flex;flex-direction:column;align-items:flex-start;gap:4px;">
+    <a href="${escapeHtml(businessUrl)}" class="mini-button" style="${style}display:inline-flex;align-items:center;min-height:44px;" title="尝试在 iPhone WhatsApp Business 打开此客户聊天；不会自动发送">WA Business</a>
+    <a href="${escapeHtml(fallbackUrl)}" target="_blank" rel="noopener noreferrer" class="muted" style="display:inline-flex;align-items:center;min-height:44px;font-size:12px;white-space:nowrap;" title="Business 没有打开时使用；此通用入口可能打开普通版 WhatsApp">备用入口</a>
+  </span>`;
+}
+
 function renderPreviewLeadsRows(leads, totalCount) {
   const tbody = document.getElementById('previewLeadsBody');
   if (!tbody) return;
@@ -5510,7 +5533,7 @@ function renderPreviewLeadsRows(leads, totalCount) {
       year:'numeric',month:'short',day:'2-digit',
       hour:'2-digit',minute:'2-digit'
     }).format(date);
-    const wa = l.phone ? `<a href="https://wa.me/${l.phone.replace(/[^\d]/g,'')}" target="_blank" class="mini-button" style="background:#25D366;color:#fff;border-color:#25D366;text-decoration:none;">WA</a>` : '-';
+    const wa = renderPreviewLeadWhatsappAction(l.phone);
     return `
       <tr data-lead-id="${escapeHtml(l.id || '')}">
         <td><input type="checkbox" class="preview-lead-select" data-id="${escapeHtml(l.id || '')}" onchange="updatePreviewBulkBar()"></td>
