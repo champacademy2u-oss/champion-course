@@ -1,4 +1,5 @@
 import { DEFAULT_CATEGORIES, inspectFile, metadata, validateCategories, libraryError } from './champ-library-core.js';
+import { uploadThroughRelay } from './champ-library-upload.js?v=20261113-relay';
 
 // Files are stored as Blobs in IndexedDB, never as temporary object URLs or localStorage strings.
 export class LocalLibrary {
@@ -91,7 +92,7 @@ export class LocalLibrary {
 }
 
 export class CloudLibrary {
-  constructor(endpoint, token) { this.endpoint = endpoint; this.token = token; }
+  constructor(endpoint, token, transport = uploadThroughRelay) { this.endpoint = endpoint; this.token = token; this.transport = transport; }
   async request(action, body, query = {}) {
     const url = new URL(this.endpoint, location.href);
     url.searchParams.set('action', action);
@@ -124,15 +125,7 @@ export class CloudLibrary {
     const pending = await this.request('begin', { ...validated, ...input });
     let uploaded = false;
     try {
-      await new Promise((resolve, reject) => {
-        const xhr = new XMLHttpRequest();
-        xhr.open('PUT', pending.url); xhr.setRequestHeader('Content-Type', validated.mime);
-        xhr.timeout = 30 * 60 * 1000;
-        xhr.upload.onprogress = event => { if (event.lengthComputable) progress(Math.round(event.loaded / event.total * 95)); };
-        xhr.onload = () => xhr.status >= 200 && xhr.status < 300 ? resolve() : reject(libraryError('文件上传失败；请检查云端上传权限后重试。'));
-        xhr.onerror = xhr.ontimeout = () => reject(libraryError('文件上传中断，尚未保存到云端。'));
-        xhr.send(file);
-      });
+      await this.transport({ endpoint: this.endpoint, url: pending.url, file, mime: validated.mime, onProgress: progress });
       uploaded = true;
       const result = await this.request('complete', { id: pending.id });
       progress(100); return result.file;

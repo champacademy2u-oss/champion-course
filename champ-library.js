@@ -1,5 +1,5 @@
 import { ACCEPT, DEFAULT_CATEGORIES, MAX_BATCH, filterFiles, formatBytes, metadata, text, validateCategories } from './champ-library-core.js';
-import { CloudLibrary, LocalLibrary } from './champ-library-store.js';
+import { CloudLibrary, LocalLibrary } from './champ-library-store.js?v=20261113-relay';
 
 const root = document.querySelector('#champLibraryView');
 const escape = value => String(value ?? '').replace(/[&<>"']/g, char => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' })[char]);
