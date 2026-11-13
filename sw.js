@@ -1,4 +1,4 @@
-const CACHE_NAME = "lead-center-v24-preview-wa-business";
+const CACHE_NAME = "lead-center-v25-champ-library";
 const ASSETS = [
   "./",
   "./index.html",
@@ -8,7 +8,11 @@ const ASSETS = [
   "./ebook-reply-core.js?v=20261007-five-step",
   "./ebook-reply.js?v=20261007-five-step",
   "./ebook-reply.css?v=20261007-five-step",
-  "./app.js?v=20261027-preview-wa-business",
+  "./app.js?v=20261113-champ-library",
+  "./champ-library.js?v=20261113-library",
+  "./champ-library-core.js",
+  "./champ-library-store.js",
+  "./champ-library.css?v=20261113-library",
   "./preview-followup-core.js?v=20261018-preview-followup",
   "./preview-followup.js?v=20261018-preview-followup",
   "./preview-followup.css?v=20261018-preview-followup",
@@ -42,6 +46,10 @@ self.addEventListener("activate", (event) => {
 self.addEventListener("fetch", (event) => {
   // Only intercept same-origin GET requests
   if (event.request.method !== "GET") return;
+  const url = new URL(event.request.url);
+  if (url.origin !== self.location.origin) return;
+  const allowedPaths = new Set(ASSETS.map(asset => new URL(asset, self.location).pathname));
+  if (!allowedPaths.has(url.pathname)) return;
 
   event.respondWith(
     fetch(event.request)

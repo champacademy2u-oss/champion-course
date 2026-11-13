@@ -4,6 +4,16 @@
 
 ## 怎么使用
 
+### Champ 资料库（2026-11-13，本地待发布）
+
+左侧 **Champ 资料库** 集中保存视频、照片和 PDF。支持每批最多 30 个文件，按课程教材、营销素材、品牌资料、活动资料、内部文件分类；可新增或改名分类，编辑资料名称、标签及备注，搜索、按类型筛选、预览和下载原文件。删除只移到回收站，可恢复，不会销毁原件。同名文件分别保存，不覆盖已有文件。视频最大 1 GB，照片 / PDF 最大 50 MB；支持 MP4、MOV、WebM、JPG、PNG、WebP、GIF、AVIF、HEIC、HEIF 和 PDF。HEIC/HEIF 及部分视频编码需下载后以兼容软件打开。
+
+- **云端资料**：`api/champ-library.js` 复用 Firebase 管理员身份及现有 `CRM_ADMIN_UIDS` / 已验证 Google `CRM_ADMIN_EMAILS` 许可，元数据保存在 `champ_library_files` / `champ_library_settings`，原文件保存在现有私有 R2 Bucket 的 `champ-library/` 前缀。未授权者不能列举、修改或取得播放链接；读取链接十分钟有效。直传后由服务器核验实际大小、类型和文件头，成功后才加入资料库。并发编辑采用版本检查；上传或云端保存失败不会回退成本机成功。中断上传保留为不可见的 pending 记录，不会显示为可用资料；本版无自动清理 pending 对象的排程。
+- **本机资料**：元数据和 Blob 原文件用 IndexedDB 原子保存，刷新页面后可读取；不是临时对象 URL。只限同一设备、同一浏览器及同一网站地址，清除网站资料会移除文件，应保留原件。与云端资料分开，不会自动迁移或同步。本机模式不需要管理员网络请求。
+- **发布准备**：前端入口在 `index.html`，云端地址在 `CHAMP_LIBRARY_CONFIG.apiBaseUrl`。云端 API 经既有 Email Function 分派，不增加生产 Function 数量；`.vercelignore` 仅追加共享校验模块，复用既有 Firebase/R2 环境变量；R2 CORS 须允许实际前端来源使用 PUT / GET / HEAD 及 Content-Type。额外来源可设置 `CHAMP_LIBRARY_ALLOWED_ORIGINS`（默认含 GitHub Pages、champacademy.asia 与本机 4174）；不应启用公共 Bucket。现有公开 Videos 播放系统独立保留。
+- **验证**：`node --test test/champ-library.test.mjs`；隔离预览 `node scripts/champ-library-qa-server.mjs`。预览只服务白名单静态文件，移除 Firebase 和真实名单读取。环境禁止监听端口时可加 `--file`，或运行 `node scripts/build-champ-library-preview.mjs` 生成单个离线预览文件（独立 IndexedDB 名称，无云端连接）。生产发布及真实账号上传仍需负责人最终确认。
+
+
 1. 打开 `http://localhost:4174`，或者直接打开 `index.html`。
 2. 在 Facebook Ads Manager / Lead Center 导出 Lead Form CSV。
 3. 点击右上角上传按钮，选择 CSV。

@@ -27,3 +27,7 @@ window.ZOOM_PUBLIC_CONFIG = {
 window.EMAIL_CAMPAIGN_CONFIG = {
   apiBaseUrl: "https://champion-course-video-room.vercel.app/api/email-campaigns"
 };
+
+window.CHAMP_LIBRARY_CONFIG = {
+  apiBaseUrl: "https://champion-course-video-room.vercel.app/api/champ-library"
+};

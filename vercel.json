@@ -16,6 +16,7 @@
     { "src": "public/**", "use": "@vercel/static" }
   ],
   "routes": [
+    { "src": "/api/champ-library", "dest": "/api/email-campaigns.js" },
     { "src": "/api/preview-registration", "dest": "/api/zoom.js?action=registerPreviewLead" },
     { "src": "/api/unsubscribe", "dest": "/api/email-campaigns.js" },
     { "src": "/api/email-track", "dest": "/api/email-campaigns.js" },

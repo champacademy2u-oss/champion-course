@@ -3725,6 +3725,7 @@ function switchView(view, targetCourse) {
   if (view === "ebookLeads") title = "Ebook Leads";
   if (view === "zoom") title = "Zoom";
   if (view === "emailCampaigns") title = "Email Campaigns";
+  if (view === "champLibrary") title = "Champ 资料库";
   if (view === "enrollments") {
     title = state.enrollmentFilter === "all" ? "Combined Course Enrollments" : state.enrollmentFilter;
   }
@@ -3743,6 +3744,7 @@ function switchView(view, targetCourse) {
   if (view === "enrollments") renderEnrollments();
   if (view === "followup") renderFollowUpList();
   if (view === "videos") renderVideos();
+  if (view === "champLibrary") window.ChampLibrary?.open();
   if (view === "zoom") initZoomAdmin();
   if (view === "emailCampaigns") initEmailCampaigns();
   if (view === "ebookLeads") loadLandingLeads();
