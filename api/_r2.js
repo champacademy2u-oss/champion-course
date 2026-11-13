@@ -41,13 +41,14 @@ function r2() {
   return client;
 }
 
-async function createUploadUrl(objectKey, contentType) {
+async function createUploadUrl(objectKey, contentType, options = {}) {
   const values = config();
   return getSignedUrl(r2(), new PutObjectCommand({
     Bucket: values.bucketName,
     Key: objectKey,
-    ContentType: contentType
-  }), { expiresIn: 30 * 60 });
+    ContentType: contentType,
+    ...(options.size ? { ContentLength: options.size } : {})
+  }), { expiresIn: options.expiresIn || 30 * 60 });
 }
 
 async function putStoredObject(objectKey, bytes, contentType) {
@@ -61,9 +62,9 @@ async function putStoredObject(objectKey, bytes, contentType) {
   }));
 }
 
-async function getStoredObject(objectKey) {
+async function getStoredObject(objectKey, options = {}) {
   const values = config();
-  return r2().send(new GetObjectCommand({ Bucket: values.bucketName, Key: objectKey }));
+  return r2().send(new GetObjectCommand({ Bucket: values.bucketName, Key: objectKey, ...(options.range ? { Range: options.range } : {}) }));
 }
 
 async function headStoredObject(objectKey) {
@@ -71,13 +72,13 @@ async function headStoredObject(objectKey) {
   return r2().send(new HeadObjectCommand({ Bucket: values.bucketName, Key: objectKey }));
 }
 
-async function createReadUrl(objectKey) {
+async function createReadUrl(objectKey, options = {}) {
   const values = config();
   return getSignedUrl(r2(), new GetObjectCommand({
     Bucket: values.bucketName,
     Key: objectKey,
-    ResponseContentDisposition: 'inline'
-  }), { expiresIn: 2 * 60 * 60 });
+    ResponseContentDisposition: options.disposition || 'inline'
+  }), { expiresIn: options.expiresIn || 2 * 60 * 60 });
 }
 
 async function storedObjectExists(objectKey) {
