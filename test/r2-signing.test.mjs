@@ -15,6 +15,8 @@ test('R2 signed URLs target the configured bucket and expire', async () => {
   assert.equal(uploadUrl.pathname, '/videos/example/test.mp4');
   assert.equal(uploadUrl.searchParams.get('X-Amz-Expires'), '1800');
   assert.ok(uploadUrl.searchParams.get('X-Amz-Signature'));
+  assert.equal(uploadUrl.searchParams.has('x-amz-checksum-crc32'), false);
+  assert.equal(uploadUrl.searchParams.has('x-amz-sdk-checksum-algorithm'), false);
   assert.equal(readUrl.searchParams.get('X-Amz-Expires'), '7200');
   assert.ok(readUrl.searchParams.get('X-Amz-Signature'));
 
@@ -23,6 +25,7 @@ test('R2 signed URLs target the configured bucket and expire', async () => {
   const libraryDownload = new URL(await createReadUrl('champ-library/test-file', { expiresIn: 600, disposition }));
   assert.equal(libraryUpload.searchParams.get('X-Amz-Expires'), '300');
   assert.match(libraryUpload.searchParams.get('X-Amz-SignedHeaders'), /content-length/);
+  assert.equal(libraryUpload.searchParams.has('x-amz-checksum-crc32'), false);
   assert.equal(libraryDownload.searchParams.get('X-Amz-Expires'), '600');
   assert.equal(libraryDownload.searchParams.get('response-content-disposition'), disposition);
 });
