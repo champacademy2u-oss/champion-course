@@ -32,6 +32,9 @@ function r2() {
   const values = config();
   client = new S3Client({
     region: 'auto',
+    // Presigning precedes the browser body: do not sign the SDK's optional
+    // CRC32 of an empty body as though it were the uploaded file's checksum.
+    requestChecksumCalculation: 'WHEN_REQUIRED',
     endpoint: `https://${values.accountId}.r2.cloudflarestorage.com`,
     credentials: {
       accessKeyId: values.accessKeyId,
