@@ -1,5 +1,5 @@
 import { DEFAULT_CATEGORIES, inspectFile, metadata, validateCategories, libraryError } from './champ-library-core.js';
-import { uploadThroughRelay } from './champ-library-upload.js?v=20261113-relay';
+import { uploadThroughRelay } from './champ-library-upload.js?v=20261113-upload-check';
 
 // Files are stored as Blobs in IndexedDB, never as temporary object URLs or localStorage strings.
 export class LocalLibrary {

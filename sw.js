@@ -1,4 +1,4 @@
-const CACHE_NAME = "lead-center-v26-champ-library-relay";
+const CACHE_NAME = "lead-center-v27-champ-library-upload-check";
 const ASSETS = [
   "./",
   "./index.html",
@@ -9,10 +9,10 @@ const ASSETS = [
   "./ebook-reply.js?v=20261007-five-step",
   "./ebook-reply.css?v=20261007-five-step",
   "./app.js?v=20261113-champ-library",
-  "./champ-library.js?v=20261113-relay",
+  "./champ-library.js?v=20261113-upload-check",
   "./champ-library-core.js",
-  "./champ-library-store.js?v=20261113-relay",
-  "./champ-library-upload.js?v=20261113-relay",
+  "./champ-library-store.js?v=20261113-upload-check",
+  "./champ-library-upload.js?v=20261113-upload-check",
   "./champ-library.css?v=20261113-library",
   "./preview-followup-core.js?v=20261018-preview-followup",
   "./preview-followup.js?v=20261018-preview-followup",

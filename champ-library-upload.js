@@ -29,7 +29,11 @@ export function uploadThroughRelay({ endpoint, url, file, mime, onProgress = () 
       if (['accepted', 'progress', 'complete'].includes(event.data.status)) { started = true; clearTimeout(loadTimeout); }
       if (event.data.status === 'progress' && Number.isFinite(event.data.percent)) onProgress(Math.max(0, Math.min(95, event.data.percent)));
       if (event.data.status === 'complete') finish();
-      if (event.data.status === 'error') finish(new Error('云端上传未完成，请检查网络后重试。'));
+      if (event.data.status === 'error') {
+        const messages = { destination_policy: '上传地址不符合私有存储规则。', file_policy: '上传文件的格式或大小不符合要求。', network_cors: '上传连接被浏览器拦截，请检查存储设置。', timeout: '文件上传超时，请刷新资料列表核对后重试。' };
+        const status = event.data.httpStatus;
+        finish(new Error(messages[event.data.code] || (Number.isInteger(status) ? `云端拒绝上传（HTTP ${status}），请检查上传设置。` : '云端上传未完成，请检查网络后重试。')));
+      }
     }
     window.addEventListener('message', message);
     frame.addEventListener('load', () => {
