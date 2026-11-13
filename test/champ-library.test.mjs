@@ -1,9 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
+import vm from 'node:vm';
 import { DEFAULT_CATEGORIES, filterFiles, inspectFile, libraryError, matchesSignature, metadata, validateCategories, validateFile } from '../champ-library-core.js';
 import { createLibraryHandler, libraryAdminAllowed, publicFile } from '../lib/champ-library-api.js';
 import { CloudLibrary } from '../champ-library-store.js';
+import { isRelayMessage } from '../champ-library-upload.js';
 
 const pdf = Buffer.from('%PDF-1.4\nChamp test document\n%%EOF');
 const input = { fileName: '课程.pdf', mime: 'application/pdf', size: pdf.length, title: '课程简介', categoryId: 'course', tags: ['课程'] };
@@ -186,7 +188,7 @@ test('a lost completion response retries the same file rather than uploading a d
     return Response.json({ ok: true, file: { id: 'same-file', status: 'ready' } });
   };
   try {
-    const client = new CloudLibrary('https://api.example/library', async () => 'test');
+    const client = new CloudLibrary('https://api.example/library', async () => 'test', async () => { puts++; });
     assert.equal((await client.upload(new File([pdf], '课程.pdf', { type: 'application/pdf' }), input)).id, 'same-file');
     assert.deepEqual([begins, puts, completes], [1, 1, 2]);
   } finally { Object.assign(globalThis, originals); }
@@ -203,8 +205,41 @@ test('a failed direct upload never finalizes a file or reports success', async (
   };
   globalThis.fetch = async url => { actions.push(new URL(url).searchParams.get('action')); return Response.json({ ok: true, id: 'qa-file', url: 'https://store.example/upload' }); };
   try {
-    const client = new CloudLibrary('https://api.example/library', async () => 'test');
+    const client = new CloudLibrary('https://api.example/library', async () => 'test', async () => { throw libraryError('文件上传失败。'); });
     await assert.rejects(client.upload(new File([pdf], '课程.pdf', { type: 'application/pdf' }), input), /上传失败/);
     assert.deepEqual(actions, ['begin']);
   } finally { Object.assign(globalThis, originals); }
+});
+
+test('upload relay accepts responses only from its exact frame, origin and operation', () => {
+  const frame = {}, origin = 'https://backend.example', id = 'operation-1';
+  const event = { source: frame, origin, data: { channel: 'champ-library-upload-v1', id } };
+  assert.equal(isRelayMessage(event, frame, origin, id), true);
+  assert.equal(isRelayMessage({ ...event, source: {} }, frame, origin, id), false);
+  assert.equal(isRelayMessage({ ...event, origin: 'https://other.example' }, frame, origin, id), false);
+  assert.equal(isRelayMessage({ ...event, data: { ...event.data, id: 'other' } }, frame, origin, id), false);
+});
+
+test('backend-origin relay rejects untrusted parents and upload destinations; no signed URLs are echoed', async () => {
+  const code = await fs.readFile(new URL('../public/library-upload.js', import.meta.url), 'utf8');
+  const sent = []; let handler, requests = 0;
+  const parent = { postMessage(payload, origin) { sent.push({ payload, origin }); } };
+  const window = { addEventListener(_name, callback) { handler = callback; } };
+  class Xhr {
+    constructor() { this.upload = {}; }
+    open(method) { assert.equal(method, 'PUT'); requests++; }
+    setRequestHeader(name, value) { assert.equal(name, 'Content-Type'); assert.equal(value, 'application/pdf'); }
+    send(file) { assert.equal(file.size, pdf.length); this.status = 200; this.onload(); }
+  }
+  vm.runInNewContext(code, { window, parent, location: { origin: 'https://backend.example' }, URL, Blob, XMLHttpRequest: Xhr });
+  const data = { channel: 'champ-library-upload-v1', id: 'qa-relay', url: 'https://bucket.account.r2.cloudflarestorage.com/champ-library/qa?X-Amz-Signature=test-only', file: new Blob([pdf]), mime: 'application/pdf' };
+  handler({ source: parent, origin: 'https://other.example', data });
+  handler({ source: {}, origin: 'https://champacademy2u-oss.github.io', data });
+  assert.equal(requests, 0); assert.equal(sent.length, 0);
+  handler({ source: parent, origin: 'https://champacademy2u-oss.github.io', data: { ...data, url: 'https://other.example/champ-library/qa?X-Amz-Signature=test-only' } });
+  assert.equal(requests, 0); assert.equal(sent.at(-1).payload.status, 'error');
+  handler({ source: parent, origin: 'https://champacademy2u-oss.github.io', data });
+  assert.equal(requests, 1);
+  assert.deepEqual(sent.slice(-2).map(value => value.payload.status), ['accepted', 'complete']);
+  assert.doesNotMatch(JSON.stringify(sent), /X-Amz|test-only|cloudflarestorage/);
 });
