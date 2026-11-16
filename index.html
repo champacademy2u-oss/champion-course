@@ -8,7 +8,7 @@
     <link rel="stylesheet" href="./ebook-reply.css?v=20261007-five-step" />
     <link rel="stylesheet" href="./preview-followup.css?v=20261018-preview-followup" />
     <link rel="stylesheet" href="./champ-library.css?v=20261113-library" />
-    <link rel="stylesheet" href="./landing-lead-import.css?v=20261116-landing-import" />
+    <link rel="stylesheet" href="./landing-lead-import.css?v=20261116-phone-fix" />
     <link rel="manifest" href="./manifest.json" />
   </head>
   <body>
@@ -1136,7 +1136,8 @@
 
     <dialog id="landingImportDialog" class="landing-import-dialog" aria-labelledby="landingImportTitle" aria-describedby="landingImportSummary">
       <div class="modal-header"><h3 id="landingImportTitle">导入到 Landing Leads</h3><button class="text-button" id="landingImportClose" type="button" aria-label="关闭导入窗口">✕</button></div>
-      <p class="landing-import-notice">本批名单只加入 Landing Leads，重复记录跳过。导入不会发送消息；联系许可需另行核实。</p>
+      <p class="landing-import-notice">本批名单只加入 Landing Leads。重复记录跳过；同 Email 的历史导入记录可补回空白电话，已有号码不会覆盖。</p>
+      <label class="landing-import-mapping" for="landingImportPhoneColumn"><span>电话号码栏位</span><select id="landingImportPhoneColumn"><option value="">请选择电话号码栏位</option></select></label>
       <p id="landingImportSummary" role="status" aria-live="polite"></p>
       <div id="landingImportSamples"></div>
       <p id="landingImportStatus" role="status" aria-live="polite"></p>
@@ -1159,8 +1160,8 @@
     <script src="./ebook-reply.js?v=20261007-five-step"></script>
     <script src="./preview-followup-core.js?v=20261018-preview-followup"></script>
     <script src="./preview-followup.js?v=20261018-preview-followup"></script>
-    <script src="./landing-lead-import-core.js?v=20261116-landing-import"></script>
-    <script src="./landing-lead-import.js?v=20261116-landing-import"></script>
+    <script src="./landing-lead-import-core.js?v=20261116-phone-fix"></script>
+    <script src="./landing-lead-import.js?v=20261116-phone-fix"></script>
     <script src="./app.js?v=20261116-landing-import"></script>
     <script type="module" src="./champ-library.js?v=20261113-upload-check"></script>
   </body>
