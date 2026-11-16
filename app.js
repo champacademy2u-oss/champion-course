@@ -5679,27 +5679,31 @@ window.filterPreviewLeadsTable = function() {
   renderPreviewLeadsRows(filtered, leads.length);
 };
 
-function renderPreviewLeadWhatsappAction(rawPhone) {
+function renderPreviewLeadWhatsappAction(rawPhone, message = '') {
   const recipient = whatsappBulkCore.normalizeMalaysiaPhone(rawPhone);
   if (!recipient.valid) {
     return '<span class="muted" title="请先核对客户电话号码">号码待核对</span>';
   }
 
-  const fallbackUrl = whatsappBulkCore.whatsappUrl(recipient.phone, '');
   const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent) ||
     (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  const isAndroid = /Android/i.test(navigator.userAgent);
+  const encoded = whatsappBulkCore.inspectMessageEncoding(message);
+  if (!encoded.valid) return '<span class="muted" title="请先修正文案中的损坏字符">文案待核对</span>';
+  const query = `phone=${recipient.phone}${encoded.message ? `&text=${encodeURIComponent(encoded.message)}` : ''}`;
+  // Desktop links stay in WhatsApp Web instead of handing the request to the
+  // OS's Personal app. The sending account is the browser's linked account;
+  // a URL cannot select or authenticate the owner's Business account.
+  const webUrl = `https://web.whatsapp.com/send?${query}`;
+  const href = isIOS ? `whatsapp-smb://send?${query}`
+    : isAndroid ? `intent://send?${query}#Intent;scheme=whatsapp;package=com.whatsapp.w4b;end`
+    : webUrl;
   const style = 'background:#25D366;color:#fff;border-color:#25D366;text-decoration:none;white-space:nowrap;';
-  if (!isIOS) {
-    return `<a href="${escapeHtml(fallbackUrl)}" target="_blank" rel="noopener noreferrer" class="mini-button" style="${style}" title="打开客户聊天；请确认使用的是 Business 账号，不会自动发送">WA</a>`;
-  }
-
-  // The Business-specific iOS scheme needs an installed, compatible app.
-  // Keep a user-operated HTTPS fallback: no timed redirects or auto-sends.
-  const businessUrl = `whatsapp-smb://send?phone=${recipient.phone}`;
-  return `<span style="display:inline-flex;flex-direction:column;align-items:flex-start;gap:4px;">
-    <a href="${escapeHtml(businessUrl)}" class="mini-button" style="${style}display:inline-flex;align-items:center;min-height:44px;" title="尝试在 iPhone WhatsApp Business 打开此客户聊天；不会自动发送">WA Business</a>
-    <a href="${escapeHtml(fallbackUrl)}" target="_blank" rel="noopener noreferrer" class="muted" style="display:inline-flex;align-items:center;min-height:44px;font-size:12px;white-space:nowrap;" title="Business 没有打开时使用；此通用入口可能打开普通版 WhatsApp">备用入口</a>
-  </span>`;
+  const target = isIOS || isAndroid ? '' : ' target="_blank" rel="noopener noreferrer"';
+  const title = isIOS || isAndroid
+    ? '尝试打开已安装的 WhatsApp Business；不转入个人版。打开后请核对客户并人工发送。'
+    : '在 WhatsApp Web 打开；请先用 WhatsApp Business 关联此浏览器。打开聊天不会自动发送。';
+  return `<a href="${escapeHtml(href)}"${target} class="mini-button" data-whatsapp-business="true" style="${style}display:inline-flex;align-items:center;min-height:44px;" title="${title}">WA Business</a>`;
 }
 
 function renderPreviewLeadsRows(leads, totalCount) {
@@ -5729,8 +5733,9 @@ function renderPreviewLeadsRows(leads, totalCount) {
         <td><span class="muted">${escapeHtml(l.email || '-')}</span></td>
         <td><span class="badge" style="background:rgba(99,102,241,0.1);color:#6366F1;border:1px solid rgba(99,102,241,0.2);font-size:12px;">${escapeHtml(l.state || '-')}</span></td>
         <td style="font-size:12px;color:var(--muted);">${dateStr}</td>
-        <td style="display:flex;gap:6px;align-items:center;">
+        <td style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
           ${wa}
+          <button class="mini-button" type="button" data-preview-edit data-id="${escapeHtml(l.id || '')}" data-source="Champ Learning Landing Page">Edit</button>
           <button class="mini-button" style="background:rgba(239,68,68,0.12);color:#ef4444;border-color:rgba(239,68,68,0.3);" onclick="deletePreviewLead('${escapeHtml(l.id || '')}', this)" title="删除这条记录">🗑</button>
         </td>
       </tr>
@@ -5942,7 +5947,7 @@ function renderChampPreviewLeadsRows(leads, totalCount) {
 
   tbody.innerHTML = leads.map((l, i) => {
     const dateStr = formatLeadRegistrationTime(l);
-    const wa = l.phone ? `<a href="https://wa.me/${l.phone.replace(/[^\d]/g,'')}" target="_blank" class="mini-button" style="background:#25D366;color:#fff;border-color:#25D366;text-decoration:none;">WA</a>` : '-';
+    const wa = renderPreviewLeadWhatsappAction(l.phone);
     return `
       <tr data-lead-id="${escapeHtml(l.id || '')}">
         <td><input type="checkbox" class="champ-preview-lead-select" data-id="${escapeHtml(l.id || '')}" onchange="updateChampPreviewBulkBar()"></td>
@@ -5952,8 +5957,9 @@ function renderChampPreviewLeadsRows(leads, totalCount) {
         <td><span class="muted">${escapeHtml(l.email || '-')}</span></td>
         <td><span class="badge" style="background:rgba(99,102,241,0.1);color:#6366F1;border:1px solid rgba(99,102,241,0.2);font-size:12px;">${escapeHtml(l.state || '-')}</span></td>
         <td style="font-size:12px;color:var(--muted);">${dateStr}</td>
-        <td style="display:flex;gap:6px;align-items:center;">
+        <td style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
           ${wa}
+          <button class="mini-button" type="button" data-preview-edit data-id="${escapeHtml(l.id || '')}" data-source="Champ Preview Landing Page">Edit</button>
           <button class="mini-button" style="background:rgba(239,68,68,0.12);color:#ef4444;border-color:rgba(239,68,68,0.3);" onclick="deleteChampPreviewLead('${escapeHtml(l.id || '')}', this)" title="删除这条记录">🗑</button>
         </td>
       </tr>
@@ -6084,5 +6090,12 @@ window.LandingLeadImport?.init({
   parseRows: parseLeadFile,
   parseDate: registrationParseValue,
   refresh: () => window.loadChampPreviewLeads(),
+  notify: toast,
+});
+
+window.PreviewLeadEditor?.init({
+  db: () => _db,
+  cloudExpected: () => Boolean(window.FIREBASE_CONFIG),
+  refresh: source => source === CHAMP_PREVIEW_LEAD_SOURCE ? window.loadChampPreviewLeads() : window.loadPreviewLeads(),
   notify: toast,
 });

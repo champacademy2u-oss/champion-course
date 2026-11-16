@@ -1,4 +1,4 @@
-const CACHE_NAME = "lead-center-v29-landing-phone-fix";
+const CACHE_NAME = "lead-center-v30-business-edit";
 const ASSETS = [
   "./",
   "./index.html",
@@ -8,7 +8,10 @@ const ASSETS = [
   "./ebook-reply-core.js?v=20261007-five-step",
   "./ebook-reply.js?v=20261007-five-step",
   "./ebook-reply.css?v=20261007-five-step",
-  "./app.js?v=20261116-landing-import",
+  "./app.js?v=20261116-business-edit",
+  "./preview-lead-editor-core.js?v=20261116-business-edit",
+  "./preview-lead-editor.js?v=20261116-business-edit",
+  "./preview-lead-editor.css?v=20261116-business-edit",
   "./landing-lead-import-core.js?v=20261116-phone-fix",
   "./landing-lead-import.js?v=20261116-phone-fix",
   "./landing-lead-import.css?v=20261116-phone-fix",

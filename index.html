@@ -9,6 +9,7 @@
     <link rel="stylesheet" href="./preview-followup.css?v=20261018-preview-followup" />
     <link rel="stylesheet" href="./champ-library.css?v=20261113-library" />
     <link rel="stylesheet" href="./landing-lead-import.css?v=20261116-phone-fix" />
+    <link rel="stylesheet" href="./preview-lead-editor.css?v=20261116-business-edit" />
     <link rel="manifest" href="./manifest.json" />
   </head>
   <body>
@@ -714,6 +715,7 @@
             <div>
               <h3>📋 Landing Leads</h3>
               <p class="muted" style="font-size:13px; margin-top:4px;">无限杠杆首页报名名单 — 客户通过 champacademy.asia 首页报名后自动记录</p>
+              <p class="muted" style="font-size:12px; margin-top:6px;">电脑：先用 WhatsApp Business → 已连接的设备，关联此浏览器，再点 WA Business。手机：尝试直接打开 Business。打开聊天不会自动发送。</p>
             </div>
             <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
               <div id="champPreviewBulkBar" style="display:none; align-items:center; gap:8px; background:rgba(239,68,68,0.08); border:1px solid rgba(239,68,68,0.3); border-radius:8px; padding:6px 12px;">
@@ -725,6 +727,7 @@
               <button class="text-button primary" id="importChampPreviewLeadsBtn" onclick="LandingLeadImport.chooseFile()" type="button" style="font-weight:700;">⬆ 导入名单</button>
               <input id="landingImportInput" type="file" accept=".csv,.tsv,text/csv,text/tab-separated-values" hidden />
               <button class="text-button" id="exportChampPreviewLeadsBtn" onclick="exportChampPreviewLeadsCSV()" style="font-weight:700;">⬇ Export CSV</button>
+              <a id="connectLandingWhatsappBusiness" href="https://web.whatsapp.com/" target="_blank" rel="noopener noreferrer" class="text-button" style="text-decoration:none; font-weight:700;">连接 WhatsApp Business</a>
               <a href="https://champacademy.asia/" target="_blank" class="text-button primary" style="text-decoration:none; font-weight:700; display:inline-flex; align-items:center; gap:6px;">🔗 打开 Landing Page</a>
             </div>
           </div>
@@ -770,7 +773,7 @@
             <div>
               <h3>🎯 Preview Leads</h3>
               <p class="muted" style="font-size:13px; margin-top:4px;">Champ Learning 报名名单 — 客户通过 Landing Page (champ-learning) 报名后自动记录</p>
-              <p class="muted" style="font-size:12px; margin-top:6px;">iPhone：点 WA Business 尝试打开客户聊天；若无响应，点备用入口（可能打开普通版 WhatsApp 或网页）。打开聊天不会自动发送或标记已联系，请核对客户与 Business 账号后手动发送。</p>
+              <p class="muted" style="font-size:12px; margin-top:6px;">电脑：先用 WhatsApp Business → 已连接的设备，关联此浏览器，再点 WA Business。手机：尝试直接打开 Business。打开聊天不会自动发送。</p>
             </div>
             <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
               <div id="previewBulkBar" style="display:none; align-items:center; gap:8px; background:rgba(239,68,68,0.08); border:1px solid rgba(239,68,68,0.3); border-radius:8px; padding:6px 12px;">
@@ -780,6 +783,7 @@
               </div>
               <button class="text-button" id="refreshPreviewLeadsBtn" onclick="loadPreviewLeads()" style="font-weight:700;">🔄 刷新</button>
               <button class="text-button" id="exportPreviewLeadsBtn" onclick="exportPreviewLeadsCSV()" style="font-weight:700;">⬇ Export CSV</button>
+              <a id="connectPreviewWhatsappBusiness" href="https://web.whatsapp.com/" target="_blank" rel="noopener noreferrer" class="text-button" style="text-decoration:none; font-weight:700;">连接 WhatsApp Business</a>
               <a href="https://champacademy.asia/preview" target="_blank" class="text-button primary" style="text-decoration:none; font-weight:700; display:inline-flex; align-items:center; gap:6px;">🔗 打开 Preview 页</a>
             </div>
           </div>
@@ -1143,6 +1147,19 @@
       <p id="landingImportStatus" role="status" aria-live="polite"></p>
       <div class="modal-footer"><button class="text-button" id="landingImportCancel" type="button">关闭</button><button class="text-button primary" id="landingImportConfirm" type="button" disabled>确认导入到 Landing Leads</button></div>
     </dialog>
+    <dialog id="previewLeadEditDialog" class="preview-lead-edit-dialog" aria-labelledby="previewLeadEditTitle" aria-describedby="previewLeadEditStatus">
+      <div class="modal-header"><div><h3 id="previewLeadEditTitle">编辑名单</h3><p id="previewLeadEditSource" class="muted"></p></div><button class="text-button" type="button" id="previewLeadEditClose" aria-label="关闭编辑窗口">✕</button></div>
+      <form id="previewLeadEditForm" novalidate>
+        <div class="preview-lead-edit-grid">
+          <label for="previewLeadEdit_name">姓名<input id="previewLeadEdit_name" type="text" maxlength="200" autocomplete="off" required /></label>
+          <label for="previewLeadEdit_phone">电话<input id="previewLeadEdit_phone" type="tel" maxlength="40" autocomplete="off" placeholder="例如 +60…" /></label>
+          <label for="previewLeadEdit_email">Email<input id="previewLeadEdit_email" type="email" maxlength="254" autocomplete="off" /></label>
+          <label for="previewLeadEdit_state">州属<input id="previewLeadEdit_state" type="text" maxlength="80" autocomplete="off" /></label>
+        </div>
+        <p id="previewLeadEditStatus" role="status" aria-live="polite"></p>
+        <div class="modal-footer"><button class="text-button" type="button" id="previewLeadEditCancel">取消</button><button class="text-button primary" type="submit" id="previewLeadEditSave">保存修改</button></div>
+      </form>
+    </dialog>
     <div id="toast" class="toast"></div>
     <script src="./jspdf.umd.min.js"></script>
     <script src="./jspdf.plugin.autotable.min.js"></script>
@@ -1162,7 +1179,9 @@
     <script src="./preview-followup.js?v=20261018-preview-followup"></script>
     <script src="./landing-lead-import-core.js?v=20261116-phone-fix"></script>
     <script src="./landing-lead-import.js?v=20261116-phone-fix"></script>
-    <script src="./app.js?v=20261116-landing-import"></script>
+    <script src="./preview-lead-editor-core.js?v=20261116-business-edit"></script>
+    <script src="./preview-lead-editor.js?v=20261116-business-edit"></script>
+    <script src="./app.js?v=20261116-business-edit"></script>
     <script type="module" src="./champ-library.js?v=20261113-upload-check"></script>
   </body>
 </html>
