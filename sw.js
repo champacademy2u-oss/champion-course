@@ -1,4 +1,4 @@
-const CACHE_NAME = "lead-center-v27-champ-library-upload-check";
+const CACHE_NAME = "lead-center-v28-landing-import";
 const ASSETS = [
   "./",
   "./index.html",
@@ -8,7 +8,10 @@ const ASSETS = [
   "./ebook-reply-core.js?v=20261007-five-step",
   "./ebook-reply.js?v=20261007-five-step",
   "./ebook-reply.css?v=20261007-five-step",
-  "./app.js?v=20261113-champ-library",
+  "./app.js?v=20261116-landing-import",
+  "./landing-lead-import-core.js?v=20261116-landing-import",
+  "./landing-lead-import.js?v=20261116-landing-import",
+  "./landing-lead-import.css?v=20261116-landing-import",
   "./champ-library.js?v=20261113-upload-check",
   "./champ-library-core.js",
   "./champ-library-store.js?v=20261113-upload-check",

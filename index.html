@@ -8,6 +8,7 @@
     <link rel="stylesheet" href="./ebook-reply.css?v=20261007-five-step" />
     <link rel="stylesheet" href="./preview-followup.css?v=20261018-preview-followup" />
     <link rel="stylesheet" href="./champ-library.css?v=20261113-library" />
+    <link rel="stylesheet" href="./landing-lead-import.css?v=20261116-landing-import" />
     <link rel="manifest" href="./manifest.json" />
   </head>
   <body>
@@ -721,6 +722,8 @@
                 <button class="text-button" onclick="clearChampPreviewSelection()" style="min-height:32px; font-size:13px;">取消</button>
               </div>
               <button class="text-button" id="refreshChampPreviewLeadsBtn" onclick="loadChampPreviewLeads()" style="font-weight:700;">🔄 刷新</button>
+              <button class="text-button primary" id="importChampPreviewLeadsBtn" onclick="LandingLeadImport.chooseFile()" type="button" style="font-weight:700;">⬆ 导入名单</button>
+              <input id="landingImportInput" type="file" accept=".csv,.tsv,text/csv,text/tab-separated-values" hidden />
               <button class="text-button" id="exportChampPreviewLeadsBtn" onclick="exportChampPreviewLeadsCSV()" style="font-weight:700;">⬇ Export CSV</button>
               <a href="https://champacademy.asia/" target="_blank" class="text-button primary" style="text-decoration:none; font-weight:700; display:inline-flex; align-items:center; gap:6px;">🔗 打开 Landing Page</a>
             </div>
@@ -748,7 +751,7 @@
                   <th>电话</th>
                   <th>Email</th>
                   <th>州属</th>
-                  <th>报名时间</th>
+                  <th>报名时间（马来西亚）</th>
                   <th style="width:120px">操作</th>
                 </tr>
               </thead>
@@ -1131,6 +1134,14 @@
       </div>
     </div>
 
+    <dialog id="landingImportDialog" class="landing-import-dialog" aria-labelledby="landingImportTitle" aria-describedby="landingImportSummary">
+      <div class="modal-header"><h3 id="landingImportTitle">导入到 Landing Leads</h3><button class="text-button" id="landingImportClose" type="button" aria-label="关闭导入窗口">✕</button></div>
+      <p class="landing-import-notice">本批名单只加入 Landing Leads，重复记录跳过。导入不会发送消息；联系许可需另行核实。</p>
+      <p id="landingImportSummary" role="status" aria-live="polite"></p>
+      <div id="landingImportSamples"></div>
+      <p id="landingImportStatus" role="status" aria-live="polite"></p>
+      <div class="modal-footer"><button class="text-button" id="landingImportCancel" type="button">关闭</button><button class="text-button primary" id="landingImportConfirm" type="button" disabled>确认导入到 Landing Leads</button></div>
+    </dialog>
     <div id="toast" class="toast"></div>
     <script src="./jspdf.umd.min.js"></script>
     <script src="./jspdf.plugin.autotable.min.js"></script>
@@ -1148,7 +1159,9 @@
     <script src="./ebook-reply.js?v=20261007-five-step"></script>
     <script src="./preview-followup-core.js?v=20261018-preview-followup"></script>
     <script src="./preview-followup.js?v=20261018-preview-followup"></script>
-    <script src="./app.js?v=20261113-champ-library"></script>
+    <script src="./landing-lead-import-core.js?v=20261116-landing-import"></script>
+    <script src="./landing-lead-import.js?v=20261116-landing-import"></script>
+    <script src="./app.js?v=20261116-landing-import"></script>
     <script type="module" src="./champ-library.js?v=20261113-upload-check"></script>
   </body>
 </html>

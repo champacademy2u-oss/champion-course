@@ -4261,6 +4261,17 @@ document.querySelector(".sidebar").addEventListener("click", (e) => {
 elements.csvInput.addEventListener("change", async (event) => {
   const [file] = event.target.files;
   if (!file) return;
+
+  // The global upload entry must follow the visible Landing Leads destination.
+  // It must never fall through to the ordinary leads/course importer here.
+  if (document.getElementById('landingLeadsView')?.classList.contains('active')) {
+    state.pendingCourseImport = null;
+    event.target.value = '';
+    if (window.LandingLeadImport) await window.LandingLeadImport.openFile(file);
+    else toast('Landing Leads 导入功能尚未载入，请刷新后重试。');
+    return;
+  }
+  
   
   const targetCourse = state.pendingCourseImport;
   state.pendingCourseImport = null;
@@ -5409,6 +5420,179 @@ window.deleteSelectedLandingLeads = async function() {
 // Preview Leads Admin — reads from Firebase Firestore (preview_leads)
 // ──────────────────────────────────────────────────────
 
+// BEGIN READ-ONLY REGISTRATION TIME HELPERS
+// Dependency-free helpers. Remove only `export ` when embedding in classic app.js.
+const registrationTimeZone = 'Asia/Kuala_Lumpur';
+const registrationTimeFormatter = new Intl.DateTimeFormat('en-GB', {
+  timeZone: registrationTimeZone,
+  year: 'numeric', month: '2-digit', day: '2-digit',
+  hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23',
+});
+
+function registrationCalendarValid(year, month, day, hour = 0, minute = 0, second = 0) {
+  if (![year, month, day, hour, minute, second].every(Number.isInteger)) return false;
+  if (year < 1 || year > 9999 || month < 1 || month > 12 || day < 1 || hour < 0 || hour > 23 || minute < 0 || minute > 59 || second < 0 || second > 59) return false;
+  const registrationLeap = year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0);
+  return day <= [31, registrationLeap ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31][month - 1];
+}
+
+function registrationUtcMillis(year, month, day, hour = 0, minute = 0, second = 0, millisecond = 0) {
+  // setUTCFullYear avoids Date.UTC's special 1900 offset for years 0..99.
+  const registrationDate = new Date(0);
+  registrationDate.setUTCFullYear(year, month - 1, day);
+  registrationDate.setUTCHours(hour, minute, second, millisecond);
+  return registrationDate.getTime();
+}
+
+function registrationFromMillis(value, precision = 'second') {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return null;
+  const registrationInstant = new Date(value);
+  if (!Number.isFinite(registrationInstant.getTime()) || registrationInstant.getUTCFullYear() < 1 || registrationInstant.getUTCFullYear() > 9999) return null;
+  return { instant: registrationInstant, precision };
+}
+
+function registrationMalaysiaParts(instant) {
+  try {
+    const registrationParts = {};
+    for (const registrationPart of registrationTimeFormatter.formatToParts(instant)) {
+      if (registrationPart.type !== 'literal') registrationParts[registrationPart.type] = Number(registrationPart.value);
+    }
+    return registrationParts;
+  } catch {
+    return null;
+  }
+}
+
+function registrationMalaysiaInstant(year, month, day, hour = 0, minute = 0, second = 0) {
+  if (!registrationCalendarValid(year, month, day, hour, minute, second)) return null;
+  const registrationWallMillis = registrationUtcMillis(year, month, day, hour, minute, second);
+  let registrationCandidate = registrationWallMillis - 8 * 60 * 60 * 1000;
+  // Resolve the named zone, not the browser zone. Round-trip rejects skipped wall times.
+  // This also respects historical Malaysian offsets rather than assuming UTC+8 forever.
+  for (let registrationAttempt = 0; registrationAttempt < 3; registrationAttempt++) {
+    const registrationParts = registrationMalaysiaParts(new Date(registrationCandidate));
+    if (!registrationParts) return null;
+    const registrationActual = registrationUtcMillis(registrationParts.year, registrationParts.month, registrationParts.day, registrationParts.hour, registrationParts.minute, registrationParts.second);
+    const registrationDelta = registrationWallMillis - registrationActual;
+    if (registrationDelta === 0) return registrationFromMillis(registrationCandidate);
+    registrationCandidate += registrationDelta;
+  }
+  return null;
+}
+
+function registrationParseString(value) {
+  const registrationText = value.trim();
+  if (!registrationText) return null;
+  // Explicit zone is mandatory for ISO date-times; no Date.parse rollover or local guessing.
+  const registrationIso = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2})(?:\.(\d{1,9}))?)?(Z|[+-]\d{2}:\d{2})$/.exec(registrationText);
+  if (registrationIso) {
+    const [, registrationY, registrationM, registrationD, registrationH, registrationMin, registrationS, registrationFraction, registrationZone] = registrationIso;
+    const registrationNumbers = [registrationY, registrationM, registrationD, registrationH, registrationMin, registrationS ?? '0'].map(Number);
+    if (!registrationCalendarValid(...registrationNumbers)) return null;
+    let registrationOffset = 0;
+    if (registrationZone !== 'Z') {
+      const registrationOffsetHours = Number(registrationZone.slice(1, 3));
+      const registrationOffsetMinutes = Number(registrationZone.slice(4, 6));
+      if (registrationOffsetHours > 23 || registrationOffsetMinutes > 59) return null;
+      registrationOffset = (registrationOffsetHours * 60 + registrationOffsetMinutes) * (registrationZone[0] === '-' ? -1 : 1);
+    }
+    const registrationMillis = Number((registrationFraction ?? '').padEnd(3, '0').slice(0, 3));
+    return registrationFromMillis(registrationUtcMillis(...registrationNumbers, registrationMillis) - registrationOffset * 60000, registrationS === undefined ? 'minute' : 'second');
+  }
+  const registrationIsoDay = /^(\d{4})-(\d{2})-(\d{2})$/.exec(registrationText);
+  if (registrationIsoDay) {
+    const registrationResult = registrationMalaysiaInstant(Number(registrationIsoDay[1]), Number(registrationIsoDay[2]), Number(registrationIsoDay[3]));
+    return registrationResult ? { instant: registrationResult.instant, precision: 'day' } : null;
+  }
+  const registrationLegacy = /^(\d{1,2})\/(\d{1,2})\/(\d{4})(?:(?:\s*,\s*|\s+)(\d{1,2}):(\d{2})(?::(\d{2}))?(?:\s*(AM|PM))?)?$/i.exec(registrationText);
+  if (!registrationLegacy) return null;
+  const [, registrationD, registrationM, registrationY, registrationH, registrationMin, registrationS, registrationMeridiem] = registrationLegacy;
+  let registrationHour = Number(registrationH ?? 0);
+  if (registrationMeridiem) {
+    if (registrationHour < 1 || registrationHour > 12) return null;
+    registrationHour = registrationHour % 12 + (registrationMeridiem.toUpperCase() === 'PM' ? 12 : 0);
+  }
+  const registrationResult = registrationMalaysiaInstant(Number(registrationY), Number(registrationM), Number(registrationD), registrationHour, Number(registrationMin ?? 0), Number(registrationS ?? 0));
+  return registrationResult ? { instant: registrationResult.instant, precision: registrationH === undefined ? 'day' : registrationS === undefined ? 'minute' : 'second' } : null;
+}
+
+function registrationFromDate(value) {
+  try {
+    return registrationFromMillis(Date.prototype.getTime.call(value));
+  } catch {
+    return null;
+  }
+}
+
+function registrationParseValue(value) {
+  if (typeof value === 'number') return registrationFromMillis(value);
+  if (typeof value === 'string') return registrationParseString(value);
+  if (!value || typeof value !== 'object') return null;
+  const registrationDate = registrationFromDate(value);
+  if (registrationDate) return registrationDate;
+  try {
+    if (typeof value.toDate === 'function') {
+      const registrationSdkDate = registrationFromDate(value.toDate());
+      if (registrationSdkDate) return registrationSdkDate;
+    }
+  } catch { /* Try another supported representation or the next lead field. */ }
+  try {
+    if (typeof value.toMillis === 'function') {
+      const registrationSdkMillis = registrationFromMillis(value.toMillis());
+      if (registrationSdkMillis) return registrationSdkMillis;
+    }
+  } catch { /* A failed SDK method must not hide a valid legacy date. */ }
+  for (const registrationKeys of [['seconds', 'nanoseconds'], ['_seconds', '_nanoseconds']]) {
+    try {
+      const registrationSeconds = value[registrationKeys[0]];
+      const registrationNanos = value[registrationKeys[1]];
+      if (!Number.isSafeInteger(registrationSeconds) || !Number.isInteger(registrationNanos) || registrationNanos < 0 || registrationNanos > 999999999) continue;
+      const registrationResult = registrationFromMillis(registrationSeconds * 1000 + Math.floor(registrationNanos / 1000000));
+      if (registrationResult) return registrationResult;
+    } catch { /* Ignore malformed object properties without logging record values. */ }
+  }
+  return null;
+}
+
+function getLeadRegistrationTime(lead) {
+  if (!lead || typeof lead !== 'object' || Array.isArray(lead)) return null;
+  for (const registrationSource of ['createdAt', 'submittedAt', 'date']) {
+    try {
+      const registrationResult = registrationParseValue(lead[registrationSource]);
+      if (registrationResult) return { ...registrationResult, source: registrationSource };
+    } catch { /* A bad field cannot prevent trying the next permitted source. */ }
+  }
+  return null;
+}
+
+function formatLeadRegistrationTime(lead) {
+  const registrationResult = getLeadRegistrationTime(lead);
+  if (!registrationResult) return '未记录';
+  const registrationParts = registrationMalaysiaParts(registrationResult.instant);
+  if (!registrationParts || registrationParts.year < 1 || registrationParts.year > 9999) return '未记录';
+  const registrationPad = value => String(value).padStart(2, '0');
+  let registrationText = `${registrationPad(registrationParts.day)}/${registrationPad(registrationParts.month)}/${String(registrationParts.year).padStart(4, '0')}`;
+  if (registrationResult.precision === 'day') registrationText += '（时间未记录）';
+  else {
+    registrationText += ` ${registrationPad(registrationParts.hour)}:${registrationPad(registrationParts.minute)}`;
+    if (registrationResult.precision === 'second') registrationText += `:${registrationPad(registrationParts.second)}`;
+  }
+  if (registrationResult.source === 'submittedAt') registrationText += '（提交时间）';
+  return registrationText;
+}
+
+function isLeadRegistrationToday(lead, now = new Date()) {
+  const registrationResult = getLeadRegistrationTime(lead);
+  // A repeated submission timestamp cannot prove a new registration occurred today.
+  if (!registrationResult || registrationResult.source === 'submittedAt') return false;
+  const registrationNow = registrationFromDate(now);
+  if (!registrationNow) return false;
+  const registrationParts = registrationMalaysiaParts(registrationResult.instant);
+  const registrationToday = registrationMalaysiaParts(registrationNow.instant);
+  return Boolean(registrationParts && registrationToday && registrationParts.year === registrationToday.year && registrationParts.month === registrationToday.month && registrationParts.day === registrationToday.day);
+}
+// END READ-ONLY REGISTRATION TIME HELPERS
+
 const CHAMP_LEARNING_LEAD_SOURCE = 'Champ Learning Landing Page';
 const CHAMP_PREVIEW_LEAD_SOURCE = 'Champ Preview Landing Page';
 
@@ -5700,11 +5884,7 @@ window.loadChampPreviewLeads = async function() {
     const total = leads.length;
 
     if (statsBar) {
-      const today = leads.filter(l => {
-        const d = new Date(l.createdAt || l.date);
-        const now = new Date();
-        return d.toDateString() === now.toDateString();
-      }).length;
+      const today = leads.filter(l => isLeadRegistrationToday(l)).length;
 
       const states = {};
       leads.forEach(l => { if (l.state) states[l.state] = (states[l.state] || 0) + 1; });
@@ -5761,11 +5941,7 @@ function renderChampPreviewLeadsRows(leads, totalCount) {
   updateChampPreviewBulkBar();
 
   tbody.innerHTML = leads.map((l, i) => {
-    const date = new Date(l.createdAt || l.date);
-    const dateStr = isNaN(date.getTime()) ? (l.date || '-') : new Intl.DateTimeFormat('zh-MY', {
-      year:'numeric',month:'short',day:'2-digit',
-      hour:'2-digit',minute:'2-digit'
-    }).format(date);
+    const dateStr = formatLeadRegistrationTime(l);
     const wa = l.phone ? `<a href="https://wa.me/${l.phone.replace(/[^\d]/g,'')}" target="_blank" class="mini-button" style="background:#25D366;color:#fff;border-color:#25D366;text-decoration:none;">WA</a>` : '-';
     return `
       <tr data-lead-id="${escapeHtml(l.id || '')}">
@@ -5797,14 +5973,14 @@ window.exportChampPreviewLeadsCSV = async function() {
     leads = leads.filter(isChampPreviewLead);
     if (!leads.length) { toast('暂时没有数据可以导出'); return; }
 
-    const headers = ['编号','姓名','电话','Email','州属','报名时间'];
+    const headers = ['编号','姓名','电话','Email','州属','报名时间（马来西亚）'];
     const rows = leads.map((l, i) => [
       i + 1,
       l.name,
       l.phone,
       l.email,
       l.state,
-      l.createdAt ? new Date(l.createdAt).toLocaleString('zh-MY') : (l.date || ''),
+      formatLeadRegistrationTime(l),
     ]);
 
     const csvContent = [headers, ...rows]
@@ -5901,3 +6077,12 @@ window.deleteSelectedChampPreviewLeads = async function() {
     toast('❌ 删除失败，请重试');
   }
 };
+
+window.LandingLeadImport?.init({
+  db: () => _db,
+  cloudExpected: () => Boolean(window.FIREBASE_CONFIG),
+  parseRows: parseLeadFile,
+  parseDate: registrationParseValue,
+  refresh: () => window.loadChampPreviewLeads(),
+  notify: toast,
+});
