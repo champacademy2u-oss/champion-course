@@ -1,0 +1,78 @@
+.customer-receipts { --cr-accent:#c65c22; --cr-ink:#262522; --cr-border:#e9e4dd; color:var(--cr-ink); }
+.customer-receipts .cr-heading { display:flex; justify-content:space-between; gap:24px; align-items:center; margin-bottom:22px; }
+.customer-receipts h3 { font-size:27px; letter-spacing:-.6px; margin:4px 0 8px; }
+.customer-receipts .cr-kicker { margin:0; font-size:10px; font-weight:800; letter-spacing:1.7px; color:#96613e; }
+.customer-receipts .cr-muted { color:#767269; margin:0; font-size:13px; line-height:1.7; }
+.customer-receipts .cr-company { display:flex; align-items:center; gap:16px; padding:19px 22px; border:1px solid #e9decf; border-radius:14px; background:#fbf8f2; margin-bottom:22px; font-size:13px; }
+.customer-receipts .cr-company p { color:#777066; margin:6px 0 0; font-size:12px; }
+.customer-receipts .cr-company-icon { color:#b2733c; font-size:28px; }
+.customer-receipts .cr-signature-setting { display:flex;align-items:center;justify-content:space-between;gap:16px;margin:0 0 20px;padding:12px 16px;background:#fffaf0;border:1px solid #eddfbd;border-radius:10px;font-size:12px; }
+.customer-receipts .cr-signature-setting span { display:block;color:#987b47;margin-top:4px;font-size:11px; }
+.customer-receipts .cr-auto-number { border:1px solid #e5ddce;padding:12px;border-radius:7px;background:#faf8f2;display:flex;flex-direction:column;gap:8px;min-width:0; }
+.customer-receipts .cr-auto-number span { color:#8d7a5e;font-size:11px; }.customer-receipts .cr-auto-number strong { font-size:12px;overflow-wrap:anywhere; }
+.customer-receipts .cr-template-tag { font-size:10px; color:#96613e; border:1px solid #e1cdb4; border-radius:30px; padding:5px 10px; margin-left:auto; white-space:nowrap; }
+.customer-receipts .cr-metrics { display:grid; grid-template-columns:1fr 1.6fr 1fr; gap:16px; margin:22px 0; }
+.customer-receipts .cr-metrics>div { border:1px solid var(--cr-border); border-radius:14px; background:#fff; padding:22px; }
+.customer-receipts .cr-metrics span { color:#81796c; font-size:12px; display:block; margin-bottom:9px; }
+.customer-receipts .cr-metrics strong { font-size:26px; letter-spacing:-.5px; font-variant-numeric:tabular-nums; }
+.customer-receipts .cr-panel { border:1px solid var(--cr-border); border-radius:16px; background:white; overflow:hidden; }
+.customer-receipts .cr-toolbar { padding:20px; display:flex; align-items:center; gap:10px; border-bottom:1px solid var(--cr-border); }
+.customer-receipts .cr-toolbar label:first-child { flex:1; }
+.customer-receipts input,.customer-receipts textarea,.customer-receipts select { min-width:0; width:100%; font:inherit; color:#36312b; background:#fff; border:1px solid #ddd7ce; border-radius:7px; padding:10px 11px; box-sizing:border-box; }
+.customer-receipts textarea { resize:vertical; line-height:1.6; }
+.customer-receipts input:focus,.customer-receipts textarea:focus,.customer-receipts select:focus { outline:2px solid #cf8d5844; border-color:#b97845; outline-offset:1px; }
+.customer-receipts .cr-table-wrap { overflow-x:auto; }
+.customer-receipts table { width:100%; border-collapse:collapse; min-width:640px; font-size:13px; }
+.customer-receipts th { font-size:10px; letter-spacing:.6px; color:#8d8171; background:#fcfbf9; text-align:left; padding:14px 22px; white-space:nowrap; }
+.customer-receipts td { padding:19px 22px; border-top:1px solid #f0ece6; }
+.customer-receipts .cr-customer-name { display:block; color:#7b7369; margin-top:6px; font-size:12px; max-width:320px; overflow-wrap:anywhere; }
+.customer-receipts .cr-money { font-variant-numeric:tabular-nums; font-weight:700; white-space:nowrap; }
+.customer-receipts .cr-status { border-radius:30px; padding:5px 9px; font-size:10px; white-space:nowrap; }
+.customer-receipts .cr-status-draft { color:#8d6d28; background:#f7f0dd; }
+.customer-receipts .cr-status-issued { color:#43775d; background:#eaf4ee; }
+.customer-receipts .cr-status-void { color:#9d574d; background:#faeeeb; }
+.customer-receipts .cr-empty { text-align:center; color:#9a8e7e; padding:60px 24px; }
+.customer-receipts .cr-empty strong,.customer-receipts .cr-empty span { display:block; margin:9px; }
+.customer-receipts .cr-empty strong { color:#635a4f; font-size:17px; }
+.customer-receipts .cr-count { margin:0; padding:15px 22px; color:#948a7c; font-size:11px; border-top:1px solid var(--cr-border); }
+.customer-receipts .cr-notice { padding:13px 16px; border:1px solid #d6e5d7; border-radius:8px; background:#f3f8f2; font-size:13px; }
+.customer-receipts .cr-error { color:#9d4234; background:#fff3ed; border-radius:7px; padding:10px; }
+.customer-receipts .cr-dialog { width:min(1240px,calc(100vw - 44px)); max-width:none; max-height:calc(100dvh - 44px); padding:0; border:1px solid #dcd3c5; border-radius:17px; color:#2f2c27; box-shadow:0 30px 100px #35270d33; }
+.customer-receipts .cr-dialog::backdrop { background:#231d1666; backdrop-filter:blur(3px); }
+.customer-receipts .cr-dialog-heading { display:flex; justify-content:space-between; align-items:center; padding:22px 28px; border-bottom:1px solid var(--cr-border); }
+.customer-receipts .cr-dialog-heading h3 { margin-bottom:0; font-size:22px; }
+.customer-receipts .cr-editor-layout { display:grid; grid-template-columns:minmax(330px,1fr) minmax(370px,1.08fr); }
+.customer-receipts #crForm { padding:24px; }
+.customer-receipts fieldset { border:0; margin:0; padding:0; min-width:0; }
+.customer-receipts fieldset:disabled { opacity:.72; }
+.customer-receipts .cr-fields { display:grid; grid-template-columns:1fr 1fr; gap:16px 13px; }
+.customer-receipts .cr-fields label,.customer-receipts .cr-prepared,.customer-receipts .cr-item label { display:flex; flex-direction:column; gap:7px; font-size:12px; font-weight:600; color:#746657; }
+.customer-receipts .cr-span { grid-column:1 / -1; }
+.customer-receipts .cr-items-heading { display:flex; justify-content:space-between; align-items:center; margin:26px 0 10px; font-size:13px; }
+.customer-receipts .cr-items-heading small { color:#978b7a; font-weight:400; font-size:10px; }
+.customer-receipts .cr-item { display:grid; grid-template-columns:minmax(90px,1fr) 52px 93px 21px; gap:8px; margin-bottom:12px; align-items:start; border-top:1px solid #f0ece6; padding-top:10px; }
+.customer-receipts .cr-item label { font-size:10px; }
+.customer-receipts .cr-item input { padding:10px 7px; }
+.customer-receipts .cr-remove { border:0; color:#b18469; background:none; font-size:20px; cursor:pointer; padding:30px 0 0; }
+.customer-receipts .cr-item-actions { display:flex; gap:8px; flex-wrap:wrap; }
+.customer-receipts .cr-help { color:#9c8e7c; font-size:11px; line-height:1.7; }
+.customer-receipts .cr-prepared { margin-top:20px; }
+.customer-receipts .cr-total { display:flex; align-items:center; justify-content:space-between; padding:20px 0; margin-top:18px; border-top:1px solid #e7ded1; font-size:12px; }
+.customer-receipts .cr-total strong { font-size:23px; font-variant-numeric:tabular-nums; }
+.customer-receipts #crDialogStatus { font-size:12px; line-height:1.8; min-height:20px; }
+.customer-receipts .cr-dialog-actions,.customer-receipts .cr-recovery { display:flex; justify-content:flex-end; gap:8px; flex-wrap:wrap; margin-top:15px; }
+.customer-receipts .cr-dialog-actions .text-button { font-size:12px; }
+.customer-receipts .cr-danger { color:#a74f3c; border-color:#d8b3a5; }
+.customer-receipts .cr-readonly { padding:12px; background:#faf0dd; border-radius:8px; margin-bottom:20px; line-height:1.8; font-size:12px; overflow-wrap:anywhere; }
+.customer-receipts .cr-preview { padding:24px; background:#eeebe6; min-width:0; border-left:1px solid #e1dacf; }
+.customer-receipts .cr-preview-heading { display:flex; justify-content:space-between; color:#8d8170; font-size:11px; margin-bottom:18px; }
+.customer-receipts .cr-preview-heading span { font-size:10px; }
+.customer-receipts .cr-paper { background:white; box-shadow:0 3px 18px #4b3a1810; margin-bottom:20px; }
+.customer-receipts .cr-paper svg { width:100%; height:auto; display:block; }
+.customer-receipts .cr-preview-empty { min-height:320px; border:1px dashed #cfc5b8; border-radius:9px; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; padding:26px; color:#948674; }
+.customer-receipts .cr-preview-empty strong { font-size:17px; color:#7b6b55; }
+.customer-receipts .cr-preview-empty p { font-size:12px; line-height:1.8; }
+.customer-receipts [hidden] { display:none!important; }
+.customer-receipts .cr-sr { position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0; }
+@media(max-width:1100px) { .customer-receipts .cr-editor-layout { grid-template-columns:1fr; }.customer-receipts .cr-preview { border-left:0; border-top:1px solid var(--cr-border); }.customer-receipts .cr-paper { max-width:650px;margin:0 auto 20px; } }
+@media(max-width:640px) { .customer-receipts .cr-heading { align-items:flex-start; flex-direction:column; gap:16px; }.customer-receipts .cr-company { padding:16px;align-items:flex-start; }.customer-receipts .cr-company p { line-height:1.8; overflow-wrap:anywhere; }.customer-receipts .cr-template-tag { display:none; }.customer-receipts .cr-metrics { grid-template-columns:1fr;gap:9px; }.customer-receipts .cr-metrics>div { display:flex;align-items:center;justify-content:space-between;padding:18px; }.customer-receipts .cr-metrics span { margin:0; }.customer-receipts .cr-metrics strong { font-size:23px; }.customer-receipts .cr-toolbar { flex-wrap:wrap; padding:15px; }.customer-receipts .cr-toolbar label:first-child { flex-basis:100%; }.customer-receipts .cr-toolbar label:nth-child(2) { flex:1; }.customer-receipts .cr-dialog { width:calc(100vw - 16px); max-height:calc(100dvh - 16px); }.customer-receipts .cr-dialog-heading { padding:18px; }.customer-receipts #crForm,.customer-receipts .cr-preview { padding:17px; }.customer-receipts .cr-fields { grid-template-columns:1fr; }.customer-receipts .cr-item { grid-template-columns:1fr 72px 100px 22px; }.customer-receipts .cr-item-description { grid-column:1 / -1; }.customer-receipts .cr-remove { padding-top:22px; }.customer-receipts .cr-dialog-actions .text-button { flex:1;white-space:nowrap; }.customer-receipts .cr-total strong { font-size:22px; } }

@@ -10,3 +10,4 @@
 !vercel.json
 !.env.vercel.example
 !champ-library-core.js
+!customer-receipts-core.js

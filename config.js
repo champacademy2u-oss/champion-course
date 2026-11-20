@@ -31,3 +31,7 @@ window.EMAIL_CAMPAIGN_CONFIG = {
 window.CHAMP_LIBRARY_CONFIG = {
   apiBaseUrl: "https://champion-course-video-room.vercel.app/api/champ-library"
 };
+
+window.CUSTOMER_RECEIPTS_CONFIG = {
+  apiBaseUrl: "https://champion-course-video-room.vercel.app/api/customer-receipts"
+};

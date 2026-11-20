@@ -3726,6 +3726,7 @@ function switchView(view, targetCourse) {
   if (view === "zoom") title = "Zoom";
   if (view === "emailCampaigns") title = "Email Campaigns";
   if (view === "champLibrary") title = "Champ 资料库";
+  if (view === "customerReceipts") title = "客户收据";
   if (view === "enrollments") {
     title = state.enrollmentFilter === "all" ? "Combined Course Enrollments" : state.enrollmentFilter;
   }
@@ -3745,6 +3746,7 @@ function switchView(view, targetCourse) {
   if (view === "followup") renderFollowUpList();
   if (view === "videos") renderVideos();
   if (view === "champLibrary") window.ChampLibrary?.open();
+  if (view === "customerReceipts") window.CustomerReceipts?.open();
   if (view === "zoom") initZoomAdmin();
   if (view === "emailCampaigns") initEmailCampaigns();
   if (view === "ebookLeads") loadLandingLeads();

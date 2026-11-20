@@ -11,6 +11,7 @@
     <link rel="stylesheet" href="./landing-lead-import.css?v=20261116-phone-fix" />
     <link rel="stylesheet" href="./preview-lead-editor.css?v=20261116-business-edit" />
     <link rel="manifest" href="./manifest.json" />
+    <link rel="stylesheet" href="./customer-receipts.css?v=20261120-receipts" />
   </head>
   <body>
     <aside class="sidebar">
@@ -49,6 +50,7 @@
           <span>🎬</span> Videos
         </button>
         <button class="nav-item" data-view="champLibrary" title="Champ 资料库"><span aria-hidden="true">▱</span> Champ 资料库</button>
+        <button class="nav-item" data-view="customerReceipts" title="客户收据"><span aria-hidden="true">▤</span> 客户收据</button>
         <button class="nav-item" data-view="previewLeads" title="Preview Leads" style="border-top: 1px solid rgba(255,255,255,0.08); margin-top: 8px; padding-top: 8px;">
           <span>🎯</span> Preview Leads
         </button>
@@ -371,6 +373,7 @@
       </section>
 
       <section class="view" id="champLibraryView" aria-label="Champ 资料库"></section>
+      <section class="view" id="customerReceiptsView" aria-label="客户收据"></section>
 
       <section class="view" id="templatesView">
         <div class="template-grid">
@@ -1181,7 +1184,8 @@
     <script src="./landing-lead-import.js?v=20261116-phone-fix"></script>
     <script src="./preview-lead-editor-core.js?v=20261116-business-edit"></script>
     <script src="./preview-lead-editor.js?v=20261116-business-edit"></script>
-    <script src="./app.js?v=20261116-business-edit"></script>
+    <script src="./app.js?v=20261120-receipts"></script>
+    <script type="module" src="./customer-receipts.js?v=20261120-receipts"></script>
     <script type="module" src="./champ-library.js?v=20261113-upload-check"></script>
   </body>
 </html>

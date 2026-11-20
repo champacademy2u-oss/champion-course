@@ -1,4 +1,4 @@
-const CACHE_NAME = "lead-center-v30-business-edit";
+const CACHE_NAME = "lead-center-v31-customer-receipts";
 const ASSETS = [
   "./",
   "./index.html",
@@ -8,7 +8,13 @@ const ASSETS = [
   "./ebook-reply-core.js?v=20261007-five-step",
   "./ebook-reply.js?v=20261007-five-step",
   "./ebook-reply.css?v=20261007-five-step",
-  "./app.js?v=20261116-business-edit",
+  "./app.js?v=20261120-receipts",
+  "./customer-receipts.js?v=20261120-receipts",
+  "./customer-receipts-core.js",
+  "./customer-receipts-client.js",
+  "./customer-receipts-document.js",
+  "./customer-receipts-brand.js",
+  "./customer-receipts.css?v=20261120-receipts",
   "./preview-lead-editor-core.js?v=20261116-business-edit",
   "./preview-lead-editor.js?v=20261116-business-edit",
   "./preview-lead-editor.css?v=20261116-business-edit",
