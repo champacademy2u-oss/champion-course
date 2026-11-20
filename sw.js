@@ -1,4 +1,4 @@
-const CACHE_NAME = "lead-center-v31-customer-receipts";
+const CACHE_NAME = "lead-center-v32-zoom-access";
 const ASSETS = [
   "./",
   "./index.html",
@@ -8,7 +8,7 @@ const ASSETS = [
   "./ebook-reply-core.js?v=20261007-five-step",
   "./ebook-reply.js?v=20261007-five-step",
   "./ebook-reply.css?v=20261007-five-step",
-  "./app.js?v=20261120-receipts",
+  "./app.js?v=20261120-zoom-access",
   "./customer-receipts.js?v=20261120-receipts",
   "./customer-receipts-core.js",
   "./customer-receipts-client.js",

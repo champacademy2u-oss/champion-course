@@ -623,6 +623,8 @@
                   <label class="template-field"><span>活动时间（GMT+8）</span><input id="zoomEventTime" type="time" /></label>
                   <label class="template-field"><span>活动状态</span><select id="zoomEventStatus"><option value="draft">草稿</option><option value="published">发布报名</option><option value="closed">关闭报名</option></select></label>
                   <label class="template-field zoom-field-full"><span>Zoom 加入链接（不会公开显示）</span><input id="zoomRegistrationUrl" type="url" inputmode="url" placeholder="https://us06web.zoom.us/j/..." autocomplete="off" /></label>
+                  <label class="template-field"><span>Zoom Meeting ID</span><input id="zoomMeetingId" type="text" inputmode="numeric" maxlength="32" placeholder="例如：123 456 7890" autocomplete="off" /></label>
+                  <label class="template-field"><span>Zoom 密码</span><input id="zoomMeetingPassword" type="text" maxlength="64" placeholder="本场会议密码" autocomplete="off" /></label>
                 </div>
                 <div class="zoom-channel-row"><span>自动发送</span><label><input id="zoomSendWhatsapp" type="checkbox" checked /> WhatsApp</label><label><input id="zoomSendEmail" type="checkbox" checked /> Email</label></div>
                 <div class="zoom-security-note">每次只能发布一场活动。发布新活动后，上一场会自动关闭；客户资料、Zoom 链接和服务密钥不会写进公开报名页。</div>
@@ -640,7 +642,7 @@
                 <label class="template-field"><span>Email 报名确认内容</span><textarea id="zoomEmailBody" rows="6"></textarea></label>
                 <label class="template-field"><span>Email 提醒标题</span><input id="zoomReminderEmailSubject" type="text" /></label>
                 <label class="template-field"><span>Email 提醒内容</span><textarea id="zoomReminderEmailBody" rows="6"></textarea></label>
-                <p class="zoom-template-help">Email 可使用：<code>{{name}}</code>、<code>{{event}}</code>、<code>{{date}}</code>、<code>{{time}}</code>、<code>{{zoom_link}}</code>。WhatsApp 自动发送内容以 Meta 核准模板为准。</p>
+                <p class="zoom-template-help">Email 可使用：<code>{{name}}</code>、<code>{{zoom_name}}</code>、<code>{{event}}</code>、<code>{{date}}</code>、<code>{{time}}</code>、<code>{{zoom_link}}</code>、<code>{{zoom_id}}</code>、<code>{{zoom_password}}</code>。WhatsApp 沿用 5 个变量的 Meta 核准模板，第 5 个变量会发送链接、Meeting ID 与密码。</p>
               </div>
             </div>
 
@@ -656,7 +658,7 @@
 
             <div class="zoom-form-card zoom-registrations-card">
               <div class="zoom-table-heading"><div><h4>最新报名记录</h4><p>可检查双渠道状态，并为单一客户重新发送。</p></div><button class="text-button" id="refreshZoomDataBtn" type="button">刷新</button></div>
-              <div class="table-wrap"><table class="zoom-registration-table"><thead><tr><th>客户</th><th>活动</th><th>报名时间</th><th>WhatsApp</th><th>Email</th><th>操作</th></tr></thead><tbody id="zoomRegistrationsBody"><tr><td colspan="6" class="muted">还没有报名记录</td></tr></tbody></table></div>
+              <div class="table-wrap"><table class="zoom-registration-table"><thead><tr><th>Zoom 使用名字</th><th>活动</th><th>报名时间</th><th>WhatsApp</th><th>Email</th><th>操作</th></tr></thead><tbody id="zoomRegistrationsBody"><tr><td colspan="6" class="muted">还没有报名记录</td></tr></tbody></table></div>
             </div>
           </div>
         </div>
@@ -1184,7 +1186,7 @@
     <script src="./landing-lead-import.js?v=20261116-phone-fix"></script>
     <script src="./preview-lead-editor-core.js?v=20261116-business-edit"></script>
     <script src="./preview-lead-editor.js?v=20261116-business-edit"></script>
-    <script src="./app.js?v=20261120-receipts"></script>
+    <script src="./app.js?v=20261120-zoom-access"></script>
     <script type="module" src="./customer-receipts.js?v=20261120-receipts"></script>
     <script type="module" src="./champ-library.js?v=20261113-upload-check"></script>
   </body>

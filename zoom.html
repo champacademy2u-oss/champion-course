@@ -125,7 +125,7 @@
           <h2>三步完成，不需要重复填写 Zoom 表格</h2>
         </div>
         <ol class="steps">
-          <li><b>1</b><div><strong>填写基本资料</strong><span>姓名、国际区号手机号码与 Email。</span></div></li>
+          <li><b>1</b><div><strong>填写基本资料</strong><span>进入 Zoom 时使用的名字、国际区号手机号码与 Email。</span></div></li>
           <li><b>2</b><div><strong>收到双渠道确认</strong><span>系统把本场 Zoom 资料发送到 WhatsApp 和 Email。</span></div></li>
           <li><b>3</b><div><strong>开课前检查活动通知</strong><span>请留意 WhatsApp 与 Email，并把活动时间加入行程，避免错过直播。</span></div></li>
         </ol>
@@ -173,7 +173,7 @@
           <h2 id="registrationTitle">领取 Zoom 活动资料</h2>
           <p class="modal-intro" id="modalEventName">填写后将同时发送到 WhatsApp 与 Email。</p>
           <form id="registrationForm" novalidate>
-            <label>姓名 <span>*</span><input id="registrationName" name="name" type="text" maxlength="80" autocomplete="name" placeholder="请输入您的姓名" required /></label>
+            <label>Zoom 使用的名字 <span>*</span><input id="registrationName" name="zoomName" type="text" maxlength="80" autocomplete="name" placeholder="进入 Zoom 时请使用同一个名字" required /></label>
             <label>Email <span>*</span><input id="registrationEmail" name="email" type="email" maxlength="160" autocomplete="email" placeholder="name@example.com" required /></label>
             <label>WhatsApp 手机号码 <span>*</span></label>
             <div class="phone-field">
@@ -204,6 +204,6 @@
     <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-check-compat.js"></script>
     <script src="./config.js"></script>
-    <script src="./zoom.js?v=20260812-1"></script>
+    <script src="./zoom.js?v=20261120-zoom-name"></script>
   </body>
 </html>

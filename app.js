@@ -66,17 +66,19 @@ const defaultZoomSettings = {
   eventDate: "",
   eventTime: "",
   registrationUrl: "",
+  meetingId: "",
+  meetingPassword: "",
   status: "draft",
   seatLimit: 0,
   sendWhatsapp: true,
   sendEmail: true,
   whatsappTemplateName: "champion_zoom_confirmation",
   whatsappReminderTemplateName: "champion_zoom_reminder",
-  whatsappMessage: "Hi {{name}}，您已成功报名 {{event}}。\n\n日期：{{date}}\n时间：{{time}}\nZoom 报名链接：{{zoom_link}}",
+  whatsappMessage: "Hi {{name}}，您已成功报名 {{event}}。\n\n日期：{{date}}\n时间：{{time}}\nZoom 链接：{{zoom_link}}\nMeeting ID：{{zoom_id}}\n密码：{{zoom_password}}",
   emailSubject: "{{event}}｜Zoom 报名确认",
-  emailBody: "Hi {{name}}，\n\n感谢您报名 {{event}}。\n\n日期：{{date}}\n时间：{{time}}\nZoom 报名链接：{{zoom_link}}\n\nChampion Academy",
+  emailBody: "Hi {{name}}，\n\n感谢您报名 {{event}}。\n\n日期：{{date}}\n时间：{{time}}\nZoom 链接：{{zoom_link}}\nMeeting ID：{{zoom_id}}\n密码：{{zoom_password}}\n\n请使用报名时填写的 Zoom 名字进入。\n\nChampion Academy",
   reminderEmailSubject: "提醒｜{{event}} 即将开始",
-  reminderEmailBody: "Hi {{name}}，\n\n提醒您，{{event}} 将在 {{date}} {{time}} 开始。\n\nZoom 链接：{{zoom_link}}\n\nChampion Academy",
+  reminderEmailBody: "Hi {{name}}，\n\n提醒您，{{event}} 将在 {{date}} {{time}} 开始。\n\nZoom 链接：{{zoom_link}}\nMeeting ID：{{zoom_id}}\n密码：{{zoom_password}}\n\nChampion Academy",
   updatedAt: "",
 };
 
@@ -531,6 +533,8 @@ const elements = {
   zoomEventTime: document.querySelector("#zoomEventTime"),
   zoomEventStatus: document.querySelector("#zoomEventStatus"),
   zoomRegistrationUrl: document.querySelector("#zoomRegistrationUrl"),
+  zoomMeetingId: document.querySelector("#zoomMeetingId"),
+  zoomMeetingPassword: document.querySelector("#zoomMeetingPassword"),
   zoomSendWhatsapp: document.querySelector("#zoomSendWhatsapp"),
   zoomSendEmail: document.querySelector("#zoomSendEmail"),
   zoomWhatsappTemplateName: document.querySelector("#zoomWhatsappTemplateName"),
@@ -750,6 +754,8 @@ function normalizeZoomSettings(value) {
     eventDate: clean(data.eventDate),
     eventTime: clean(data.eventTime),
     registrationUrl: clean(data.joinUrl || data.registrationUrl),
+    meetingId: clean(data.meetingId),
+    meetingPassword: clean(data.meetingPassword),
     status: ["draft", "published", "closed"].includes(data.status) ? data.status : "draft",
     seatLimit: Math.max(0, Number(data.seatLimit) || 0),
     sendWhatsapp: data.sendWhatsapp !== false,
@@ -869,6 +875,8 @@ function fillZoomEventForm(event = {}) {
   elements.zoomEventTime.value = settings.eventTime;
   elements.zoomEventStatus.value = settings.status;
   elements.zoomRegistrationUrl.value = settings.registrationUrl;
+  elements.zoomMeetingId.value = settings.meetingId;
+  elements.zoomMeetingPassword.value = settings.meetingPassword;
   elements.zoomSendWhatsapp.checked = settings.sendWhatsapp;
   elements.zoomSendEmail.checked = settings.sendEmail;
   elements.zoomWhatsappTemplateName.value = settings.whatsappTemplateName;
@@ -893,7 +901,7 @@ function renderZoomRegistrations() {
     ? zoomAdminState.registrations.map(registration => {
         const confirmation = registration.deliveries?.confirmation || {};
         return `<tr>
-          <td><strong>${escapeHtml(registration.name)}</strong><small>${escapeHtml(registration.phone)} · ${escapeHtml(registration.email)}</small></td>
+          <td><strong>${escapeHtml(registration.zoomName || registration.name)}</strong><small>${escapeHtml(registration.phone)} · ${escapeHtml(registration.email)}</small></td>
           <td>${escapeHtml(eventTitles[registration.eventId] || "已归档活动")}</td>
           <td>${escapeHtml(zoomDateTime(registration.createdAt))}</td>
           <td>${zoomDeliveryBadge(confirmation.whatsapp)}</td>
@@ -977,6 +985,8 @@ function zoomUrlIsValid(value) {
 
 async function saveZoomSettings() {
   const joinUrl = elements.zoomRegistrationUrl.value.trim();
+  const meetingId = elements.zoomMeetingId.value.replace(/\D/g, "");
+  const meetingPassword = elements.zoomMeetingPassword.value.trim();
   if (!zoomUrlIsValid(joinUrl)) {
     alert("请输入以 https:// 开头的完整 Zoom 链接。");
     elements.zoomRegistrationUrl.focus();
@@ -984,6 +994,16 @@ async function saveZoomSettings() {
   }
   if (!elements.zoomEventName.value.trim() || !elements.zoomEventDate.value || !elements.zoomEventTime.value) {
     toast("请填写活动名称、日期和时间");
+    return;
+  }
+  if (elements.zoomEventStatus.value === "published" && !/^\d{9,12}$/.test(meetingId)) {
+    toast("发布报名之前，请填写正确的 Zoom Meeting ID");
+    elements.zoomMeetingId.focus();
+    return;
+  }
+  if (elements.zoomEventStatus.value === "published" && !meetingPassword) {
+    toast("发布报名之前，请填写 Zoom 密码");
+    elements.zoomMeetingPassword.focus();
     return;
   }
 
@@ -997,6 +1017,8 @@ async function saveZoomSettings() {
     eventTime: elements.zoomEventTime.value,
     status: elements.zoomEventStatus.value,
     joinUrl,
+    meetingId,
+    meetingPassword,
     sendWhatsapp: elements.zoomSendWhatsapp.checked,
     sendEmail: elements.zoomSendEmail.checked,
     whatsappTemplateName: elements.zoomWhatsappTemplateName.value,

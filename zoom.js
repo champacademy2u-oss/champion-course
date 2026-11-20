@@ -194,11 +194,11 @@
   async function submitRegistration(event) {
     event.preventDefault();
     errorElement.textContent = "";
-    const name = document.getElementById("registrationName").value.trim();
+    const zoomName = document.getElementById("registrationName").value.trim();
     const email = document.getElementById("registrationEmail").value.trim();
     const phone = internationalPhone();
     const consent = document.getElementById("registrationConsent").checked;
-    if (name.length < 2) return void (errorElement.textContent = "请填写完整姓名");
+    if (zoomName.length < 2) return void (errorElement.textContent = "请填写 Zoom 使用的名字");
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return void (errorElement.textContent = "请填写正确的 Email");
     if (!/^\+[1-9]\d{7,14}$/.test(phone)) return void (errorElement.textContent = "请填写包含国际区号的 WhatsApp 手机号码");
     if (!consent) return void (errorElement.textContent = "请勾选同意接收本次活动通知");
@@ -211,7 +211,7 @@
         method: "POST",
         headers: { "Content-Type": "application/json", ...(token ? { "X-Firebase-AppCheck": token } : {}) },
         body: JSON.stringify({
-          name, email, phone, consent,
+          name: zoomName, zoomName, email, phone, consent,
           website: document.getElementById("registrationWebsite").value,
           ...sourceData()
         })
