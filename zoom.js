@@ -74,6 +74,15 @@
   }
 
   function eventDisplay(event) {
+    const isSalesMarketingSummit = event.eventDate === "2027-01-13"
+      || /2027.*销售.*营销大会/.test(String(event.title || ""));
+    if (isSalesMarketingSummit) {
+      return {
+        title: "2027 年销售与营销大会",
+        date: "2027年1月13–14日（星期三、四）",
+        time: "晚上 8:00 起（GMT+8）"
+      };
+    }
     const isMoneyMachineSession = event.eventDate === "2026-08-28" && event.eventTime === "20:30";
     if (isMoneyMachineSession) {
       return {
@@ -99,7 +108,7 @@
     document.getElementById("eventTitle").textContent = display.title;
     document.getElementById("finalEventTitle").textContent = `保留「${display.title}」线上名额`;
     document.getElementById("modalEventName").textContent = `报名：${display.title}。完成后将同时发送到 WhatsApp 与 Email。`;
-    document.getElementById("eventSubtitle").textContent = event.subtitle || "建立你的赚钱系统，让企业自动化运转，业绩与利润持续增长。";
+    document.getElementById("eventSubtitle").textContent = event.subtitle || "两晚连续讲解全年战略布局、流量获客与收网成交。";
     document.getElementById("eventDate").textContent = display.date;
     document.getElementById("eventTime").textContent = display.time;
     document.getElementById("eventStatus").textContent = event.registrationOpen ? "报名开放中" : "报名已结束";
@@ -125,7 +134,7 @@
     } catch (error) {
       setRegistrationEnabled(false);
       document.getElementById("eventStatus").textContent = "报名尚未开放";
-      document.getElementById("eventSubtitle").textContent = "最新活动资料准备好后，报名按钮会在这里开放。";
+      document.getElementById("eventSubtitle").textContent = "2027 大会活动资料准备好后，报名按钮会在这里开放。";
       eventError.textContent = error.message === "Failed to fetch" ? "报名服务尚未开放" : error.message;
     }
   }
