@@ -5580,10 +5580,16 @@ function registrationParseValue(value) {
 
 function getLeadRegistrationTime(lead) {
   if (!lead || typeof lead !== 'object' || Array.isArray(lead)) return null;
-  for (const registrationSource of ['createdAt', 'submittedAt', 'date']) {
+  // Summit retries preserve the original submittedAt; generic lead retries may change it.
+  const summitRegistration = lead.source === 'Champ Learning Landing Page' && lead.campaignId === 'champ-summit-2027';
+  const registrationSources = summitRegistration ? ['submittedAt', 'createdAt'] : ['createdAt', 'submittedAt', 'date'];
+  for (const registrationSource of registrationSources) {
     try {
       const registrationResult = registrationParseValue(lead[registrationSource]);
-      if (registrationResult) return { ...registrationResult, source: registrationSource };
+      const firstSummitSubmission = summitRegistration && registrationSource === 'submittedAt';
+      if (registrationResult && (!firstSummitSubmission || registrationResult.precision !== 'day')) {
+        return { ...registrationResult, source: registrationSource, ...(firstSummitSubmission ? { firstSummitSubmission: true } : {}) };
+      }
     } catch { /* A bad field cannot prevent trying the next permitted source. */ }
   }
   return null;
@@ -5601,14 +5607,14 @@ function formatLeadRegistrationTime(lead) {
     registrationText += ` ${registrationPad(registrationParts.hour)}:${registrationPad(registrationParts.minute)}`;
     if (registrationResult.precision === 'second') registrationText += `:${registrationPad(registrationParts.second)}`;
   }
-  if (registrationResult.source === 'submittedAt') registrationText += '（提交时间）';
+  if (registrationResult.source === 'submittedAt' && !registrationResult.firstSummitSubmission) registrationText += '（提交时间）';
   return registrationText;
 }
 
 function isLeadRegistrationToday(lead, now = new Date()) {
   const registrationResult = getLeadRegistrationTime(lead);
   // A repeated submission timestamp cannot prove a new registration occurred today.
-  if (!registrationResult || registrationResult.source === 'submittedAt') return false;
+  if (!registrationResult || (registrationResult.source === 'submittedAt' && !registrationResult.firstSummitSubmission)) return false;
   const registrationNow = registrationFromDate(now);
   if (!registrationNow) return false;
   const registrationParts = registrationMalaysiaParts(registrationResult.instant);
@@ -5654,11 +5660,7 @@ window.loadPreviewLeads = async function() {
     const total = leads.length;
 
     if (statsBar) {
-      const today = leads.filter(l => {
-        const d = new Date(l.createdAt || l.date);
-        const now = new Date();
-        return d.toDateString() === now.toDateString();
-      }).length;
+      const today = leads.filter(l => isLeadRegistrationToday(l)).length;
 
       const states = {};
       leads.forEach(l => { if (l.state) states[l.state] = (states[l.state] || 0) + 1; });
@@ -5742,11 +5744,7 @@ function renderPreviewLeadsRows(leads, totalCount) {
   updatePreviewBulkBar();
 
   tbody.innerHTML = leads.map((l, i) => {
-    const date = new Date(l.createdAt || l.date);
-    const dateStr = isNaN(date.getTime()) ? (l.date || '-') : new Intl.DateTimeFormat('zh-MY', {
-      year:'numeric',month:'short',day:'2-digit',
-      hour:'2-digit',minute:'2-digit'
-    }).format(date);
+    const dateStr = formatLeadRegistrationTime(l);
     const wa = renderPreviewLeadWhatsappAction(l.phone);
     return `
       <tr data-lead-id="${escapeHtml(l.id || '')}">
@@ -5779,14 +5777,14 @@ window.exportPreviewLeadsCSV = async function() {
     leads = leads.filter(isChampLearningLead);
     if (!leads.length) { toast('暂时没有数据可以导出'); return; }
 
-    const headers = ['编号','姓名','电话','Email','州属','报名时间'];
+    const headers = ['编号','姓名','电话','Email','州属','报名日期与时间（马来西亚）'];
     const rows = leads.map((l, i) => [
       i + 1,
       l.name,
       l.phone,
       l.email,
       l.state,
-      l.createdAt ? new Date(l.createdAt).toLocaleString('zh-MY') : (l.date || ''),
+      formatLeadRegistrationTime(l),
     ]);
 
     const csvContent = [headers, ...rows]
