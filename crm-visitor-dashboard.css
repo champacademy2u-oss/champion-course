@@ -1,0 +1,177 @@
+.pva {
+  --pva-ink: var(--ink, #15212f);
+  --pva-muted: #4a5667;
+  --pva-line: var(--line, #dce3ea);
+  --pva-panel: var(--panel, #fff);
+  --pva-brand: #0d5f59;
+  --pva-soft: #eef7f5;
+  color: var(--pva-ink);
+  display: grid;
+  gap: 0.8rem;
+  min-width: 0;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.pva :where(p, dl, dd, h4, h5) { margin: 0; }
+
+.pva-intro { display: grid; gap: 0.2rem; }
+.pva-title { font-size: 1.0625rem; font-weight: 760; }
+
+.pva-controls,
+.pva-range-options {
+  align-items: end;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.pva-controls { justify-content: space-between; }
+
+.pva-range-group {
+  border: 0;
+  margin: 0;
+  min-inline-size: 0;
+  padding: 0;
+}
+
+.pva-range-label {
+  color: var(--pva-muted);
+  font-size: 0.8125rem;
+  font-weight: 650;
+  margin-bottom: 0.35rem;
+  padding: 0;
+}
+
+.pva-button {
+  background: var(--pva-panel);
+  border: 1px solid var(--pva-line);
+  border-radius: 0.55rem;
+  color: var(--pva-ink);
+  flex: 0 0 auto;
+  font-size: 0.875rem;
+  font-weight: 700;
+  min-block-size: 44px;
+  min-inline-size: 44px;
+  padding: 0.35rem 0.7rem;
+}
+
+.pva-button[aria-pressed='true'] {
+  background: var(--pva-brand);
+  border-color: var(--pva-brand);
+  color: #fff;
+}
+
+.pva-button:focus-visible {
+  outline: 2px solid var(--pva-brand);
+  outline-offset: 2px;
+}
+
+.pva-button:disabled { cursor: wait; opacity: 0.6; }
+
+.pva-report {
+  display: grid;
+  gap: 1rem;
+  min-width: 0;
+}
+
+.pva-report:empty { display: none; }
+
+.pva-note,
+.pva-status,
+.pva-empty {
+  color: var(--pva-muted);
+  font-size: 0.8125rem;
+}
+
+.pva-status { font-weight: 650; }
+
+.pva-warning {
+  background: #fff7ed;
+  border: 1px solid #f3d3ad;
+  border-radius: 0.6rem;
+  color: #773515;
+  font-size: 0.8125rem;
+  padding: 0.65rem 0.8rem;
+}
+
+.pva-metrics {
+  display: grid;
+  gap: 0.6rem;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 8rem), 1fr));
+}
+
+.pva-metric {
+  background: var(--pva-panel);
+  border: 1px solid var(--pva-line);
+  border-radius: 0.7rem;
+  display: grid;
+  gap: 0.3rem;
+  grid-template-rows: 1fr auto auto;
+  min-width: 0;
+  padding: clamp(0.6rem, 1.4vw, 0.9rem);
+}
+
+.pva-metric:nth-child(2), .pva-metric:nth-child(3) { background: var(--pva-soft); }
+.pva-metric-label { font-size: 0.85rem; font-weight: 730; }
+.pva-metric-value { font-size: clamp(1.45rem, 3vw, 2rem); font-variant-numeric: tabular-nums; font-weight: 780; line-height: 1.2; }
+.pva-metric-note { color: var(--pva-muted); font-size: 0.75rem; }
+
+.pva-block {
+  background: var(--pva-panel);
+  border: 1px solid var(--pva-line);
+  border-radius: 0.7rem;
+  display: grid;
+  align-content: start;
+  gap: 0.55rem;
+  min-width: 0;
+  padding: clamp(0.7rem, 2vw, 1rem);
+}
+
+.pva-heading { font-size: 0.9375rem; font-weight: 750; }
+
+.pva-table {
+  border-collapse: collapse;
+  min-width: 0;
+  table-layout: fixed;
+  width: 100%;
+}
+
+.pva-table :is(th, td) {
+  background: transparent;
+  border-bottom: 1px solid var(--pva-line);
+  color: var(--pva-ink);
+  font-size: 0.8125rem;
+  letter-spacing: 0;
+  padding: 0.5rem 0.35rem;
+  position: static;
+  text-align: left;
+  text-transform: none;
+  vertical-align: top;
+  white-space: normal;
+}
+
+.pva-table thead th { background: #f4f7f9; color: var(--pva-muted); }
+.pva-table thead th:first-child { width: 42%; }
+.pva-table thead th:last-child { width: 26%; }
+.pva-table tbody th { font-weight: 650; }
+.pva-table tbody tr:last-child :is(th, td) { border-bottom: 0; }
+.pva-table-note { color: var(--pva-muted); display: block; font-size: 0.75rem; }
+
+.pva-breakdowns {
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 13rem), 1fr));
+}
+
+.pva-breakdown-pair {
+  border-bottom: 1px solid var(--pva-line);
+  display: grid;
+  font-size: 0.8125rem;
+  gap: 0.5rem;
+  grid-template-columns: minmax(0, 1fr) minmax(0, auto);
+  padding: 0.43rem 0;
+}
+
+.pva-breakdown-pair:last-child { border-bottom: 0; }
+.pva-breakdown-pair dd { color: var(--pva-muted); text-align: right; }
