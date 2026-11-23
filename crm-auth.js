@@ -8,7 +8,6 @@
   const status = document.getElementById("crmAuthStatus");
   const badge = document.getElementById("crmAuthBadge");
   const logoutButton = document.getElementById("crmLogoutButton");
-  const MAX_SHARED_SESSION_SECONDS = 12 * 60 * 60;
   const MAX_CLOCK_SKEW_SECONDS = 5 * 60;
   const loginUrl = String(
     window.CRM_AUTH_CONFIG?.loginUrl
@@ -70,10 +69,8 @@
         if (token.claims?.firebase?.sign_in_provider !== "custom") return "";
         const authTime = Number(token.claims?.auth_time);
         const now = Math.floor(Date.now() / 1000);
-        const sessionAge = now - authTime;
         if (!Number.isFinite(authTime) || authTime <= 0
-          || sessionAge < -MAX_CLOCK_SKEW_SECONDS
-          || sessionAge > MAX_SHARED_SESSION_SECONDS) return "";
+          || now - authTime < -MAX_CLOCK_SKEW_SECONDS) return "";
         return "shared";
       }
       const provider = token.claims?.firebase?.sign_in_provider;

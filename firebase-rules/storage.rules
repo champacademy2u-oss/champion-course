@@ -8,7 +8,6 @@ service firebase.storage {
           || (request.auth.token.role == 'crm_shared_admin'
             && request.auth.token.firebase.sign_in_provider == 'custom'
             && request.auth.token.auth_time is int
-            && request.time.toMillis() / 1000 - request.auth.token.auth_time <= 43200
             && request.auth.token.auth_time - request.time.toMillis() / 1000 <= 300));
     }
 

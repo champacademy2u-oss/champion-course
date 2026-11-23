@@ -4,7 +4,7 @@
 
 ## CRM 共享密码登录（发布前须完成服务器设置）
 
-`/api/crm-session` 只在 Vercel 服务器端核对 `CRM_SHARED_LOGIN_PASSWORD`。密码不会写入 Git、公开 JavaScript、URL、浏览器储存或 API 日志。验证成功后，服务器为 `CRM_SHARED_ADMIN_UID` 签发带有 `admin=true` 与 `role=crm_shared_admin` 的 Firebase custom token，并建立对应的 `crm_admins/{uid}` 授权文件。Firestore Rules、Email、Zoom、Champ 资料库、客户收据和视频后台都验证同一专用身份。共享身份从 Firebase `auth_time` 起最多使用 12 小时；服务器 API 同时执行 token revocation 检查。
+`/api/crm-session` 只在 Vercel 服务器端核对 `CRM_SHARED_LOGIN_PASSWORD`。密码不会写入 Git、公开 JavaScript、URL、浏览器储存或 API 日志。验证成功后，服务器为 `CRM_SHARED_ADMIN_UID` 签发带有 `admin=true` 与 `role=crm_shared_admin` 的 Firebase custom token，并建立对应的 `crm_admins/{uid}` 授权文件。Firestore Rules、Email、Zoom、Champ 资料库、客户收据和视频后台都验证同一专用身份。共享管理员在当前浏览器会话内可持续读取数据，不再设定 12 小时的业务层截止；Firebase ID token 仍必须有效，服务器 API 同时执行 token revocation 检查。退出、关闭浏览器会话或管理员撤销身份后，仍需重新输入密码。
 
 上线时必须同时完成：
 

@@ -78,7 +78,8 @@ test('shared administrator claims require the exact role and dedicated UID', () 
   assert.equal(isSharedCrmAdmin({ uid: 'champ-crm-shared-admin', admin: true, role: 'admin', auth_time, firebase }), false);
   assert.equal(isSharedCrmAdmin({ uid: 'champ-crm-shared-admin', admin: false, role: CRM_SHARED_ROLE, auth_time, firebase }), false);
   assert.equal(isSharedCrmAdmin({ uid: 'champ-crm-shared-admin', admin: true, role: CRM_SHARED_ROLE, auth_time, firebase: { sign_in_provider: 'google.com' } }), false);
-  assert.equal(isSharedCrmAdmin({ uid: 'champ-crm-shared-admin', admin: true, role: CRM_SHARED_ROLE, auth_time: auth_time - (12 * 60 * 60) - 1, firebase }), false);
+  assert.equal(isSharedCrmAdmin({ uid: 'champ-crm-shared-admin', admin: true, role: CRM_SHARED_ROLE, auth_time: auth_time - (365 * 24 * 60 * 60), firebase }), true);
+  assert.equal(isSharedCrmAdmin({ uid: 'champ-crm-shared-admin', admin: true, role: CRM_SHARED_ROLE, auth_time: auth_time + 301, firebase }), false);
   assert.equal(isSharedCrmIdentity({ uid: 'champ-crm-shared-admin' }), true);
   assert.equal(isSharedCrmIdentity({ uid: 'existing-google-admin' }), false);
   assert.equal(firebaseAdminAllowed({ uid: 'champ-crm-shared-admin', admin: true, role: CRM_SHARED_ROLE, auth_time, firebase }), true);
@@ -189,7 +190,8 @@ test('Firestore rules reject ordinary authenticated users and keep login metadat
   assert.match(rules, /request\.auth\.token\.admin == true/);
   assert.match(rules, /request\.auth\.token\.role == 'crm_shared_admin'/);
   assert.match(rules, /request\.auth\.token\.firebase\.sign_in_provider == 'custom'/);
-  assert.match(rules, /request\.time\.toMillis\(\) \/ 1000 - request\.auth\.token\.auth_time <= 43200/);
+  assert.doesNotMatch(rules, /request\.time\.toMillis\(\) \/ 1000 - request\.auth\.token\.auth_time <= 43200/);
+  assert.match(rules, /request\.auth\.token\.auth_time - request\.time\.toMillis\(\) \/ 1000 <= 300/);
   assert.match(rules, /match \/crm_admins\/\{document\} \{ allow read, write: if false; \}/);
   assert.match(rules, /match \/crm_login_rate_limits\/\{document\} \{ allow read, write: if false; \}/);
   assert.doesNotMatch(rules, /function signedIn\(\)/);
@@ -225,12 +227,13 @@ test('legacy admin endpoints cannot be made public and have no default password'
   }
 });
 
-test('Firebase Storage applies the same exact shared role and 12-hour limit', async () => {
+test('Firebase Storage applies the same exact shared role without an artificial read-age cutoff', async () => {
   const rules = await readFile(new URL('../firebase-rules/storage.rules', import.meta.url), 'utf8');
   assert.match(rules, /request\.auth\.uid != 'champ-crm-shared-admin'/);
   assert.match(rules, /request\.auth\.token\.role == 'crm_shared_admin'/);
   assert.match(rules, /request\.auth\.token\.firebase\.sign_in_provider == 'custom'/);
-  assert.match(rules, /request\.time\.toMillis\(\) \/ 1000 - request\.auth\.token\.auth_time <= 43200/);
+  assert.doesNotMatch(rules, /request\.time\.toMillis\(\) \/ 1000 - request\.auth\.token\.auth_time <= 43200/);
+  assert.match(rules, /request\.auth\.token\.auth_time - request\.time\.toMillis\(\) \/ 1000 <= 300/);
 });
 
 test('every protected CRM API uses the unified shared-admin authorization path', async () => {

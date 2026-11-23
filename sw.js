@@ -1,4 +1,4 @@
-const CACHE_NAME = "lead-center-v37-shared-password-auth";
+const CACHE_NAME = "lead-center-v38-unlimited-read-access";
 const ASSETS = [
   "./",
   "./index.html",
@@ -8,7 +8,7 @@ const ASSETS = [
   "./ebook-reply-core.js?v=20261007-five-step",
   "./ebook-reply.js?v=20261007-five-step",
   "./ebook-reply.css?v=20261007-five-step",
-  "./crm-auth.js?v=20261123-shared-password-auth",
+  "./crm-auth.js?v=20261123-unlimited-read-access",
   "./app.js?v=20261123-shared-password-auth",
   "./preview-visitor-stage.js?v=20261123-private-visitor-reports",
   "./crm-visitor-dashboard.css?v=20261123-private-visitor-reports",

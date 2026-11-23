@@ -12,7 +12,6 @@ const defaultWebConfig = {
   measurementId: 'G-3RZV6TX39W'
 };
 
-const CRM_SHARED_SESSION_SECONDS = 12 * 60 * 60;
 const CRM_SHARED_CLOCK_SKEW_SECONDS = 5 * 60;
 
 function serviceAccount() {
@@ -72,7 +71,6 @@ function sharedCrmUid() {
 function isSharedCrmAdmin(decoded) {
   const authTime = Number(decoded?.auth_time);
   const nowSeconds = Math.floor(Date.now() / 1000);
-  const sessionAge = nowSeconds - authTime;
   return Boolean(decoded
     && decoded.admin === true
     && decoded.role === CRM_SHARED_ROLE
@@ -80,8 +78,7 @@ function isSharedCrmAdmin(decoded) {
     && decoded.firebase?.sign_in_provider === 'custom'
     && Number.isFinite(authTime)
     && authTime > 0
-    && sessionAge >= -CRM_SHARED_CLOCK_SKEW_SECONDS
-    && sessionAge <= CRM_SHARED_SESSION_SECONDS);
+    && nowSeconds - authTime >= -CRM_SHARED_CLOCK_SKEW_SECONDS);
 }
 
 function isSharedCrmIdentity(decoded) {

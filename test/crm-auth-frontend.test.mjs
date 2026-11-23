@@ -21,8 +21,8 @@ test('CRM business scripts load only after the authentication gate', async () =>
   assert.match(auth, /Auth\.Persistence\.SESSION/);
   assert.match(auth, /claims\?\.admin === true && token\.claims\?\.role === "crm_shared_admin"/);
   assert.match(auth, /sign_in_provider !== "custom"/);
-  assert.match(auth, /MAX_SHARED_SESSION_SECONDS = 12 \* 60 \* 60/);
-  assert.match(auth, /sessionAge > MAX_SHARED_SESSION_SECONDS/);
+  assert.doesNotMatch(auth, /MAX_SHARED_SESSION_SECONDS|sessionAge > MAX_SHARED_SESSION_SECONDS/);
+  assert.match(auth, /now - authTime < -MAX_CLOCK_SKEW_SECONDS/);
   assert.match(auth, /credentials: "omit"/);
   assert.match(auth, /cache: "no-store"/);
   assert.match(auth, /serviceWorker\.register\("\.\/sw\.js"\)/);
