@@ -1,9 +1,19 @@
 rules_version = '2';
 service firebase.storage {
   match /b/{bucket}/o {
-    match /videos/{videoId}/{fileName} {
-      allow write: if request.auth != null
+    function isVideoAdmin() {
+      return request.auth != null
         && request.auth.token.admin == true
+        && (request.auth.uid != 'champ-crm-shared-admin'
+          || (request.auth.token.role == 'crm_shared_admin'
+            && request.auth.token.firebase.sign_in_provider == 'custom'
+            && request.auth.token.auth_time is int
+            && request.time.toMillis() / 1000 - request.auth.token.auth_time <= 43200
+            && request.auth.token.auth_time - request.time.toMillis() / 1000 <= 300));
+    }
+
+    match /videos/{videoId}/{fileName} {
+      allow write: if isVideoAdmin()
         && request.resource.size < 1024 * 1024 * 1024
         && request.resource.contentType.matches('video/.*');
 

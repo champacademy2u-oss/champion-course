@@ -2,40 +2,99 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // SECURITY MODEL
-    // app.js signs in ANONYMOUSLY (firebase.auth().signInAnonymously()) before
-    // any read/write. Anonymous Auth satisfies `request.auth != null`, so the
-    // database is no longer publicly readable by anyone on the internet — only
-    // by a Firebase Auth user of THIS project. For a single-operator CRM this
-    // closes the open-access hole while keeping the code simple.
-    //
-    // REQUIRED BEFORE DEPLOYING THESE RULES:
-    //   1. In the Firebase console → Authentication → Sign-in method, ENABLE
-    //      "Anonymous". Otherwise signInAnonymously() fails and the app falls
-    //      back to localStorage (it will NOT crash).
-    //   2. The web API key in config.js is public by design; these rules are
-    //      what actually protect the data.
-    //
-    // FUTURE HARDENING (optional): restrict to a specific operator uid, e.g.
-    //   allow read, write: if request.auth != null
-    //     && request.auth.uid == "YOUR_OPERATOR_UID";
-    // or add per-user `ownerId` fields. Not required for single-user use.
-
-    function signedIn() {
-      return request.auth != null;
+    // Browser access is granted only to a server-provisioned CRM administrator.
+    // Anonymous or ordinary Firebase users cannot read customer records.
+    function isCrmAdmin() {
+      return request.auth != null
+        && exists(/databases/$(database)/documents/crm_admins/$(request.auth.uid))
+        && get(/databases/$(database)/documents/crm_admins/$(request.auth.uid)).data.active == true
+        && sharedRoleIsValid();
     }
 
-    // Existing CRM collections keep the current anonymous-auth compatibility
-    // model. Email Campaign data below is server-only.
-    match /leads/{document} { allow read, write: if signedIn(); }
-    match /previews/{document} { allow read, write: if signedIn(); }
-    match /videos/{document} { allow read, write: if signedIn(); }
-    match /views/{document} { allow read, write: if signedIn(); }
-    match /settings/{document} { allow read, write: if signedIn(); }
-    match /config/{document} { allow read, write: if signedIn(); }
-    match /preview_leads/{document} { allow read, write: if signedIn(); }
-    match /landing_leads/{document} { allow read, write: if signedIn(); }
+    function sharedRoleIsValid() {
+      let adminRecord = get(/databases/$(database)/documents/crm_admins/$(request.auth.uid)).data;
+      return !('role' in adminRecord)
+        || adminRecord.role != 'crm_shared_admin'
+        || (request.auth.token.admin == true
+          && request.auth.token.role == 'crm_shared_admin'
+          && request.auth.token.firebase.sign_in_provider == 'custom'
+          && request.auth.token.auth_time is int
+          && request.time.toMillis() / 1000 - request.auth.token.auth_time <= 43200
+          && request.auth.token.auth_time - request.time.toMillis() / 1000 <= 300);
+    }
 
+    // The two public Ebook forms still submit directly from the browser. They
+    // may create one tightly validated lead, but can never list, read, change,
+    // or delete any lead. CRM administrators retain full management access.
+    function isValidPublicLandingLead(document) {
+      let data = request.resource.data;
+      return request.auth != null
+        && request.auth.token.firebase.sign_in_provider == 'anonymous'
+        && data.keys().hasOnly([
+          'id', 'ebookId', 'ebookTitle', 'source', 'name', 'phone',
+          'industry', 'challenge', 'createdAt'
+        ])
+        && data.keys().hasAll([
+          'id', 'ebookId', 'ebookTitle', 'source', 'name', 'phone',
+          'industry', 'challenge', 'createdAt'
+        ])
+        && data.id is string
+        && document == data.id
+        && data.id.size() >= 8
+        && data.id.size() <= 64
+        && data.id.matches('^[A-Za-z0-9-]+$')
+        && data.ebookId is string
+        && data.ebookTitle is string
+        && data.source is string
+        && ((data.ebookId == 'world-class-marketing-100'
+            && data.ebookTitle == '世界级营销100招'
+            && data.source == 'World-Class Marketing Ebook Landing Page')
+          || (data.ebookId == 'whatsapp-account-safety'
+            && data.ebookTitle == 'Ryan Lim × Champ Academy WhatsApp Ebook'
+            && data.source == 'WhatsApp Ebook Landing Page'))
+        && data.name is string
+        && data.name.size() >= 1
+        && data.name.size() <= 100
+        && data.name.matches('.*[^\\s].*')
+        && data.phone is string
+        && data.phone.matches('^\\+[0-9]{7,15}$')
+        && data.industry is string
+        && data.industry.size() >= 1
+        && data.industry.size() <= 120
+        && data.industry.matches('.*[^\\s].*')
+        && data.challenge is string
+        && data.challenge.size() >= 1
+        && data.challenge.size() <= 2000
+        && data.challenge.matches('.*[^\\s].*')
+        && data.createdAt is string
+        && data.createdAt.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]{3}Z$');
+    }
+
+    match /crm_admins/{document} { allow read, write: if false; }
+    match /leads/{document} { allow read, write: if isCrmAdmin(); }
+    match /previews/{document} { allow read, write: if isCrmAdmin(); }
+    match /videos/{document} { allow read, write: if isCrmAdmin(); }
+    match /views/{document} { allow read, write: if isCrmAdmin(); }
+    match /settings/{document} { allow read, write: if isCrmAdmin(); }
+    match /config/{document} { allow read, write: if isCrmAdmin(); }
+    match /preview_leads/{document} { allow read, write: if isCrmAdmin(); }
+    match /landing_leads/{document} {
+      allow read, update, delete: if isCrmAdmin();
+      allow create: if isCrmAdmin() || isValidPublicLandingLead(document);
+    }
+
+    // Login attempts and shared administrator provisioning are server-only.
+    match /crm_login_rate_limits/{document} { allow read, write: if false; }
+
+    // Zoom meeting links, registrations, rate limits and delivery counters are
+    // server-only. Admin SDK requests bypass Firestore rules after server-side
+    // authentication.
+    match /zoom_events/{document} { allow read, write: if false; }
+    match /zoom_registrations/{document} { allow read, write: if false; }
+    match /zoom_rate_limits/{document} { allow read, write: if false; }
+    match /zoom_delivery_counters/{document} { allow read, write: if false; }
+
+    // Email Campaign content and delivery data are server-only.
     match /email_campaigns/{campaign} { allow read, write: if false; }
     match /email_campaigns/{campaign}/{document=**} { allow read, write: if false; }
     match /email_messages/{document} { allow read, write: if false; }
@@ -43,7 +102,14 @@ service cloud.firestore {
     match /email_suppressions/{document} { allow read, write: if false; }
     match /email_delivery_counters/{document} { allow read, write: if false; }
 
-    // New collections remain private until they are reviewed explicitly.
+    // Private Champ library and customer receipt records are server-only.
+    match /champ_library_files/{document} { allow read, write: if false; }
+    match /champ_library_settings/{document} { allow read, write: if false; }
+    match /customer_receipts/{document} { allow read, write: if false; }
+    match /customer_receipt_numbers/{document} { allow read, write: if false; }
+    match /customer_receipt_counters/{document} { allow read, write: if false; }
+
+    // Default deny for future collections until reviewed explicitly.
     match /{document=**} { allow read, write: if false; }
   }
 }

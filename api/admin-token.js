@@ -1,13 +1,46 @@
-import { createAdminSession, readJson, sendJson } from './_firebase.js';
+import {
+  createAdminSession,
+  db,
+  fieldValue,
+  readJson
+} from './_firebase.js';
+import { createLegacyAdminTokenHandler } from '../lib/admin-token.js';
 
-export default async function handler(req, res) {
-  try {
-    if (req.method !== 'POST') return sendJson(res, 405, { error: 'Method not allowed' });
-    const input = await readJson(req);
-    const expected = process.env.ADMIN_PASSWORD || 'admin123';
-    if (String(input.password || '') !== expected) return sendJson(res, 401, { error: '管理员密码不正确' });
-    return sendJson(res, 200, { token: createAdminSession() });
-  } catch (error) {
-    return sendJson(res, 400, { error: error.message || '无法登录' });
+const repository = {
+  async recordAttempt({ key, success, now, maxAttempts, windowMs, blockMs }) {
+    const ref = db().collection('admin_login_rate_limits').doc(key);
+    return db().runTransaction(async transaction => {
+      const snapshot = await transaction.get(ref);
+      const current = snapshot.exists ? snapshot.data() : {};
+      const blockedUntil = Number(current.blockedUntil) || 0;
+      if (blockedUntil > now) return { blocked: true, retryAfterMs: blockedUntil - now };
+      if (success) {
+        if (snapshot.exists) transaction.delete(ref);
+        return { blocked: false };
+      }
+
+      const windowStartedAt = Number(current.windowStartedAt) || 0;
+      const withinWindow = windowStartedAt > 0 && now - windowStartedAt < windowMs;
+      const attempts = withinWindow ? (Number(current.attempts) || 0) + 1 : 1;
+      const nextWindowStartedAt = withinWindow ? windowStartedAt : now;
+      const nextBlockedUntil = attempts >= maxAttempts ? now + blockMs : 0;
+      transaction.set(ref, {
+        attempts,
+        windowStartedAt: nextWindowStartedAt,
+        blockedUntil: nextBlockedUntil,
+        expiresAt: new Date(now + Math.max(windowMs, blockMs) * 2).toISOString(),
+        updatedAt: fieldValue().serverTimestamp()
+      }, { merge: true });
+      return nextBlockedUntil > now
+        ? { blocked: true, retryAfterMs: nextBlockedUntil - now }
+        : { blocked: false };
+    });
   }
-}
+};
+
+export default createLegacyAdminTokenHandler({
+  secret: process.env.ADMIN_PASSWORD,
+  repository,
+  createSession: createAdminSession,
+  readInput: readJson
+});

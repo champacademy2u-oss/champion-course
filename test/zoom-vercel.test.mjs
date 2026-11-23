@@ -16,6 +16,7 @@ test('Vercel Zoom registration validates and deduplicates customer details', () 
   });
   assert.deepEqual(person, {
     name: 'Test Customer',
+    zoomName: 'Test Customer',
     email: 'test@example.com',
     phone: '+60123456789',
     consent: true

@@ -120,8 +120,12 @@
 <div id="toast" class="toast" role="status" aria-live="polite"></div>
 
 <script type="module">
-let adminToken = sessionStorage.getItem('videoRoomAdminToken') || '';
-let isPublicAdmin = false;
+const CRM_PARENT_ORIGIN = 'https://champacademy2u-oss.github.io';
+const VIDEO_AUTH_REQUEST = 'champ-crm-video-auth-request';
+const VIDEO_AUTH_RESPONSE = 'champ-crm-video-auth-response';
+const isEmbeddedInCrm = window.parent !== window;
+let adminToken = isEmbeddedInCrm ? '' : (sessionStorage.getItem('videoRoomAdminToken') || '');
+let parentTokenRequest = null;
 let state = {};
 let maxVideoSize = 1024 * 1024 * 1024;
 let thumbnailTargetId = '';
@@ -150,11 +154,58 @@ const cancelEditVideoEl = document.getElementById('cancelEditVideo');
 const toastEl = document.getElementById('toast');
 let toastTimer;
 
-const api = async (url, options = {}) => {
+function secureNonce() {
+  const bytes = new Uint8Array(18);
+  crypto.getRandomValues(bytes);
+  return Array.from(bytes, value => value.toString(16).padStart(2, '0')).join('');
+}
+
+function requestParentToken(timeoutMs = 8000) {
+  if (!isEmbeddedInCrm) return Promise.reject(new Error('请使用管理员密码登录。'));
+  if (parentTokenRequest) return parentTokenRequest;
+  parentTokenRequest = new Promise((resolve, reject) => {
+    const nonce = secureNonce();
+    let settled = false;
+    const finish = (error, token = '') => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timeout);
+      clearInterval(retry);
+      window.removeEventListener('message', receive);
+      parentTokenRequest = null;
+      error ? reject(error) : resolve(token);
+    };
+    const receive = event => {
+      const token = event.data?.token;
+      if (event.origin !== CRM_PARENT_ORIGIN
+        || event.source !== window.parent
+        || event.data?.type !== VIDEO_AUTH_RESPONSE
+        || event.data?.nonce !== nonce) return;
+      if (typeof token !== 'string' || token.length > 8192
+        || !/^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/.test(token)) {
+        finish(new Error('CRM 管理员授权无效。'));
+        return;
+      }
+      finish(null, token);
+    };
+    const ask = () => window.parent.postMessage({ type: VIDEO_AUTH_REQUEST, nonce }, CRM_PARENT_ORIGIN);
+    const timeout = setTimeout(() => finish(new Error('无法取得 CRM 管理员授权，请退出 CRM 后重新登录。')), timeoutMs);
+    const retry = setInterval(ask, 500);
+    window.addEventListener('message', receive);
+    ask();
+  });
+  return parentTokenRequest;
+}
+
+const api = async (url, options = {}, retried = false) => {
   const headers = new Headers(options.headers || {});
-  if (adminToken && !isPublicAdmin) headers.set('Authorization', 'Bearer ' + adminToken);
+  if (adminToken) headers.set('Authorization', 'Bearer ' + adminToken);
   const res = await fetch(url, { ...options, headers });
   const data = await res.json().catch(() => ({}));
+  if (res.status === 401 && isEmbeddedInCrm && !retried) {
+    adminToken = await requestParentToken();
+    return api(url, options, true);
+  }
   if (!res.ok) throw new Error(data.error || '操作失败');
   return data;
 };
@@ -194,14 +245,18 @@ const showToast = (message, type = 'success') => {
 async function init() {
   const config = await fetch('/api/config').then(res => res.json());
   maxVideoSize = config.maxVideoSize;
-  isPublicAdmin = Boolean(config.adminLoginDisabled);
-  if (isPublicAdmin) {
-    loginPanel.hidden = true;
-    dashboardPanel.hidden = false;
+  if (isEmbeddedInCrm) {
+    loginPanel.hidden = false;
+    loginFormEl.hidden = true;
+    loginErrorEl.textContent = '正在验证 CRM 管理员身份…';
     try {
+      adminToken = await requestParentToken();
       await boot();
+      loginPanel.hidden = true;
+      dashboardPanel.hidden = false;
     } catch (error) {
-      renderLoadError(error);
+      adminToken = '';
+      loginErrorEl.textContent = error.message;
     }
     return;
   }

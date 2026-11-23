@@ -14,6 +14,10 @@
       "use": "@vercel/node"
     },
     {
+      "src": "api/crm-session.js",
+      "use": "@vercel/node"
+    },
+    {
       "src": "api/email-campaigns.js",
       "use": "@vercel/node"
     },
@@ -52,6 +56,17 @@
     {
       "src": "public/**",
       "use": "@vercel/static"
+    }
+  ],
+  "headers": [
+    {
+      "source": "/admin",
+      "headers": [
+        {
+          "key": "Content-Security-Policy",
+          "value": "frame-ancestors 'self' https://champacademy2u-oss.github.io"
+        }
+      ]
     }
   ],
   "routes": [

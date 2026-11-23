@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Champ Academy</title>
-    <link rel="stylesheet" href="./styles.css?v=20261012-contact-export" />
+    <link rel="stylesheet" href="./styles.css?v=20261123-shared-password-auth" />
     <link rel="stylesheet" href="./ebook-reply.css?v=20261007-five-step" />
     <link rel="stylesheet" href="./preview-followup.css?v=20261018-preview-followup" />
     <link rel="stylesheet" href="./champ-library.css?v=20261113-library" />
@@ -22,7 +22,23 @@
   </style>
   <link rel="stylesheet" href="./crm-visitor-dashboard.css?v=20261123-private-visitor-reports" />
 </head>
-  <body>
+  <body class="crm-auth-pending">
+    <section class="crm-auth-gate" id="crmAuthGate" aria-labelledby="crmAuthTitle" aria-live="polite">
+      <div class="crm-auth-card">
+        <img class="crm-auth-logo" src="logo.png" alt="Champ Academy" />
+        <p class="crm-auth-eyebrow">INTERNAL CRM</p>
+        <h1 id="crmAuthTitle">请输入内部密码</h1>
+        <p class="crm-auth-copy">验证成功后可查看和管理完整 CRM。请勿在共用或不受信任的设备保持页面开启。</p>
+        <form id="crmAuthForm" novalidate>
+          <label class="crm-auth-field" for="crmAuthPassword">
+            <span>密码</span>
+            <input id="crmAuthPassword" name="password" type="password" autocomplete="current-password" required autofocus />
+          </label>
+          <button class="crm-auth-submit" id="crmAuthSubmit" type="submit">登入 CRM</button>
+        </form>
+        <p class="crm-auth-status" id="crmAuthStatus" role="status"></p>
+      </div>
+    </section>
     <aside class="sidebar">
       <div class="brand">
         <img src="logo.png" alt="Champ Academy Logo" style="width: 40px; height: 40px; object-fit: contain; border-radius: 8px;" onerror="this.style.display='none'; document.getElementById('brand-fallback').style.display='flex';">
@@ -112,6 +128,8 @@
           <h2 id="viewTitle">Dashboard</h2>
         </div>
         <div class="top-actions">
+          <span class="crm-auth-badge" id="crmAuthBadge" hidden></span>
+          <button class="text-button" id="crmLogoutButton" type="button" hidden>退出</button>
           <label class="text-button primary" title="Import CSV" style="padding: 8px 16px; font-size: 13px; font-weight: 700;">
             <span>⬆</span> Import
             <input id="csvInput" type="file" accept=".csv,.tsv,text/csv,text/tab-separated-values" style="display:none" />
@@ -371,6 +389,7 @@
       <section class="view" id="videosView">
         <div class="panel wide" style="padding: 0; overflow: hidden; min-height: calc(100vh - 150px);">
           <iframe
+            id="videoRoomAdminFrame"
             src="https://champion-course-video-room.vercel.app/admin"
             title="Champion Course Video Room Admin"
             loading="lazy"
@@ -1191,29 +1210,39 @@
       </form>
     </dialog>
     <div id="toast" class="toast"></div>
-    <script src="./jspdf.umd.min.js"></script>
-    <script src="./jspdf.plugin.autotable.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
-    <!-- Firebase SDK -->
+    <!-- Only Firebase App/Auth load before the gate. Business SDKs and report
+         libraries are injected after administrator authentication. -->
     <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-storage-compat.js"></script>
     <script src="./config.js"></script>
-    <script src="./whatsapp-bulk-core.js?v=20260828-emoji-direct"></script>
-    <script src="./contact-export-core.js?v=20261012-contact-export"></script>
-    <script src="./ebook-reply-core.js?v=20261007-five-step"></script>
-    <script src="./ebook-reply.js?v=20261007-five-step"></script>
-    <script src="./preview-followup-core.js?v=20261018-preview-followup"></script>
-    <script src="./preview-followup.js?v=20261018-preview-followup"></script>
-    <script src="./landing-lead-import-core.js?v=20261116-phone-fix"></script>
-    <script src="./landing-lead-import.js?v=20261116-phone-fix"></script>
-    <script src="./preview-lead-editor-core.js?v=20261116-business-edit"></script>
-    <script src="./preview-lead-editor.js?v=20261116-business-edit"></script>
-    <script src="./app.js?v=20261123-preview-cloud-refresh-and-fee"></script>
-    <script src="./preview-visitor-stage.js?v=20261123-private-visitor-reports" defer></script>
-    <script type="module" src="./customer-receipts.js?v=20261120-receipts"></script>
-    <script type="module" src="./champ-library.js?v=20261113-upload-check"></script>
+    <script>
+      window.CRM_APP_SCRIPTS = {
+        classic: [
+          "./jspdf.umd.min.js",
+          "./jspdf.plugin.autotable.min.js",
+          "https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js",
+          "https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js",
+          "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js",
+          "https://www.gstatic.com/firebasejs/10.12.2/firebase-storage-compat.js",
+          "./whatsapp-bulk-core.js?v=20260828-emoji-direct",
+          "./contact-export-core.js?v=20261012-contact-export",
+          "./ebook-reply-core.js?v=20261007-five-step",
+          "./ebook-reply.js?v=20261007-five-step",
+          "./preview-followup-core.js?v=20261018-preview-followup",
+          "./preview-followup.js?v=20261018-preview-followup",
+          "./landing-lead-import-core.js?v=20261116-phone-fix",
+          "./landing-lead-import.js?v=20261116-phone-fix",
+          "./preview-lead-editor-core.js?v=20261116-business-edit",
+          "./preview-lead-editor.js?v=20261116-business-edit",
+          "./app.js?v=20261123-shared-password-auth",
+          "./preview-visitor-stage.js?v=20261123-private-visitor-reports"
+        ],
+        modules: [
+          "./customer-receipts.js?v=20261120-receipts",
+          "./champ-library.js?v=20261113-upload-check"
+        ]
+      };
+    </script>
+    <script src="./crm-auth.js?v=20261123-shared-password-auth"></script>
   </body>
 </html>

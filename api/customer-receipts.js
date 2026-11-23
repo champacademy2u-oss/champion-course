@@ -1,4 +1,4 @@
-import { db, firebaseApp } from './_firebase.js';
+import { db, firebaseApp, isSharedCrmAdmin, isSharedCrmIdentity } from './_firebase.js';
 import { ReceiptError } from '../customer-receipts-core.js';
 import { createReceiptHandler, receiptAdminAllowed } from '../lib/customer-receipts-api.js';
 
@@ -35,10 +35,12 @@ export default createReceiptHandler({
     if (!token) throw new ReceiptError('请先在 Mailbox 使用管理员账号登录。', 401);
     const uids = new Set(String(process.env.CRM_ADMIN_UIDS || '').split(',').map(value => value.trim()).filter(Boolean));
     const emails = new Set(String(process.env.CRM_ADMIN_EMAILS || '').split(',').map(value => value.trim().toLowerCase()).filter(Boolean));
-    if (!uids.size && !emails.size) throw new ReceiptError('客户收据尚未设置管理员权限。', 503);
     let decoded;
     try { decoded = await firebaseApp().auth().verifyIdToken(token, true); }
     catch { throw new ReceiptError('登录已失效，请重新登录管理员账号。', 401); }
+    if (isSharedCrmAdmin(decoded)) return decoded.uid;
+    if (isSharedCrmIdentity(decoded)) throw new ReceiptError('此账号没有客户收据管理权限。', 403);
+    if (!uids.size && !emails.size) throw new ReceiptError('客户收据尚未设置管理员权限。', 503);
     if (!receiptAdminAllowed(decoded, uids, emails)) throw new ReceiptError('此账号没有客户收据管理权限。', 403);
     return decoded.uid;
   }

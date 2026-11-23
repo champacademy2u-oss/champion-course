@@ -2,6 +2,20 @@
 
 一个轻量的 Facebook Lead CSV 导入和 1/3/7 天 follow-up 系统。
 
+## CRM 共享密码登录（发布前须完成服务器设置）
+
+`/api/crm-session` 只在 Vercel 服务器端核对 `CRM_SHARED_LOGIN_PASSWORD`。密码不会写入 Git、公开 JavaScript、URL、浏览器储存或 API 日志。验证成功后，服务器为 `CRM_SHARED_ADMIN_UID` 签发带有 `admin=true` 与 `role=crm_shared_admin` 的 Firebase custom token，并建立对应的 `crm_admins/{uid}` 授权文件。Firestore Rules、Email、Zoom、Champ 资料库、客户收据和视频后台都验证同一专用身份。共享身份从 Firebase `auth_time` 起最多使用 12 小时；服务器 API 同时执行 token revocation 检查。
+
+上线时必须同时完成：
+
+1. 在 Vercel secret 设置 `CRM_SHARED_LOGIN_PASSWORD`，不要把真实值写入 `.env.vercel.example`。
+2. 保持 `CRM_SHARED_ADMIN_UID` 在前后端一致；默认值为 `champ-crm-shared-admin`。
+3. 部署本仓库的 `firestore.rules`，否则旧的匿名用户规则仍可能允许绕过登入读取客户资料。
+4. 设置 `CRM_SHARED_ALLOWED_ORIGINS` 为实际 CRM 来源；登录接口拒绝没有 Origin 或非白名单来源的请求。
+5. 共享密码身份拥有读取、导出、修改、删除以及后台操作权限。所有伙伴共用一个 UID，无法按个人追踪或单独撤权；更换密码时应同时撤销该 UID 的 Firebase refresh tokens。
+
+登录失败会按来源的 HMAC 散列键写入服务器专用 `crm_login_rate_limits`，默认 15 分钟内 5 次失败后暂停 15 分钟；不保存原始 IP。
+
 ## 怎么使用
 
 ### Champ 资料库（2026-11-13，本地待发布）
@@ -169,5 +183,5 @@ Ali Tan,+60123456789,ali@example.com,Business Owner
 - Firestore：保存视频资料、观看密码、期限和观看记录。
 - Cloudflare R2：保存实际视频文件，并通过短期签名链接上传与播放。
 
-部署需要在 Vercel 设置环境变量，参考 `.env.vercel.example`。R2 Bucket 必须允许 `https://champion-course-video-room.vercel.app` 使用 `PUT`、`GET` 和 `HEAD`，并允许 `Content-Type` 请求头。如果 `ADMIN_LOGIN_DISABLED=true`，后台会公开访问；正式对客户开放前建议改回 `false` 并设置强管理员密码。视频文件通过 Vercel API 产生的短期 signed URL 由浏览器直传 Cloudflare R2，避免触碰 Vercel Function request body 限制；Vercel API 只负责验证、签名和记录。
+部署需要在 Vercel 设置环境变量，参考 `.env.vercel.example`。R2 Bucket 必须允许 `https://champion-course-video-room.vercel.app` 使用 `PUT`、`GET` 和 `HEAD`，并允许 `Content-Type` 请求头。后台 API 不允许通过环境变量切换成公开访问；仍须设置强管理员密码。视频文件通过 Vercel API 产生的短期 signed URL 由浏览器直传 Cloudflare R2，避免触碰 Vercel Function request body 限制；Vercel API 只负责验证、签名和记录。
 

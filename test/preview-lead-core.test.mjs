@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
 import {
   CHAMP_PREVIEW_CAMPAIGN,
   CHAMP_PREVIEW_LEAD_SOURCE,
@@ -49,4 +50,12 @@ test('allows the GitHub Pages origin and only returns https community links', ()
   assert.equal(allowedPreviewLeadOrigins().has('https://champacademy2u-oss.github.io'), true);
   assert.equal(safeCommunityUrl('https://chat.whatsapp.com/example'), 'https://chat.whatsapp.com/example');
   assert.equal(safeCommunityUrl('javascript:alert(1)'), '');
+});
+
+test('the registration endpoint creates a new document for every valid submission', async () => {
+  const source = await readFile(new URL('../api/preview-lead.js', import.meta.url), 'utf8');
+  assert.match(source, /collection\('preview_leads'\)\.doc\(crypto\.randomUUID\(\)\)/);
+  assert.match(source, /await leadRef\.create\(\{/);
+  assert.match(source, /campaignId: 'champ-summit-2027'.*amountMinor: 0.*paymentStatus: 'free'/s);
+  assert.doesNotMatch(source, /dailyLeadId|existing\.exists|leadRef\.set\(/);
 });

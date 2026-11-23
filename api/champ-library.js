@@ -1,5 +1,5 @@
 import crypto from 'node:crypto';
-import { db, firebaseApp } from './_firebase.js';
+import { db, firebaseApp, isSharedCrmAdmin, isSharedCrmIdentity } from './_firebase.js';
 import { createReadUrl, createUploadUrl, getStoredObject, headStoredObject } from './_r2.js';
 import { createLibraryHandler, libraryAdminAllowed, publicFile } from '../lib/champ-library-api.js';
 import { libraryError } from '../champ-library-core.js';
@@ -39,10 +39,12 @@ export default createLibraryHandler({
     if (!token) throw libraryError('请先使用现有管理员账号登录。', 401);
     const allowed = new Set(String(process.env.CRM_ADMIN_UIDS || '').split(',').map(value => value.trim()).filter(Boolean));
     const allowedEmails = new Set(String(process.env.CRM_ADMIN_EMAILS || '').split(',').map(value => value.trim().toLowerCase()).filter(Boolean));
-    if (!allowed.size && !allowedEmails.size) throw libraryError('云端资料库尚未设置管理员权限。', 503);
     let decoded;
     try { decoded = await firebaseApp().auth().verifyIdToken(token, true); }
     catch { throw libraryError('登录已失效，请重新登录管理员账号。', 401); }
+    if (isSharedCrmAdmin(decoded)) return;
+    if (isSharedCrmIdentity(decoded)) throw libraryError('此账号没有资料库管理权限。', 403);
+    if (!allowed.size && !allowedEmails.size) throw libraryError('云端资料库尚未设置管理员权限。', 503);
     if (!libraryAdminAllowed(decoded, allowed, allowedEmails)) throw libraryError('此账号没有资料库管理权限。', 403);
   },
   objects: {

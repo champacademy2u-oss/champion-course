@@ -57,18 +57,6 @@ async function enforceRateLimit(req) {
   });
 }
 
-function dailyLeadId(lead) {
-  const malaysiaDate = new Intl.DateTimeFormat('en-CA', {
-    timeZone: 'Asia/Kuala_Lumpur',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit'
-  }).format(new Date());
-  return crypto.createHash('sha256')
-    .update(`${lead.email}|${lead.phoneDigits}|${lead.source}|${malaysiaDate}`)
-    .digest('hex');
-}
-
 export default async function handler(req, res) {
   if (!applyCors(req, res)) return;
   if (req.method !== 'POST') return sendJson(res, 405, { error: 'Method not allowed' });
@@ -80,11 +68,16 @@ export default async function handler(req, res) {
     const lead = normalizePreviewLead(input);
     await enforceRateLimit(req);
 
-    const leadRef = db().collection('preview_leads').doc(dailyLeadId(lead));
+    // Every valid form submission is a separate registration. Do not derive the
+    // document id from contact details: the same person may register more than
+    // once and every submission must be counted independently.
+    const leadRef = db().collection('preview_leads').doc(crypto.randomUUID());
     const submittedAt = now();
-    const existing = await leadRef.get();
     const timestamp = fieldValue().serverTimestamp();
-    await leadRef.set({
+    const summitOffer = cleanText(input.campaignId, 80) === 'champ-summit-2027'
+      ? { campaignId: 'champ-summit-2027', currency: 'MYR', amountMinor: 0, paymentStatus: 'free' }
+      : {};
+    await leadRef.create({
       name: lead.name,
       email: lead.email,
       phone: lead.phone,
@@ -92,10 +85,11 @@ export default async function handler(req, res) {
       source: lead.source,
       campaign: lead.campaign,
       courseDate: lead.courseDate,
+      ...summitOffer,
       submittedAt,
+      createdAt: timestamp,
       updatedAt: timestamp,
-      ...(existing.exists ? {} : { createdAt: timestamp })
-    }, { merge: true });
+    });
 
     const settings = await db().collection('settings').doc('main').get();
     return sendJson(res, 201, {

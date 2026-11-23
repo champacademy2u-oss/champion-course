@@ -1,6 +1,37 @@
 // Champion Course - Lead Center
 // PDF buttons now use inline onclick in HTML for reliability
 
+// Customer records are session-only. The authentication gate loads this file
+// only after a verified administrator session and clears the session on logout.
+const crmSessionStorage = window.sessionStorage;
+
+// The Vercel video console is embedded from a different owned origin. It asks
+// for the already-authenticated Firebase ID token through a narrow postMessage
+// bridge, so shared administrators do not enter a second password. The token is
+// sent only to the exact iframe window and exact production origin.
+const VIDEO_ADMIN_ORIGIN = "https://champion-course-video-room.vercel.app";
+const VIDEO_AUTH_REQUEST = "champ-crm-video-auth-request";
+const VIDEO_AUTH_RESPONSE = "champ-crm-video-auth-response";
+
+window.addEventListener("message", async event => {
+  const frame = document.getElementById("videoRoomAdminFrame");
+  const nonce = event.data?.nonce;
+  if (event.origin !== VIDEO_ADMIN_ORIGIN
+    || !frame?.contentWindow
+    || event.source !== frame.contentWindow
+    || event.data?.type !== VIDEO_AUTH_REQUEST
+    || typeof nonce !== "string"
+    || !/^[A-Za-z0-9_-]{16,128}$/.test(nonce)) return;
+  try {
+    const token = await window.crmAuth?.getIdToken?.(true);
+    if (typeof token !== "string" || token.length > 8192
+      || !/^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/.test(token)) return;
+    frame.contentWindow.postMessage({ type: VIDEO_AUTH_RESPONSE, nonce, token }, VIDEO_ADMIN_ORIGIN);
+  } catch {
+    // The iframe remains locked. crm-auth.js handles expired outer sessions.
+  }
+});
+
 // Fallback for crypto.randomUUID in non-secure contexts
 if (!crypto.randomUUID) {
   crypto.randomUUID = function() {
@@ -85,10 +116,9 @@ const defaultZoomSettings = {
 // ──────────────────────────────────────────
 // Firebase Firestore Cloud Storage
 // All data is synced to Google Firebase cloud.
-// SECURITY: Google sign-in is the portable administrator identity. Existing
-// browser-only administrators may continue anonymously until they link that
-// authorized UID to Google from Mailbox. New devices then sign in with the same
-// Google account and receive the same Firebase UID and allowlist permissions.
+// SECURITY: crm-auth.js verifies a shared administrator or the existing Google
+// owner before this application file is loaded. Anonymous identities and local
+// data fallbacks are intentionally disabled for customer information.
 // ──────────────────────────────────────────
 let _db = null;
 let _storage = null;
@@ -114,34 +144,28 @@ function firebaseUserUsesGoogle(user) {
   return Boolean(user && !user.isAnonymous && (user.providerData || []).some(provider => provider?.providerId === "google.com"));
 }
 
+function firebaseUserIsSharedAdmin() {
+  return window.crmAuth?.isSharedAdmin?.() === true;
+}
+
 async function initFirebase() {
   if (!window.FIREBASE_CONFIG) return false;
   try {
-    const fbApp = firebase.initializeApp(window.FIREBASE_CONFIG);
-
-    // Preserve a Google administrator across restarts. Only create an anonymous
-    // browser identity when this device has never signed in with Google.
+    const fbApp = firebase.apps?.length ? firebase.app() : firebase.initializeApp(window.FIREBASE_CONFIG);
     if (firebase.auth) {
       try {
         const auth = firebase.auth(fbApp);
-        await auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL);
+        await auth.setPersistence(firebase.auth.Auth.Persistence.SESSION);
         _authUser = await waitForInitialFirebaseUser(auth);
-        if (!_authUser) {
-          const cred = await auth.signInAnonymously();
-          _authUser = cred.user;
-        }
-        console.log(`[Firebase] Signed in with ${firebaseUserUsesGoogle(_authUser) ? 'Google administrator' : 'browser identity'}.`);
+        if (!_authUser || _authUser.isAnonymous) throw new Error("管理员登录已失效");
+        console.log(`[Firebase] Signed in with ${firebaseUserIsSharedAdmin() ? 'shared administrator' : 'Google administrator'}.`);
       } catch (authErr) {
         console.warn('[Firebase] Sign-in initialization failed:', authErr.message);
-        // Continue without auth: app uses localStorage fallback. If rules are
-        // deployed as auth-required, Firestore calls will fail and fall back.
+        return false;
       }
     }
 
     _db = firebase.firestore(fbApp);
-    _db.enablePersistence().catch((err) => {
-      console.warn('[Firebase] Offline persistence enable failed:', err.code);
-    });
     try {
       _storage = firebase.storage(fbApp);
       console.log('[Firebase] Cloud Storage initialized.');
@@ -303,9 +327,9 @@ async function loadFromFile(handle) {
       saveJson(storageKeys.zoomSettings, state.zoomSettings);
     }
     if (Array.isArray(data.customGroups))
-      localStorage.setItem("lead_center_custom_groups", JSON.stringify(data.customGroups));
+      crmSessionStorage.setItem("lead_center_custom_groups", JSON.stringify(data.customGroups));
     if (Array.isArray(data.courseOrder))
-      localStorage.setItem("lead_center_course_order", JSON.stringify(data.courseOrder));
+      crmSessionStorage.setItem("lead_center_course_order", JSON.stringify(data.courseOrder));
     return true;
   } catch (err) {
     console.warn("File load error:", err);
@@ -398,18 +422,6 @@ if (!whatsappBulkCore) {
 
 state.leads = mergeDuplicateLeads(state.leads.map(sanitizeLead));
 saveJson(storageKeys.leads, state.leads);
-
-if ("serviceWorker" in navigator) {
-  let refreshingForServiceWorker = false;
-  navigator.serviceWorker.addEventListener("controllerchange", () => {
-    if (refreshingForServiceWorker) return;
-    refreshingForServiceWorker = true;
-    window.location.reload();
-  });
-  navigator.serviceWorker.register("./sw.js")
-    .then((registration) => registration.update())
-    .catch(() => {});
-}
 
 const elements = {
   viewTitle: document.querySelector("#viewTitle"),
@@ -620,14 +632,14 @@ const templateFields = [
 
 function loadJson(key, fallback) {
   try {
-    return JSON.parse(localStorage.getItem(key)) ?? fallback;
+    return JSON.parse(crmSessionStorage.getItem(key)) ?? fallback;
   } catch {
     return fallback;
   }
 }
 
 function saveJson(key, value) {
-  localStorage.setItem(key, JSON.stringify(value));
+  crmSessionStorage.setItem(key, JSON.stringify(value));
   // Also persist to the connected local file
   if (_dataFileHandle) saveToFile();
   // Also sync to Firebase if connected
@@ -673,17 +685,19 @@ const emailCampaignState = {
 function updateEmailAdminAuthUi(message = "") {
   if (!elements.emailAdminAuthPanel) return;
   const user = _authUser || window.firebase?.auth?.().currentUser || null;
+  const sharedAdmin = firebaseUserIsSharedAdmin();
   const googleAdmin = firebaseUserUsesGoogle(user);
-  elements.emailAdminAuthPanel.classList.toggle("is-google", googleAdmin);
-  elements.emailAdminAuthTitle.textContent = googleAdmin ? "Google 管理员账号已登录" : "Email 管理员账号";
-  elements.emailAdminAuthStatus.textContent = message || (googleAdmin
+  const administrator = sharedAdmin || googleAdmin;
+  elements.emailAdminAuthPanel.classList.toggle("is-google", administrator);
+  elements.emailAdminAuthTitle.textContent = sharedAdmin ? "共享管理员已登录" : (googleAdmin ? "Google 管理员账号已登录" : "Email 管理员账号");
+  elements.emailAdminAuthStatus.textContent = message || (sharedAdmin
+    ? "本次浏览器会话已取得完整 CRM 权限；退出或关闭浏览器后需重新输入密码。"
+    : googleAdmin
     ? "这项登录可以在电脑 Chrome 与手机沿用；其他设备请使用同一个 Google 账号。"
-    : user?.isAnonymous
-      ? "目前是只属于这个浏览器的临时身份。请绑定 Google 管理员账号，才能在手机或其他 Chrome 使用。"
-      : "请使用获授权的 Google 管理员账号登录。"
+    : "请重新登入 CRM。"
   );
-  elements.emailAdminSignInBtn.hidden = googleAdmin;
-  elements.emailAdminSignOutBtn.hidden = !googleAdmin;
+  elements.emailAdminSignInBtn.hidden = administrator;
+  elements.emailAdminSignOutBtn.hidden = !administrator;
 }
 
 async function signInEmailAdminWithGoogle() {
@@ -697,7 +711,7 @@ async function signInEmailAdminWithGoogle() {
   button.textContent = "正在打开 Google 登录…";
   updateEmailAdminAuthUi("请选择 Champion Academy 的管理员 Google 账号。");
   try {
-    await auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL);
+    await auth.setPersistence(firebase.auth.Auth.Persistence.SESSION);
     const provider = new firebase.auth.GoogleAuthProvider();
     provider.setCustomParameters({ prompt: "select_account" });
     const current = auth.currentUser;
@@ -735,11 +749,8 @@ async function signInEmailAdminWithGoogle() {
 }
 
 async function signOutEmailAdminGoogle() {
-  if (!confirm("退出后，这台设备将无法读取客户和 Email Campaign，直到再次登录。确定退出吗？")) return;
   try {
-    await window.firebase?.auth?.().signOut();
-    _authUser = null;
-    window.location.reload();
+    await window.crmAuth?.logout?.();
   } catch (error) {
     toast("❌ 无法退出管理员账号，请稍后再试");
   }
@@ -813,49 +824,7 @@ async function zoomFirebaseAdminToken() {
     window.__zoomAdminUid = user.uid;
     return user.getIdToken();
   }
-
-  // Some browsers block the Firebase CDN. Keep the no-password admin flow
-  // working through Firebase's official anonymous-auth REST endpoints.
-  const apiKey = clean(window.FIREBASE_CONFIG?.apiKey);
-  if (!apiKey) throw new Error("无法确认管理员浏览器，请刷新页面再试");
-  const storageKey = "champZoomAdminIdentityV1";
-  let saved = {};
-  try { saved = JSON.parse(localStorage.getItem(storageKey) || "{}"); } catch { saved = {}; }
-
-  let identity;
-  if (saved.refreshToken) {
-    const response = await fetch(`https://securetoken.googleapis.com/v1/token?key=${encodeURIComponent(apiKey)}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: new URLSearchParams({ grant_type: "refresh_token", refresh_token: saved.refreshToken })
-    });
-    identity = await response.json().catch(() => ({}));
-    if (response.ok) {
-      identity = {
-        idToken: identity.id_token,
-        refreshToken: identity.refresh_token,
-        localId: identity.user_id
-      };
-    } else {
-      localStorage.removeItem(storageKey);
-      identity = null;
-    }
-  }
-
-  if (!identity?.idToken) {
-    const response = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=${encodeURIComponent(apiKey)}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ returnSecureToken: true })
-    });
-    identity = await response.json().catch(() => ({}));
-    if (!response.ok || !identity.idToken) throw new Error("无法建立管理员浏览器身份，请稍后再试");
-  }
-
-  localStorage.setItem(storageKey, JSON.stringify({ localId: identity.localId, refreshToken: identity.refreshToken }));
-  zoomAdminState.currentUid = identity.localId;
-  window.__zoomAdminUid = identity.localId;
-  return identity.idToken;
+  throw new Error("管理员登录已失效，请重新输入密码");
 }
 
 function zoomDateTime(value) {
@@ -2636,10 +2605,10 @@ function renderCourseView() {
   currentNames.forEach(name => {
     if (!courseOrder.includes(name)) courseOrder.push(name);
   });
-  const oldOrderStr = localStorage.getItem("lead_center_course_order");
+  const oldOrderStr = crmSessionStorage.getItem("lead_center_course_order");
   const newOrderStr = JSON.stringify(courseOrder);
   if (oldOrderStr !== newOrderStr) {
-    localStorage.setItem("lead_center_course_order", newOrderStr);
+    crmSessionStorage.setItem("lead_center_course_order", newOrderStr);
     fbSaveLayout();
   }
 
@@ -2775,7 +2744,7 @@ window.handleCourseDrop = function(e, targetCourse) {
   if (fromIdx > -1 && toIdx > -1) {
     order.splice(fromIdx, 1);
     order.splice(toIdx, 0, draggedCourse);
-    localStorage.setItem("lead_center_course_order", JSON.stringify(order));
+    crmSessionStorage.setItem("lead_center_course_order", JSON.stringify(order));
     fbSaveLayout();
     render();
     toast("Order updated!");
@@ -2789,7 +2758,7 @@ window.createManualCourseGroup = function() {
   const customGroups = loadJson("lead_center_custom_groups", []);
   if (!customGroups.includes(name.trim())) {
     customGroups.push(name.trim());
-    localStorage.setItem("lead_center_custom_groups", JSON.stringify(customGroups));
+    crmSessionStorage.setItem("lead_center_custom_groups", JSON.stringify(customGroups));
     fbSaveLayout();
     render();
     toast(`Created new group: ${name.trim()}`);
@@ -2813,7 +2782,7 @@ window.deleteEntireGroup = function(courseName) {
   // Remove from custom groups if present
   const customGroups = loadJson("lead_center_custom_groups", []);
   const updatedCustom = customGroups.filter(n => n !== courseName);
-  localStorage.setItem("lead_center_custom_groups", JSON.stringify(updatedCustom));
+  crmSessionStorage.setItem("lead_center_custom_groups", JSON.stringify(updatedCustom));
   fbSaveLayout();
   
   render();
@@ -2956,7 +2925,7 @@ window.renameCourseGroup = function(oldName) {
   const idx = customGroups.indexOf(oldName);
   if (idx > -1) {
     customGroups[idx] = newName.trim();
-    localStorage.setItem("lead_center_custom_groups", JSON.stringify(customGroups));
+    crmSessionStorage.setItem("lead_center_custom_groups", JSON.stringify(customGroups));
   }
   
   // Rename in courseOrder
@@ -2964,7 +2933,7 @@ window.renameCourseGroup = function(oldName) {
   const oIdx = order.indexOf(oldName);
   if (oIdx > -1) {
     order[oIdx] = newName.trim();
-    localStorage.setItem("lead_center_course_order", JSON.stringify(order));
+    crmSessionStorage.setItem("lead_center_course_order", JSON.stringify(order));
   }
   fbSaveLayout();
   
@@ -3124,10 +3093,10 @@ function deepScanRecovery() {
     toast("Initiating Aggressive Storage Recovery...");
     let candidates = [];
 
-    for (let i = 0; i < localStorage.length; i++) {
-        const key = localStorage.key(i);
+    for (let i = 0; i < crmSessionStorage.length; i++) {
+        const key = crmSessionStorage.key(i);
         try {
-            const raw = localStorage.getItem(key);
+            const raw = crmSessionStorage.getItem(key);
             if (!raw || raw.length < 500) continue; // Skip small keys
             
             const val = JSON.parse(raw);
@@ -3170,8 +3139,8 @@ function deepScanRecovery() {
 function emergencyRecoverPaid() {
   // This is a last-resort scanner
   try {
-    const rawSaved = localStorage.getItem(storageKeys.leads);
-    const deleted = localStorage.getItem("lead_center_leads_deleted");
+    const rawSaved = crmSessionStorage.getItem(storageKeys.leads);
+    const deleted = crmSessionStorage.getItem("lead_center_leads_deleted");
     
     // If they have a file backup or something I can't reach, I'll provide an instruction toast
     toast("Scanning local storage for lost payment records...");
@@ -3690,8 +3659,8 @@ function handleBackup() {
     previews: state.previews || [],
     videos: state.videos || [],
     zoomSettings: state.zoomSettings,
-    customGroups: JSON.parse(localStorage.getItem('lead_center_custom_groups') || 'null'),
-    courseOrder: JSON.parse(localStorage.getItem('lead_center_course_order') || 'null'),
+    customGroups: JSON.parse(crmSessionStorage.getItem('lead_center_custom_groups') || 'null'),
+    courseOrder: JSON.parse(crmSessionStorage.getItem('lead_center_course_order') || 'null'),
     exportDate: new Date().toISOString()
   };
   const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
@@ -4878,7 +4847,7 @@ if (elements.deepScanBtn) {
   elements.deepScanBtn.addEventListener("click", deepScanRecovery);
 }
 
-// Auto-load backup from server if localStorage is empty or version param ?v=X is present
+// Auto-load backup from server if crmSessionStorage is empty or version param ?v=X is present
 async function autoLoadBackupFromServer() {
   const BACKUP_URL = './lead-center-full-backup-2026-07-04-v3.json';
   const BACKUP_VER_KEY = 'lead_center_backup_last_loaded';
@@ -4886,7 +4855,7 @@ async function autoLoadBackupFromServer() {
   // Track which backup file we last loaded so we don't reload on every page view.
   // Change the value below when you upload a newer backup file.
   const BACKUP_ID = '2026-07-04-v3';
-  const alreadyLoaded = localStorage.getItem(BACKUP_VER_KEY);
+  const alreadyLoaded = crmSessionStorage.getItem(BACKUP_VER_KEY);
   if (alreadyLoaded === BACKUP_ID) return; // already loaded this exact backup
 
   try {
@@ -4923,14 +4892,14 @@ async function autoLoadBackupFromServer() {
       saveJson(storageKeys.zoomSettings, state.zoomSettings);
     }
     if (Array.isArray(data.customGroups)) {
-      localStorage.setItem('lead_center_custom_groups', JSON.stringify(data.customGroups));
+      crmSessionStorage.setItem('lead_center_custom_groups', JSON.stringify(data.customGroups));
     }
     if (Array.isArray(data.courseOrder)) {
-      localStorage.setItem('lead_center_course_order', JSON.stringify(data.courseOrder));
+      crmSessionStorage.setItem('lead_center_course_order', JSON.stringify(data.courseOrder));
     }
 
     // Mark this backup version as loaded so it won't reload on next visit
-    localStorage.setItem(BACKUP_VER_KEY, BACKUP_ID);
+    crmSessionStorage.setItem(BACKUP_VER_KEY, BACKUP_ID);
 
     fillForms();
     render();
@@ -4944,16 +4913,13 @@ async function autoLoadBackupFromServer() {
 
 // ─── Firebase startup: load all data from Firestore then render ───
 async function initFromFirebase() {
-  // Initialize Firebase and restore Google admin (or the existing browser
-  // identity) before any database read.
+  // crm-auth.js has already verified the administrator before this file loads.
+  // If that session cannot be restored, fail closed instead of showing cached
+  // customer data or importing a public backup.
   const initialized = await initFirebase();
   updateEmailAdminAuthUi();
-  if (!initialized || !_db) {
-    // No Firebase — fall back to localStorage + JSON backup
-    initPerformanceFilters();
-    fillForms();
-    render();
-    autoLoadBackupFromServer();
+  if (!initialized || !_db || !_authUser) {
+    await window.crmAuth?.lock?.("登录已失效，请重新输入密码。");
     return;
   }
 
@@ -4994,15 +4960,15 @@ async function initFromFirebase() {
     const zoomDoc = await _db.collection('config').doc('zoom').get();
     if (zoomDoc.exists) {
       state.zoomSettings = normalizeZoomSettings(zoomDoc.data());
-      localStorage.setItem(storageKeys.zoomSettings, JSON.stringify(state.zoomSettings));
+      crmSessionStorage.setItem(storageKeys.zoomSettings, JSON.stringify(state.zoomSettings));
     }
 
     // Load layout config
     const layoutDoc = await _db.collection('config').doc('layout').get();
     if (layoutDoc.exists) {
       const layout = layoutDoc.data();
-      if (layout.customGroups) localStorage.setItem('lead_center_custom_groups', JSON.stringify(layout.customGroups));
-      if (layout.courseOrder) localStorage.setItem('lead_center_course_order', JSON.stringify(layout.courseOrder));
+      if (layout.customGroups) crmSessionStorage.setItem('lead_center_custom_groups', JSON.stringify(layout.customGroups));
+      if (layout.courseOrder) crmSessionStorage.setItem('lead_center_course_order', JSON.stringify(layout.courseOrder));
     }
 
     initPerformanceFilters();
@@ -5012,11 +4978,7 @@ async function initFromFirebase() {
     setupRealTimeSync(); // Start live listeners after first load
   } catch (err) {
     console.error('[Firebase] initFromFirebase error:', err);
-    // Fallback to localStorage
-    initPerformanceFilters();
-    fillForms();
-    render();
-    toast('⚠️ 云端加载失败，显示本地缓存数据');
+    await window.crmAuth?.lock?.("无法确认云端权限，请重新登入。");
   }
 }
 
@@ -5028,6 +4990,15 @@ let _unsubscribeTemplates = null;
 let _unsubscribeLayout = null;
 let _unsubscribePreviewLeads = null;
 let _unsubscribeZoom = null;
+
+function handleRealtimeError(scope, error) {
+  const code = String(error?.code || "");
+  if (/(?:permission-denied|unauthenticated)$/.test(code)) {
+    window.crmAuth?.lock?.("管理员权限已失效，请重新登入。");
+    return;
+  }
+  console.warn(`[Sync] ${scope} onSnapshot error:`, error);
+}
 
 function setupRealTimeSync() {
   if (!_db) return;
@@ -5052,7 +5023,7 @@ function setupRealTimeSync() {
     saveJson(storageKeys.leads, state.leads);
     render();
     console.log('[Sync] Leads updated from cloud.');
-  }, err => console.warn('[Sync] leads onSnapshot error:', err));
+  }, err => handleRealtimeError('leads', err));
 
   // ── Previews ──
   _unsubscribePreviews = _db.collection('previews').onSnapshot(snap => {
@@ -5061,7 +5032,7 @@ function setupRealTimeSync() {
     saveJson(storageKeys.previews, state.previews);
     render();
     console.log('[Sync] Previews updated from cloud.');
-  }, err => console.warn('[Sync] previews onSnapshot error:', err));
+  }, err => handleRealtimeError('previews', err));
 
   // ── Videos ──
   _unsubscribeVideos = _db.collection('videos').onSnapshot(snap => {
@@ -5070,7 +5041,7 @@ function setupRealTimeSync() {
     saveJson(storageKeys.videos, state.videos);
     render();
     console.log('[Sync] Videos updated from cloud.');
-  }, err => console.warn('[Sync] videos onSnapshot error:', err));
+  }, err => handleRealtimeError('videos', err));
 
   // ── Templates ──
   _unsubscribeTemplates = _db.collection('config').doc('templates').onSnapshot(snap => {
@@ -5082,26 +5053,26 @@ function setupRealTimeSync() {
       fillForms();
     }
     console.log('[Sync] Templates updated from cloud.');
-  }, err => console.warn('[Sync] templates onSnapshot error:', err));
+  }, err => handleRealtimeError('templates', err));
 
   // ── Zoom event settings ──
   _unsubscribeZoom = _db.collection('config').doc('zoom').onSnapshot(snap => {
     if (!snap.exists || snap.metadata.hasPendingWrites) return;
     state.zoomSettings = normalizeZoomSettings(snap.data());
-    localStorage.setItem(storageKeys.zoomSettings, JSON.stringify(state.zoomSettings));
+    crmSessionStorage.setItem(storageKeys.zoomSettings, JSON.stringify(state.zoomSettings));
     if (document.getElementById('zoomView')?.classList.contains('active')) renderZoomSettings();
     console.log('[Sync] Zoom settings updated from cloud.');
-  }, err => console.warn('[Sync] Zoom settings onSnapshot error:', err));
+  }, err => handleRealtimeError('zoom', err));
 
   // ── Layout (custom groups + course order) ──
   _unsubscribeLayout = _db.collection('config').doc('layout').onSnapshot(snap => {
     if (!snap.exists || snap.metadata.hasPendingWrites) return;
     const layout = snap.data();
-    if (layout.customGroups) localStorage.setItem('lead_center_custom_groups', JSON.stringify(layout.customGroups));
-    if (layout.courseOrder) localStorage.setItem('lead_center_course_order', JSON.stringify(layout.courseOrder));
+    if (layout.customGroups) crmSessionStorage.setItem('lead_center_custom_groups', JSON.stringify(layout.customGroups));
+    if (layout.courseOrder) crmSessionStorage.setItem('lead_center_course_order', JSON.stringify(layout.courseOrder));
     render();
     console.log('[Sync] Layout updated from cloud.');
-  }, err => console.warn('[Sync] layout onSnapshot error:', err));
+  }, err => handleRealtimeError('layout', err));
 
   // ── Preview Leads ──
   _unsubscribePreviewLeads = _db.collection('preview_leads').onSnapshot(snap => {
@@ -5113,7 +5084,7 @@ function setupRealTimeSync() {
       loadChampPreviewLeads();
     }
     console.log('[Sync] Preview leads updated from cloud.');
-  }, err => console.warn('[Sync] preview_leads onSnapshot error:', err));
+  }, err => handleRealtimeError('preview_leads', err));
 
   console.log('[Firebase] Real-time sync listeners active.');
 }
@@ -5121,7 +5092,7 @@ function setupRealTimeSync() {
 // Preview notification writes are acknowledged before changing the UI. They patch
 // only the workflow field, leaving imported customer data and other sessions intact.
 function previewCache(key, records) {
-  try { localStorage.setItem(key, JSON.stringify(records)); }
+  try { crmSessionStorage.setItem(key, JSON.stringify(records)); }
   catch (error) { toast('云端已保存，但本机缓存失败；请刷新后确认。'); }
   if (_dataFileHandle) saveToFile().catch(() => {});
 }
@@ -5155,7 +5126,7 @@ async function updatePreviewFollowupRecord(leadId, previewId, revision, mutate, 
     if (PreviewFollowupCore.read(lead.previewFollowup?.[previewId]).revision !== revision) throw new Error('记录已改变，请刷新后重试');
     next = mutate(lead.previewFollowup?.[previewId], lead, event);
     const nextLeads = state.leads.map(l => l.id === leadId ? { ...l, previewFollowup: { ...(l.previewFollowup || {}), [previewId]: next } } : l);
-    localStorage.setItem(storageKeys.leads, JSON.stringify(nextLeads));
+    crmSessionStorage.setItem(storageKeys.leads, JSON.stringify(nextLeads));
   }
   const lead = state.leads.find(l => l.id === leadId);
   if (lead) lead.previewFollowup = { ...(lead.previewFollowup || {}), [previewId]: next };
@@ -5187,7 +5158,7 @@ async function updatePreviewWorkflowSettings(previewId, revision, patch, expecte
     });
   } else {
     const current = state.previews.find(s => s.id === previewId); next = build(current);
-    localStorage.setItem(storageKeys.previews, JSON.stringify(state.previews.map(s => s.id === previewId ? { ...s, workflowSettings: next } : s)));
+    crmSessionStorage.setItem(storageKeys.previews, JSON.stringify(state.previews.map(s => s.id === previewId ? { ...s, workflowSettings: next } : s)));
   }
   const current = state.previews.find(s => s.id === previewId); if (current) current.workflowSettings = next;
   previewCache(storageKeys.previews, state.previews);
@@ -5240,7 +5211,7 @@ window.loadLandingLeads = async function() {
       leads = snap.docs.map(doc => ({ ...doc.data(), id: doc.id }));
     } else {
       // Fallback: local storage
-      leads = JSON.parse(localStorage.getItem('landing_leads_static') || '[]');
+      leads = JSON.parse(crmSessionStorage.getItem('landing_leads_static') || '[]');
     }
 
     const total = leads.length;
@@ -5324,7 +5295,7 @@ window.exportLandingLeadsCSV = async function() {
       const snap = await _db.collection('landing_leads').orderBy('createdAt', 'desc').get();
       leads = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
     } else {
-      leads = JSON.parse(localStorage.getItem('landing_leads_static') || '[]');
+      leads = JSON.parse(crmSessionStorage.getItem('landing_leads_static') || '[]');
     }
     if (!leads.length) { toast('暂时没有数据可以导出'); return; }
 
@@ -5399,8 +5370,8 @@ window.deleteLandingLead = async function(id, btn) {
     if (_db) {
       await _db.collection('landing_leads').doc(id).delete();
     } else {
-      const leads = JSON.parse(localStorage.getItem('landing_leads_static') || '[]');
-      localStorage.setItem('landing_leads_static', JSON.stringify(leads.filter(l => l.id !== id)));
+      const leads = JSON.parse(crmSessionStorage.getItem('landing_leads_static') || '[]');
+      crmSessionStorage.setItem('landing_leads_static', JSON.stringify(leads.filter(l => l.id !== id)));
     }
     const row = document.querySelector(`tr[data-lead-id="${id}"]`);
     if (row) row.remove();
@@ -5427,9 +5398,9 @@ window.deleteSelectedLandingLeads = async function() {
       ids.forEach(id => batch.delete(_db.collection('landing_leads').doc(id)));
       await batch.commit();
     } else {
-      const leads = JSON.parse(localStorage.getItem('landing_leads_static') || '[]');
+      const leads = JSON.parse(crmSessionStorage.getItem('landing_leads_static') || '[]');
       const idSet = new Set(ids);
-      localStorage.setItem('landing_leads_static', JSON.stringify(leads.filter(l => !idSet.has(l.id))));
+      crmSessionStorage.setItem('landing_leads_static', JSON.stringify(leads.filter(l => !idSet.has(l.id))));
     }
     toast(`✅ 已删除 ${ids.length} 条记录`);
     loadLandingLeads();
@@ -5720,7 +5691,7 @@ async function readPreviewLeadRows(tbody, statsBar, server, version) {
       return;
     } else {
       origin = 'local';
-      leads = JSON.parse(localStorage.getItem('preview_leads_static') || '[]');
+      leads = JSON.parse(crmSessionStorage.getItem('preview_leads_static') || '[]');
     }
 
     // A later cached read must not restore data hidden by an access rejection.
@@ -5862,7 +5833,7 @@ window.exportPreviewLeadsCSV = async function() {
       const snap = await _db.collection('preview_leads').orderBy('createdAt', 'desc').get();
       leads = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
     } else {
-      leads = JSON.parse(localStorage.getItem('preview_leads_static') || '[]');
+      leads = JSON.parse(crmSessionStorage.getItem('preview_leads_static') || '[]');
     }
     leads = leads.filter(isChampLearningLead);
     if (!leads.length) { toast('暂时没有数据可以导出'); return; }
@@ -5933,8 +5904,8 @@ window.deletePreviewLead = async function(id, btn) {
     if (_db) {
       await _db.collection('preview_leads').doc(id).delete();
     } else {
-      const leads = JSON.parse(localStorage.getItem('preview_leads_static') || '[]');
-      localStorage.setItem('preview_leads_static', JSON.stringify(leads.filter(l => l.id !== id)));
+      const leads = JSON.parse(crmSessionStorage.getItem('preview_leads_static') || '[]');
+      crmSessionStorage.setItem('preview_leads_static', JSON.stringify(leads.filter(l => l.id !== id)));
     }
     const row = document.querySelector(`tr[data-lead-id="${id}"]`);
     if (row) row.remove();
@@ -5960,9 +5931,9 @@ window.deleteSelectedPreviewLeads = async function() {
       ids.forEach(id => batch.delete(_db.collection('preview_leads').doc(id)));
       await batch.commit();
     } else {
-      const leads = JSON.parse(localStorage.getItem('preview_leads_static') || '[]');
+      const leads = JSON.parse(crmSessionStorage.getItem('preview_leads_static') || '[]');
       const idSet = new Set(ids);
-      localStorage.setItem('preview_leads_static', JSON.stringify(leads.filter(l => !idSet.has(l.id))));
+      crmSessionStorage.setItem('preview_leads_static', JSON.stringify(leads.filter(l => !idSet.has(l.id))));
     }
     toast(`✅ 已删除 ${ids.length} 条记录`);
     loadPreviewLeads();
@@ -5991,7 +5962,7 @@ window.loadChampPreviewLeads = async function() {
       const snap = await _db.collection('preview_leads').orderBy('createdAt', 'desc').get();
       leads = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
     } else {
-      leads = JSON.parse(localStorage.getItem('preview_leads_static') || '[]');
+      leads = JSON.parse(crmSessionStorage.getItem('preview_leads_static') || '[]');
     }
 
     leads = leads.filter(isChampPreviewLead);
@@ -6086,7 +6057,7 @@ window.exportChampPreviewLeadsCSV = async function() {
       const snap = await _db.collection('preview_leads').orderBy('createdAt', 'desc').get();
       leads = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
     } else {
-      leads = JSON.parse(localStorage.getItem('preview_leads_static') || '[]');
+      leads = JSON.parse(crmSessionStorage.getItem('preview_leads_static') || '[]');
     }
     leads = leads.filter(isChampPreviewLead);
     if (!leads.length) { toast('暂时没有数据可以导出'); return; }
@@ -6157,8 +6128,8 @@ window.deleteChampPreviewLead = async function(id, btn) {
     if (_db) {
       await _db.collection('preview_leads').doc(id).delete();
     } else {
-      const leads = JSON.parse(localStorage.getItem('preview_leads_static') || '[]');
-      localStorage.setItem('preview_leads_static', JSON.stringify(leads.filter(l => l.id !== id)));
+      const leads = JSON.parse(crmSessionStorage.getItem('preview_leads_static') || '[]');
+      crmSessionStorage.setItem('preview_leads_static', JSON.stringify(leads.filter(l => l.id !== id)));
     }
     const row = document.querySelector(`tr[data-lead-id="${id}"]`);
     if (row) row.remove();
@@ -6184,9 +6155,9 @@ window.deleteSelectedChampPreviewLeads = async function() {
       ids.forEach(id => batch.delete(_db.collection('preview_leads').doc(id)));
       await batch.commit();
     } else {
-      const leads = JSON.parse(localStorage.getItem('preview_leads_static') || '[]');
+      const leads = JSON.parse(crmSessionStorage.getItem('preview_leads_static') || '[]');
       const idSet = new Set(ids);
-      localStorage.setItem('preview_leads_static', JSON.stringify(leads.filter(l => !idSet.has(l.id))));
+      crmSessionStorage.setItem('preview_leads_static', JSON.stringify(leads.filter(l => !idSet.has(l.id))));
     }
     toast(`✅ 已删除 ${ids.length} 条记录`);
     loadChampPreviewLeads();

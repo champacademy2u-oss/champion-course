@@ -1,14 +1,15 @@
-const CACHE_NAME = "lead-center-v36-private-visitor-reports";
+const CACHE_NAME = "lead-center-v37-shared-password-auth";
 const ASSETS = [
   "./",
   "./index.html",
-  "./styles.css?v=20261012-contact-export",
+  "./styles.css?v=20261123-shared-password-auth",
   "./whatsapp-bulk-core.js?v=20260828-emoji-direct",
   "./contact-export-core.js?v=20261012-contact-export",
   "./ebook-reply-core.js?v=20261007-five-step",
   "./ebook-reply.js?v=20261007-five-step",
   "./ebook-reply.css?v=20261007-five-step",
-  "./app.js?v=20261123-preview-cloud-refresh-and-fee",
+  "./crm-auth.js?v=20261123-shared-password-auth",
+  "./app.js?v=20261123-shared-password-auth",
   "./preview-visitor-stage.js?v=20261123-private-visitor-reports",
   "./crm-visitor-dashboard.css?v=20261123-private-visitor-reports",
   "./customer-receipts.js?v=20261120-receipts",

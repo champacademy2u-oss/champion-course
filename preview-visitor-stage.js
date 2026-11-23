@@ -243,7 +243,7 @@
       } catch (error) {
         if (request !== generation) return;
         status.className = 'pva-status pva-warning';
-        status.textContent = error?.status === 401 ? '访客分析仅限获授权的负责人。请先在 Mailbox 登录指定的 Google 账号。'
+        status.textContent = error?.status === 401 ? '访客分析授权已失效。请退出后重新输入 CRM 密码，或使用获授权的 Google 管理员账号。'
           : error?.status === 429 ? '已达到统计读取限额，请稍后再试。'
           : '统计服务尚未开启或暂时无法核对数据。请稍后重试。';
         refreshButton.textContent = '重试';

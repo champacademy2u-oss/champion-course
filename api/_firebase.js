@@ -1,5 +1,6 @@
 import crypto from 'node:crypto';
 import admin from 'firebase-admin';
+import { CRM_SHARED_ROLE, DEFAULT_CRM_SHARED_UID } from '../lib/crm-session.js';
 
 const defaultWebConfig = {
   apiKey: 'AIzaSyCJ_pqxqo4bCmSPQ0COG1ZkWw64ukX0SoM',
@@ -10,6 +11,9 @@ const defaultWebConfig = {
   appId: '1:337920852937:web:fab67a792d3b15c574de18',
   measurementId: 'G-3RZV6TX39W'
 };
+
+const CRM_SHARED_SESSION_SECONDS = 12 * 60 * 60;
+const CRM_SHARED_CLOCK_SKEW_SECONDS = 5 * 60;
 
 function serviceAccount() {
   if (process.env.FIREBASE_SERVICE_ACCOUNT_BASE64) {
@@ -56,7 +60,46 @@ function webConfig() {
 }
 
 function adminLoginDisabled() {
-  return String(process.env.ADMIN_LOGIN_DISABLED || '').toLowerCase() === 'true';
+  // Production customer data must never become public through an environment
+  // toggle. Kept for the legacy config response, but it is always disabled.
+  return false;
+}
+
+function sharedCrmUid() {
+  return String(process.env.CRM_SHARED_ADMIN_UID || DEFAULT_CRM_SHARED_UID).trim();
+}
+
+function isSharedCrmAdmin(decoded) {
+  const authTime = Number(decoded?.auth_time);
+  const nowSeconds = Math.floor(Date.now() / 1000);
+  const sessionAge = nowSeconds - authTime;
+  return Boolean(decoded
+    && decoded.admin === true
+    && decoded.role === CRM_SHARED_ROLE
+    && decoded.uid === sharedCrmUid()
+    && decoded.firebase?.sign_in_provider === 'custom'
+    && Number.isFinite(authTime)
+    && authTime > 0
+    && sessionAge >= -CRM_SHARED_CLOCK_SKEW_SECONDS
+    && sessionAge <= CRM_SHARED_SESSION_SECONDS);
+}
+
+function isSharedCrmIdentity(decoded) {
+  return Boolean(decoded?.uid && decoded.uid === sharedCrmUid());
+}
+
+function firebaseAdminAllowed(decoded) {
+  if (isSharedCrmIdentity(decoded)) return isSharedCrmAdmin(decoded);
+  if (decoded?.admin === true) return true;
+  const isVerifiedGoogle = decoded?.email_verified === true
+    && decoded?.firebase?.sign_in_provider === 'google.com';
+  if (!isVerifiedGoogle) return false;
+  const allowedUids = new Set(String(process.env.CRM_ADMIN_UIDS || '')
+    .split(',').map(value => value.trim()).filter(Boolean));
+  const allowedEmails = new Set(String(process.env.CRM_ADMIN_EMAILS || '')
+    .split(',').map(value => value.trim().toLowerCase()).filter(Boolean));
+  return allowedUids.has(String(decoded.uid || ''))
+    || allowedEmails.has(String(decoded.email || '').trim().toLowerCase());
 }
 
 function sendJson(res, status, value) {
@@ -115,7 +158,9 @@ function verifyPassword(password, stored) {
 }
 
 function adminSecret() {
-  return process.env.ADMIN_SESSION_SECRET || process.env.ADMIN_PASSWORD || 'admin123';
+  const secret = process.env.ADMIN_SESSION_SECRET || process.env.ADMIN_PASSWORD;
+  if (!secret) throw new Error('ADMIN_SESSION_SECRET 尚未配置');
+  return secret;
 }
 
 function base64Url(value) {
@@ -135,20 +180,22 @@ function createAdminSession() {
 }
 
 async function requireAdmin(req) {
-  if (adminLoginDisabled()) return { role: 'public-admin' };
   const header = req.headers.authorization || '';
   const token = header.startsWith('Bearer ') ? header.slice(7) : '';
   if (!token) throw new Error('未授权');
-  const [payload, signature] = token.split('.');
-  if (payload && signature) {
+  const parts = token.split('.');
+  if (parts.length === 2) {
+    const [payload, signature] = parts;
     const expected = signAdminPayload(payload);
-    if (!crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expected))) throw new Error('未授权');
+    const actualBuffer = Buffer.from(signature);
+    const expectedBuffer = Buffer.from(expected);
+    if (actualBuffer.length !== expectedBuffer.length || !crypto.timingSafeEqual(actualBuffer, expectedBuffer)) throw new Error('未授权');
     const decoded = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8'));
     if (decoded.role !== 'admin' || Number(decoded.exp) < Math.floor(Date.now() / 1000)) throw new Error('未授权');
     return decoded;
   }
-  const decoded = await firebaseApp().auth().verifyIdToken(token);
-  if (!decoded.admin) throw new Error('未授权');
+  const decoded = await firebaseApp().auth().verifyIdToken(token, true);
+  if (!firebaseAdminAllowed(decoded)) throw new Error('未授权');
   return decoded;
 }
 
@@ -216,9 +263,12 @@ export {
   db,
   fieldValue,
   firebaseApp,
+  firebaseAdminAllowed,
   formatBytes,
   hashPassword,
   id,
+  isSharedCrmAdmin,
+  isSharedCrmIdentity,
   isExpired,
   maxVideoSize,
   now,
