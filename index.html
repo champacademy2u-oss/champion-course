@@ -12,7 +12,15 @@
     <link rel="stylesheet" href="./preview-lead-editor.css?v=20261116-business-edit" />
     <link rel="manifest" href="./manifest.json" />
     <link rel="stylesheet" href="./customer-receipts.css?v=20261120-receipts" />
-  </head>
+    <style>
+    #previewLeadsView .preview-visitor-stage-tabs { display:flex; flex-wrap:wrap; gap:.5rem; margin-bottom:.9rem; }
+    #previewLeadsView .preview-visitor-stage-tabs button { min-height:44px; font-weight:700; }
+    #previewLeadsView .preview-visitor-stage-tabs [aria-pressed="true"] { background:#0c6b61; color:#fff; border-color:#0c6b61; }
+    #previewLeadsView [hidden] { display:none !important; }
+    #previewVisitorStagePanel .preview-visitor-stage-state { line-height:1.6; margin:.65rem 0; }
+    #previewVisitorStagePanel .muted { line-height:1.6; }
+  </style>
+</head>
   <body>
     <aside class="sidebar">
       <div class="brand">
@@ -773,7 +781,16 @@
 
       <!-- ── PREVIEW LEADS ADMIN VIEW ── -->
       <section class="view" id="previewLeadsView">
-        <div class="panel wide">
+        <nav class="preview-visitor-stage-tabs" aria-label="Preview Leads 视图">
+          <button type="button" class="text-button" id="previewLeadListButton" aria-controls="previewLeadListPanel" aria-pressed="true">报名名单</button>
+          <button type="button" class="text-button" id="previewVisitorStageButton" aria-controls="previewVisitorStagePanel" aria-pressed="false">访客分析</button>
+        </nav>
+        <section class="panel wide" id="previewVisitorStagePanel" aria-labelledby="previewVisitorStageTitle" hidden>
+          <h3 id="previewVisitorStageTitle">访客分析</h3>
+          <p class="preview-visitor-stage-state"><strong>统计尚未开启</strong> · 目前没有收集正式访客资料。</p>
+          <p class="muted">启用后，这里会显示同意统计的匿名会话、有效停留和报名转化。原有报名名单照常使用。</p>
+        </section>
+        <div class="panel wide" id="previewLeadListPanel">
           <div class="panel-heading">
             <div>
               <h3>🎯 Preview Leads</h3>
@@ -1187,6 +1204,7 @@
     <script src="./preview-lead-editor-core.js?v=20261116-business-edit"></script>
     <script src="./preview-lead-editor.js?v=20261116-business-edit"></script>
     <script src="./app.js?v=20261122-preview-registration-time"></script>
+    <script src="./preview-visitor-stage.js?v=20261123-visitor-entry" defer></script>
     <script type="module" src="./customer-receipts.js?v=20261120-receipts"></script>
     <script type="module" src="./champ-library.js?v=20261113-upload-check"></script>
   </body>
