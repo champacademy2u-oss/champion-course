@@ -13,4 +13,8 @@
   }
   listButton.addEventListener("click", () => select(false));
   visitorButton.addEventListener("click", () => select(true));
+  // Reset before the app's delegated sidebar click opens the view and loads its list.
+  document.querySelectorAll('.nav-item[data-view="previewLeads"]').forEach(button => {
+    button.addEventListener("click", () => select(false));
+  });
 })();

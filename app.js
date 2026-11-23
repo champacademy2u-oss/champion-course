@@ -5634,75 +5634,159 @@ function isChampPreviewLead(lead) {
   return lead.source === CHAMP_PREVIEW_LEAD_SOURCE;
 }
 
-window.loadPreviewLeads = async function() {
-  const tbody = document.getElementById('previewLeadsBody');
-  const statsBar = document.getElementById('previewLeadsStats');
-  if (!tbody) return;
-
-  tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:40px;color:var(--muted)">⏳ 加载中...</td></tr>`;
-
-  try {
-    let leads = [];
-
-    if (_db) {
-      // Firebase mode: read from Firestore
-      const snap = await _db.collection('preview_leads').orderBy('createdAt', 'desc').get();
-      leads = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-    } else {
-      // Fallback: local storage
-      leads = JSON.parse(localStorage.getItem('preview_leads_static') || '[]');
-    }
-
-    leads = leads.filter(isChampLearningLead);
-
-    window._previewLeadsCache = leads;
-
-    const total = leads.length;
-
-    if (statsBar) {
-      const today = leads.filter(l => isLeadRegistrationToday(l)).length;
-
-      const states = {};
-      leads.forEach(l => { if (l.state) states[l.state] = (states[l.state] || 0) + 1; });
-      const topState = Object.entries(states).sort((a,b) => b[1]-a[1])[0];
-
-      statsBar.innerHTML = `
-        <div style="background:rgba(99,102,241,0.1);border:1px solid rgba(99,102,241,0.2);border-radius:10px;padding:12px 20px;display:flex;flex-direction:column;gap:2px;">
-          <span style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.06em;">总报名人数</span>
-          <strong style="font-size:22px;color:#6366F1;">${total}</strong>
-        </div>
-        <div style="background:rgba(16,185,129,0.1);border:1px solid rgba(16,185,129,0.2);border-radius:10px;padding:12px 20px;display:flex;flex-direction:column;gap:2px;">
-          <span style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.06em;">今日新增</span>
-          <strong style="font-size:22px;color:#10B981;">${today}</strong>
-        </div>
-        ${topState ? `<div style="background:rgba(245,166,35,0.1);border:1px solid rgba(245,166,35,0.2);border-radius:10px;padding:12px 20px;display:flex;flex-direction:column;gap:2px;">
-          <span style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.06em;">最多州属</span>
-          <strong style="font-size:16px;color:#F5A623;">${escapeHtml(topState[0])} (${topState[1]})</strong>
-        </div>` : ''}
-      `;
-    }
-
-    filterPreviewLeadsTable();
-
-  } catch (err) {
-    console.error('loadPreviewLeads error:', err);
-    tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:40px;color:#ef4444;">⚠️ 加载失败，请刷新重试</td></tr>`;
-    if (statsBar) statsBar.innerHTML = '';
-  }
-};
+let previewLeadReadVersion = 0;
+let previewLeadReadOrigin = null;
+let previewLeadManualRefresh = null;
+let previewLeadRefreshQueued = false;
+let previewLeadNeedsAuthorization = false;
 
 window._previewLeadsCache = [];
 
+function setPreviewLeadSyncStatus(message) {
+  const status = document.getElementById('previewLeadSyncStatus');
+  if (status) status.textContent = message;
+}
+
+function previewLeadPlaceholder(tbody, message) {
+  tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:40px;color:var(--muted)">' + message + '</td></tr>';
+  updatePreviewBulkBar();
+}
+
+function previewLeadUnavailable(tbody, statsBar, message, denyAccess = false) {
+  if (denyAccess) {
+    previewLeadNeedsAuthorization = true;
+    previewLeadReadOrigin = null;
+    window._previewLeadsCache = [];
+  }
+  if (!previewLeadReadOrigin) {
+    if (statsBar) statsBar.innerHTML = '';
+    previewLeadPlaceholder(tbody, '无法读取报名名单，请检查连接或管理员登录后再刷新。');
+  }
+  const prior = previewLeadReadOrigin === 'server' ? '目前显示上次经云端确认的名单。'
+    : previewLeadReadOrigin === 'local' ? '目前显示本机名单。'
+    : previewLeadReadOrigin === 'cache' ? '目前显示缓存名单。'
+    : previewLeadReadOrigin ? '目前显示尚未获云端确认的名单。' : '';
+  setPreviewLeadSyncStatus(message + prior);
+}
+
+function renderPreviewLeadStats(statsBar, leads) {
+  const total = leads.length;
+
+  if (statsBar) {
+    const today = leads.filter(l => isLeadRegistrationToday(l)).length;
+
+    const states = {};
+    leads.forEach(l => { if (l.state) states[l.state] = (states[l.state] || 0) + 1; });
+    const topState = Object.entries(states).sort((a,b) => b[1]-a[1])[0];
+
+    statsBar.innerHTML = `
+      <div style="background:rgba(99,102,241,0.1);border:1px solid rgba(99,102,241,0.2);border-radius:10px;padding:12px 20px;display:flex;flex-direction:column;gap:2px;">
+        <span style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.06em;">总报名人数</span>
+        <strong style="font-size:22px;color:#6366F1;">${total}</strong>
+      </div>
+      <div style="background:rgba(16,185,129,0.1);border:1px solid rgba(16,185,129,0.2);border-radius:10px;padding:12px 20px;display:flex;flex-direction:column;gap:2px;">
+        <span style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.06em;">今日新增</span>
+        <strong style="font-size:22px;color:#10B981;">${today}</strong>
+      </div>
+      ${topState ? `<div style="background:rgba(245,166,35,0.1);border:1px solid rgba(245,166,35,0.2);border-radius:10px;padding:12px 20px;display:flex;flex-direction:column;gap:2px;">
+        <span style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.06em;">最多州属</span>
+        <strong style="font-size:16px;color:#F5A623;">${escapeHtml(topState[0])} (${topState[1]})</strong>
+      </div>` : ''}
+    `;
+  }
+
+}
+
+async function readPreviewLeadRows(tbody, statsBar, server, version) {
+  if (server || !previewLeadReadOrigin) {
+    setPreviewLeadSyncStatus(server ? '正在从云端刷新报名名单…' : '正在读取报名名单…');
+  }
+  if (!previewLeadReadOrigin) previewLeadPlaceholder(tbody, '正在读取报名名单…');
+
+  try {
+    let leads, origin;
+    if (_db) {
+      const query = _db.collection('preview_leads').orderBy('createdAt', 'desc');
+      const snap = server ? await query.get({ source: 'server' }) : await query.get();
+      if (version !== previewLeadReadVersion) return;
+      origin = snap.metadata?.fromCache !== false ? 'cache' : snap.metadata?.hasPendingWrites ? 'pending' : 'server';
+      if (server && origin !== 'server') {
+        previewLeadUnavailable(tbody, statsBar, '此次刷新未取得云端确认。');
+        return;
+      }
+      leads = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    } else if (server) {
+      previewLeadUnavailable(tbody, statsBar, '尚未连接云端，刷新未完成。');
+      return;
+    } else {
+      origin = 'local';
+      leads = JSON.parse(localStorage.getItem('preview_leads_static') || '[]');
+    }
+
+    // A later cached read must not restore data hidden by an access rejection.
+    if (origin !== 'server' && previewLeadNeedsAuthorization) {
+      previewLeadUnavailable(tbody, statsBar, '尚未取得读取云端名单的权限，请检查管理员登录。');
+      return;
+    }
+    // Background cache reads may not replace a previously confirmed list.
+    if (origin !== 'server' && previewLeadReadOrigin === 'server') {
+      previewLeadUnavailable(tbody, statsBar, '最新名单尚未获云端确认。');
+      return;
+    }
+    leads = leads.filter(isChampLearningLead);
+    if (origin === 'server') previewLeadNeedsAuthorization = false;
+    previewLeadReadOrigin = origin;
+    window._previewLeadsCache = leads;
+    renderPreviewLeadStats(statsBar, leads);
+    filterPreviewLeadsTable();
+    setPreviewLeadSyncStatus(origin === 'server' ? '已从云端读取报名名单。'
+      : origin === 'local' ? '目前显示本机名单，尚未连接云端。'
+      : origin === 'cache' ? '目前显示缓存名单，尚未确认是否包含最新报名。'
+      : '目前的名单含有尚未获云端确认的变更。');
+  } catch (err) {
+    if (version !== previewLeadReadVersion) return;
+    const denyAccess = /(?:^|\/)(permission-denied|unauthenticated)$/.test(String(err?.code || ''));
+    previewLeadUnavailable(tbody, statsBar, denyAccess ? '没有权限读取云端名单，请检查管理员登录。'
+      : _db ? '无法读取最新云端名单，请刷新重试。' : '无法读取本机名单。', denyAccess);
+  }
+}
+
+window.loadPreviewLeads = async function(options = {}) {
+  const server = options?.server === true;
+  if (previewLeadManualRefresh) {
+    // Keep manual Refresh authoritative. One follow-up can capture a remote
+    // change made while that request was already in flight.
+    if (!server) previewLeadRefreshQueued = true;
+    return previewLeadManualRefresh;
+  }
+  const tbody = document.getElementById('previewLeadsBody');
+  if (!tbody) return;
+  const statsBar = document.getElementById('previewLeadsStats');
+  const read = readPreviewLeadRows(tbody, statsBar, server, ++previewLeadReadVersion);
+  if (!server) return read;
+  previewLeadManualRefresh = read;
+  try {
+    await read;
+  } finally {
+    previewLeadManualRefresh = null;
+    if (previewLeadRefreshQueued) {
+      previewLeadRefreshQueued = false;
+      if (document.getElementById('previewLeadsView')?.classList.contains('active')) void window.loadPreviewLeads();
+    }
+  }
+};
+
 window.filterPreviewLeadsTable = function() {
+  if (!previewLeadReadOrigin) return;
   const query = (document.getElementById('previewSearchInput')?.value || '').trim().toLowerCase();
   const leads = window._previewLeadsCache || [];
-  const filtered = !query ? leads : leads.filter(l => 
-    (l.name || '').toLowerCase().includes(query) ||
-    (l.phone || '').toLowerCase().includes(query) ||
-    (l.email || '').toLowerCase().includes(query) ||
-    (l.state || '').toLowerCase().includes(query)
+  const phoneQuery = /^[+0-9(). -]+$/.test(query) ? whatsappBulkCore.normalizeMalaysiaPhone(query) : null;
+  const includes = value => String(value ?? '').toLowerCase().includes(query);
+  const filtered = !query ? leads : leads.filter(l =>
+    includes(l.name) || includes(l.phone) || includes(l.email) || includes(l.state) ||
+    (phoneQuery?.valid && whatsappBulkCore.normalizeMalaysiaPhone(l.phone).phone === phoneQuery.phone)
   );
-  renderPreviewLeadsRows(filtered, leads.length);
+  renderPreviewLeadsRows(filtered, leads.length, Boolean(query));
 };
 
 function renderPreviewLeadWhatsappAction(rawPhone, message = '') {
@@ -5732,16 +5816,20 @@ function renderPreviewLeadWhatsappAction(rawPhone, message = '') {
   return `<a href="${escapeHtml(href)}"${target} class="mini-button" data-whatsapp-business="true" style="${style}display:inline-flex;align-items:center;min-height:44px;" title="${title}">WA Business</a>`;
 }
 
-function renderPreviewLeadsRows(leads, totalCount) {
+function formatPreviewLeadRegistrationFee(lead) {
+  if (lead?.campaignId !== "champ-summit-2027" || lead.currency !== 'MYR') return '—';
+  if (lead.amountMinor === 0 && lead.paymentStatus === 'free') return 'RM0 · 免费';
+  if (lead.amountMinor === 49700 && lead.paymentStatus === 'pending_payment') return 'RM497 · 待付款';
+  return '—';
+}
+
+function renderPreviewLeadsRows(leads, totalCount, hasSearch = false) {
   const tbody = document.getElementById('previewLeadsBody');
   if (!tbody) return;
   if (!leads.length) {
-    tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:60px;color:var(--muted)">📋 暂时没有符合条件的记录<br/><small style="opacity:0.6">当有用户通过 champ-learning 页面报名后，记录将自动同步到这里。</small></td></tr>`;
+    previewLeadPlaceholder(tbody, hasSearch ? '没有符合此搜索条件的报名。清除搜索可查看名单。' : '目前显示的名单没有报名记录。');
     return;
   }
-  const selAll = document.getElementById('previewSelectAll');
-  if (selAll) selAll.checked = false;
-  updatePreviewBulkBar();
 
   tbody.innerHTML = leads.map((l, i) => {
     const dateStr = formatLeadRegistrationTime(l);
@@ -5755,6 +5843,7 @@ function renderPreviewLeadsRows(leads, totalCount) {
         <td><span class="muted">${escapeHtml(l.email || '-')}</span></td>
         <td><span class="badge" style="background:rgba(99,102,241,0.1);color:#6366F1;border:1px solid rgba(99,102,241,0.2);font-size:12px;">${escapeHtml(l.state || '-')}</span></td>
         <td style="font-size:12px;color:var(--muted);">${dateStr}</td>
+        <td style="font-size:12px;white-space:nowrap;">${formatPreviewLeadRegistrationFee(l)}</td>
         <td style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
           ${wa}
           <button class="mini-button" type="button" data-preview-edit data-id="${escapeHtml(l.id || '')}" data-source="Champ Learning Landing Page">Edit</button>
@@ -5763,6 +5852,7 @@ function renderPreviewLeadsRows(leads, totalCount) {
       </tr>
     `;
   }).join('');
+  updatePreviewBulkBar();
 }
 
 window.exportPreviewLeadsCSV = async function() {

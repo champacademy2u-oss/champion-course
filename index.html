@@ -803,7 +803,7 @@
                 <button class="text-button" onclick="deleteSelectedPreviewLeads()" style="font-weight:700; color:#fff; background:#ef4444; border-color:#ef4444; min-height:32px; font-size:13px;">🗑 删除所选</button>
                 <button class="text-button" onclick="clearPreviewSelection()" style="min-height:32px; font-size:13px;">取消</button>
               </div>
-              <button class="text-button" id="refreshPreviewLeadsBtn" onclick="loadPreviewLeads()" style="font-weight:700;">🔄 刷新</button>
+              <button class="text-button" id="refreshPreviewLeadsBtn" onclick="loadPreviewLeads({server:true})" style="font-weight:700;">🔄 刷新</button>
               <button class="text-button" id="exportPreviewLeadsBtn" onclick="exportPreviewLeadsCSV()" style="font-weight:700;">⬇ Export CSV</button>
               <a id="connectPreviewWhatsappBusiness" href="https://web.whatsapp.com/" target="_blank" rel="noopener noreferrer" class="text-button" style="text-decoration:none; font-weight:700;">连接 WhatsApp Business</a>
               <a href="https://champacademy.asia/preview" target="_blank" class="text-button primary" style="text-decoration:none; font-weight:700; display:inline-flex; align-items:center; gap:6px;">🔗 打开 Preview 页</a>
@@ -811,6 +811,7 @@
           </div>
 
           <!-- Stats bar -->
+          <p id="previewLeadSyncStatus" class="muted" role="status" aria-live="polite" style="margin-top:12px; line-height:1.5;"></p>
           <div id="previewLeadsStats" style="display:flex; gap:20px; padding: 16px 0; border-bottom: 1px solid var(--line); margin-bottom: 16px; flex-wrap:wrap;"></div>
 
           <!-- Filter / Search bar -->
@@ -833,11 +834,12 @@
                   <th>Email</th>
                   <th>州属</th>
                   <th>报名日期与时间（马来西亚）</th>
+                  <th scope="col" style="white-space:nowrap;">报名费用</th>
                   <th style="width:120px">操作</th>
                 </tr>
               </thead>
               <tbody id="previewLeadsBody">
-                <tr><td colspan="8" style="text-align:center; color:var(--muted); padding:40px;">正在加载...</td></tr>
+                <tr><td colspan="9" style="text-align:center; color:var(--muted); padding:40px;">正在加载...</td></tr>
               </tbody>
             </table>
           </div>
@@ -1203,8 +1205,8 @@
     <script src="./landing-lead-import.js?v=20261116-phone-fix"></script>
     <script src="./preview-lead-editor-core.js?v=20261116-business-edit"></script>
     <script src="./preview-lead-editor.js?v=20261116-business-edit"></script>
-    <script src="./app.js?v=20261122-preview-registration-time"></script>
-    <script src="./preview-visitor-stage.js?v=20261123-visitor-entry" defer></script>
+    <script src="./app.js?v=20261123-preview-cloud-refresh-and-fee"></script>
+    <script src="./preview-visitor-stage.js?v=20261123-preview-tab-reset" defer></script>
     <script type="module" src="./customer-receipts.js?v=20261120-receipts"></script>
     <script type="module" src="./champ-library.js?v=20261113-upload-check"></script>
   </body>
