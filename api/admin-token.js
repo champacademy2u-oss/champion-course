@@ -5,6 +5,7 @@ import {
   readJson
 } from './_firebase.js';
 import { createLegacyAdminTokenHandler } from '../lib/admin-token.js';
+import crmSessionHandler from './crm-session.js';
 
 const repository = {
   async recordAttempt({ key, success, now, maxAttempts, windowMs, blockMs }) {
@@ -38,9 +39,19 @@ const repository = {
   }
 };
 
-export default createLegacyAdminTokenHandler({
+const legacyAdminTokenHandler = createLegacyAdminTokenHandler({
   secret: process.env.ADMIN_PASSWORD,
   repository,
   createSession: createAdminSession,
   readInput: readJson
 });
+
+// Vercel Hobby deployments are limited to 12 Serverless Functions. Keep the
+// shared CRM session endpoint isolated by URL and handler, while bundling it
+// into the existing admin-token function so no extra public function is used.
+export default async function adminAuthRouter(req, res) {
+  if (String(req.query?.mode || '') === 'crm-session') {
+    return crmSessionHandler(req, res);
+  }
+  return legacyAdminTokenHandler(req, res);
+}

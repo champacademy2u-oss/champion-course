@@ -168,6 +168,20 @@ test('deployment sources contain no real shared password or client-side password
   assert.doesNotMatch(source, /password\s*:\s*["'][^"']+["']/i);
 });
 
+test('Vercel routes the CRM session through an existing function within the Hobby limit', async () => {
+  const config = JSON.parse(await readFile(new URL('../vercel.json', import.meta.url), 'utf8'));
+  const functions = config.builds.filter(build => build.use === '@vercel/node');
+  assert.ok(functions.length <= 12, `expected at most 12 serverless functions, found ${functions.length}`);
+  assert.ok(!functions.some(build => build.src === 'api/crm-session.js'));
+  assert.deepEqual(config.routes[0], {
+    src: '/api/crm-session',
+    dest: '/api/admin-token.js?mode=crm-session'
+  });
+  const adminTokenSource = await readFile(new URL('../api/admin-token.js', import.meta.url), 'utf8');
+  assert.match(adminTokenSource, /mode \|\| ''\) === 'crm-session'/);
+  assert.match(adminTokenSource, /return crmSessionHandler\(req, res\)/);
+});
+
 test('Firestore rules reject ordinary authenticated users and keep login metadata server-only', async () => {
   const rules = await readFile(new URL('../firestore.rules', import.meta.url), 'utf8');
   assert.match(rules, /function isCrmAdmin\(\)/);

@@ -14,10 +14,6 @@
       "use": "@vercel/node"
     },
     {
-      "src": "api/crm-session.js",
-      "use": "@vercel/node"
-    },
-    {
       "src": "api/email-campaigns.js",
       "use": "@vercel/node"
     },
@@ -70,6 +66,10 @@
     }
   ],
   "routes": [
+    {
+      "src": "/api/crm-session",
+      "dest": "/api/admin-token.js?mode=crm-session"
+    },
     {
       "src": "/api/customer-receipts",
       "dest": "/api/email-campaigns.js"
