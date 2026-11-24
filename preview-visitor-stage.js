@@ -126,7 +126,7 @@
     const report = element('div', 'pva-report');
     const heading = element('header', 'pva-intro');
     heading.append(element('h4', 'pva-title', title),
-      element('p', 'pva-note', '只统计同意后的' + scope + '匿名会话及报名转化，不显示个人联络资料。免费额度有限，数据可能延迟或不完整。'));
+      element('p', 'pva-note', '只统计已自动记录的' + scope + '匿名会话及报名转化，不显示个人联络资料。使用随机会话编号，记录最长保留 30 天；免费额度有限，数据可能延迟或不完整。'));
     view.append(heading, controls, dateRange, status, report);
     container.replaceChildren(view);
 
